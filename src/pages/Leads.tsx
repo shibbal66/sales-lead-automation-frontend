@@ -1,10 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -15,8 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { StatusPill } from "@/components/status-pill";
 import { leads, type Lead, campaigns } from "@/lib/mock-data";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLeadStore } from "@/store/lead/leadStore";
+import { showApiErrorToast } from "@/lib/apiToast";
+import type { LeadApiModel } from "@/types";
+import { LeadDetailSheet } from "@/components/leads/lead-detail-sheet";
 import {
-  Search, Plus, FileSpreadsheet, MoreVertical, Eye, Send, Trash2, Pencil, X, RefreshCw,
+  Search, Plus, FileSpreadsheet, MoreVertical, Eye, Send, Trash2, Pencil, X,
 } from "lucide-react";
 
 function Avatar({ name, size = 36 }: { name: string; size?: number }) {
@@ -32,14 +34,79 @@ function Avatar({ name, size = 36 }: { name: string; size?: number }) {
 }
 
 export default function Leads() {
+  const apiLeads = useLeadStore((state) => state.leads);
+  const selectedLead = useLeadStore((state) => state.selectedLead);
+  const isFetching = useLeadStore((state) => state.isFetching);
+  const isFetchingDetail = useLeadStore((state) => state.isFetchingDetail);
+  const fetchLeads = useLeadStore((state) => state.fetchLeads);
+  const fetchLeadById = useLeadStore((state) => state.fetchLeadById);
+  const clearSelectedLead = useLeadStore((state) => state.clearSelectedLead);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [drawerLead, setDrawerLead] = useState<Lead | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    fetchLeads(1, 20).catch((error) => showApiErrorToast(error));
+  }, [fetchLeads]);
+
+  const mapApiStatusToUi = (outreachStatus: string, replyReceived: string): Lead["status"] => {
+    const status = outreachStatus.toLowerCase();
+    const replied = replyReceived.toLowerCase() === "yes";
+    if (replied || status.includes("reply")) return "replied";
+    if (status.includes("book")) return "booked";
+    if (status.includes("unsub")) return "unsubscribed";
+    if (status.includes("sent") || status.includes("contact")) return "contacted";
+    return "new";
+  };
+
+  const toRelativeDate = (value?: string): string => {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    const diffMs = Date.now() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    if (diffHours < 1) return "just now";
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
+  const mapApiLeadToUiLead = useCallback(
+    (lead: LeadApiModel): Lead => ({
+      id: String(lead.id),
+      name: lead.fullName || `${lead.firstName} ${lead.lastName}`.trim(),
+      company: lead.company,
+      email: lead.email,
+      title: lead.title || "—",
+      website: lead.domain || "—",
+      phone: lead.companyPhone || "—",
+      status: mapApiStatusToUi(lead.outreachStatus || "", lead.replyReceived || ""),
+      campaign: undefined,
+      enriched: lead.fitScore ? Number(lead.fitScore) > 0 : true,
+      lastContacted: toRelativeDate(lead.emailSentDate || lead.created_at)
+    }),
+    []
+  );
+
+  const uiLeads: Lead[] = useMemo(() => apiLeads.map(mapApiLeadToUiLead), [apiLeads, mapApiLeadToUiLead]);
+  const drawerLead = useMemo(
+    () => (selectedLead ? mapApiLeadToUiLead(selectedLead) : null),
+    [selectedLead, mapApiLeadToUiLead]
+  );
+
+  const openLeadDrawer = async (leadId: string) => {
+    try {
+      await fetchLeadById(leadId);
+      setIsDrawerOpen(true);
+    } catch {
+      // Toast already handled in store.
+    }
+  };
 
   const filtered = useMemo(() => {
-    return leads.filter((l) => {
+    return uiLeads.filter((l) => {
       const matchSearch =
         !search ||
         l.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -48,7 +115,7 @@ export default function Leads() {
       const matchCampaign = campaignFilter === "all" || l.campaign === campaignFilter;
       return matchSearch && matchStatus && matchCampaign;
     });
-  }, [search, statusFilter, campaignFilter]);
+  }, [search, statusFilter, campaignFilter, uiLeads]);
 
   const allChecked = filtered.length > 0 && filtered.every((l) => selected.has(l.id));
   const toggleAll = () => {
@@ -62,7 +129,8 @@ export default function Leads() {
   const toggleOne = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
@@ -72,7 +140,7 @@ export default function Leads() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl font-bold">All Leads</h2>
-          <p className="text-sm text-muted-foreground">{leads.length} total · {filtered.length} shown</p>
+          <p className="text-sm text-muted-foreground">{uiLeads.length} total · {filtered.length} shown</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline"><FileSpreadsheet className="h-4 w-4" /> Import from Google Sheets</Button>
@@ -110,6 +178,9 @@ export default function Leads() {
 
       {/* Table */}
       <Card className="overflow-hidden shadow-card">
+        {isFetching ? (
+          <div className="p-4 text-sm text-muted-foreground">Loading leads...</div>
+        ) : null}
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -147,7 +218,7 @@ export default function Leads() {
                 <TableCell className="text-sm text-muted-foreground">{l.lastContacted}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => setDrawerLead(l)}>
+                    <Button variant="ghost" size="sm" onClick={() => openLeadDrawer(l.id)}>
                       <Eye className="h-3.5 w-3.5" /> View
                     </Button>
                     <DropdownMenu>
@@ -192,89 +263,16 @@ export default function Leads() {
         )}
       </AnimatePresence>
 
-      {/* Lead drawer */}
-      <Sheet open={!!drawerLead} onOpenChange={(o) => !o && setDrawerLead(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-[480px] p-0">
-          {drawerLead && (
-            <div className="flex h-full flex-col">
-              <div className="flex items-start gap-4 border-b border-border p-6">
-                <Avatar name={drawerLead.name} size={56} />
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-display text-xl font-bold">{drawerLead.name}</h3>
-                  <p className="text-sm text-muted-foreground">{drawerLead.title} · {drawerLead.company}</p>
-                  <p className="mt-1 text-sm text-brand-text">{drawerLead.email}</p>
-                </div>
-              </div>
-              <Tabs defaultValue="overview" className="flex flex-1 flex-col overflow-hidden">
-                <TabsList className="mx-6 mt-4 grid w-[calc(100%-3rem)] grid-cols-4">
-                  <TabsTrigger value="overview">Overview</TabsTrigger>
-                  <TabsTrigger value="emails">Emails</TabsTrigger>
-                  <TabsTrigger value="enrichment">Enrichment</TabsTrigger>
-                  <TabsTrigger value="activity">Activity</TabsTrigger>
-                </TabsList>
-                <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-                  <TabsContent value="overview" className="m-0 space-y-3">
-                    {[
-                      { l: "Name", v: drawerLead.name },
-                      { l: "Company", v: drawerLead.company },
-                      { l: "Email", v: drawerLead.email },
-                      { l: "Title", v: drawerLead.title },
-                      { l: "Website", v: drawerLead.website },
-                      { l: "Phone", v: drawerLead.phone },
-                    ].map((f) => (
-                      <div key={f.l} className="grid grid-cols-3 items-center gap-3 rounded-lg border border-border p-3">
-                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{f.l}</span>
-                        <Input defaultValue={f.v} className="col-span-2 h-8" />
-                      </div>
-                    ))}
-                  </TabsContent>
-                  <TabsContent value="emails" className="m-0 space-y-3">
-                    {[1,2,3].map((i) => (
-                      <div key={i} className="rounded-lg border border-border p-3">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold">Quick idea for {drawerLead.company}'s team</p>
-                          <span className="text-xs text-muted-foreground">{i}d ago</span>
-                        </div>
-                        <div className="mt-2 flex items-center gap-2">
-                          <StatusPill status="contacted" />
-                          <span className="text-xs text-muted-foreground">Opened · No reply</span>
-                        </div>
-                      </div>
-                    ))}
-                  </TabsContent>
-                  <TabsContent value="enrichment" className="m-0 space-y-3">
-                    <div className="rounded-lg border border-border p-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold">AI-Generated Company Summary</h4>
-                        <Button variant="outline" size="sm"><RefreshCw className="h-3.5 w-3.5" /> Re-enrich</Button>
-                      </div>
-                      <p className="mt-3 text-sm text-muted-foreground">
-                        {drawerLead.company} is a Series-B SaaS company (~120 employees) building modern infrastructure for revenue teams. Recent product launches include an AI assistant and a new analytics suite. Hiring signals indicate growth in GTM and engineering.
-                      </p>
-                      <ul className="mt-3 space-y-1.5 text-sm">
-                        <li>• <span className="text-muted-foreground">Key insight:</span> Recently expanded SDR team after Series B</li>
-                        <li>• <span className="text-muted-foreground">Tech stack:</span> Salesforce, Outreach, Gong</li>
-                        <li>• <span className="text-muted-foreground">Best angle:</span> Time-to-research per lead, AI personalization</li>
-                      </ul>
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="activity" className="m-0">
-                    <ol className="relative space-y-3 border-l border-border pl-5">
-                      {["Enrichment completed","Added to campaign Q2 Outbound — SaaS","Initial email sent","Email opened","Reply received"].map((t, i) => (
-                        <li key={i} className="relative">
-                          <span className="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
-                          <p className="text-sm">{t}</p>
-                          <p className="text-xs text-muted-foreground">{i + 1}d ago</p>
-                        </li>
-                      ))}
-                    </ol>
-                  </TabsContent>
-                </div>
-              </Tabs>
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
+      <LeadDetailSheet
+        open={isDrawerOpen}
+        onOpenChange={(open) => {
+          setIsDrawerOpen(open);
+          if (!open) clearSelectedLead();
+        }}
+        isFetchingDetail={isFetchingDetail}
+        drawerLead={drawerLead}
+        selectedLead={selectedLead}
+      />
     </div>
   );
 }

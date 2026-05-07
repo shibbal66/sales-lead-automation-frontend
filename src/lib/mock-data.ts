@@ -1,6 +1,6 @@
 // Centralized mock data for Rapid AI
 export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "unsubscribed";
-export type CampaignStatus = "running" | "paused" | "completed" | "draft";
+export type CampaignStatus = "running" | "active" | "paused" | "completed" | "draft";
 export type RunMode = "automatic" | "manual";
 
 export interface Lead {
@@ -29,6 +29,12 @@ export interface Campaign {
   replyRate: number;
   tone: "Friendly" | "Professional" | "Direct" | "Consultative";
   cta: string;
+  targetZone?: string;
+  leadSource?: "new" | "existing" | "both";
+  mailTemplate?: string;
+  exampleTraining?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface EmailThread {

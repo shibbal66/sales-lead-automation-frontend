@@ -1,0 +1,408 @@
+import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StatusPill } from "@/components/status-pill";
+import type { LeadApiModel } from "@/types";
+import type { Lead } from "@/lib/mock-data";
+import { ExternalLink, RefreshCw } from "lucide-react";
+
+function Avatar({ name, size = 36 }: { name: string; size?: number }) {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  return (
+    <div
+      className="grid shrink-0 place-items-center rounded-full bg-gradient-brand text-xs font-semibold text-primary-foreground"
+      style={{ width: size, height: size }}
+    >
+      {initials}
+    </div>
+  );
+}
+
+function isLeadValueEmpty(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  return String(value).trim() === "";
+}
+
+const toRelativeDate = (value?: string): string => {
+  if (!value?.trim()) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const diffMs = Date.now() - date.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  if (diffHours < 1) return "just now";
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+};
+
+function DetailRow({
+  label,
+  value,
+  multiline,
+  href,
+  alwaysShow
+}: {
+  label: string;
+  value: string;
+  multiline?: boolean;
+  href?: boolean;
+  /** When true, row is shown even if value is empty (e.g. numeric id). */
+  alwaysShow?: boolean;
+}) {
+  if (!alwaysShow && isLeadValueEmpty(value)) return null;
+  const display = alwaysShow && isLeadValueEmpty(value) ? "—" : String(value).trim();
+  const isLink = Boolean(href && display && display !== "—" && /^https?:\/\//i.test(display));
+
+  return (
+    <div className="rounded-lg border border-border bg-muted/30 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      {multiline ? (
+        <p className="mt-1.5 whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground">{display}</p>
+      ) : isLink ? (
+        <a
+          href={display}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-brand-text hover:underline"
+        >
+          {display}
+          <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+        </a>
+      ) : (
+        <p className="mt-1.5 text-sm text-foreground">{display}</p>
+      )}
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: ReactNode }) {
+  return (
+    <h4 className="font-display text-sm font-bold text-brand-text border-b border-border/80 pb-2">{children}</h4>
+  );
+}
+
+interface LeadDetailSheetProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  isFetchingDetail: boolean;
+  drawerLead: Lead | null;
+  selectedLead: LeadApiModel | null;
+}
+
+export function LeadDetailSheet({
+  open,
+  onOpenChange,
+  isFetchingDetail,
+  drawerLead,
+  selectedLead
+}: LeadDetailSheetProps) {
+  const sl = selectedLead;
+
+  const showPersonCard = Boolean(
+    sl &&
+      [
+        sl.fullName,
+        sl.firstName,
+        sl.lastName,
+        sl.email,
+        sl.emailStatus,
+        sl.title,
+        sl.seniority,
+        sl.department
+      ].some((v) => !isLeadValueEmpty(v))
+  );
+
+  const showCompanyCard = Boolean(
+    sl &&
+      [
+        sl.company,
+        sl.domain,
+        sl.companyCity,
+        sl.compantyState,
+        sl.industry,
+        sl.employees,
+        sl.revenue,
+        sl.companyPhone
+      ].some((v) => !isLeadValueEmpty(v))
+  );
+
+  const showProfileCard =
+    !!sl &&
+    (!isLeadValueEmpty(sl.linkedin) || !isLeadValueEmpty(sl.notes));
+
+  const showEmailOutreachCard = Boolean(
+    sl &&
+      [
+        sl.emailSource,
+        sl.emailSent,
+        sl.emailSentDate,
+        sl.replyReceived,
+        sl.replyDate,
+        sl.outreachStatus,
+        sl.emailSubject,
+        sl.emailBody
+      ].some((v) => !isLeadValueEmpty(v))
+  );
+
+  const showLinkedInCard = Boolean(
+    sl &&
+      [
+        sl.linkedinSent,
+        sl.linkedSentDate,
+        sl.linkedinMessage,
+        sl.linkedin
+      ].some((v) => !isLeadValueEmpty(v))
+  );
+
+  const showFitScoringCard = Boolean(
+    sl &&
+      (!isLeadValueEmpty(sl.fitTag) ||
+        !isLeadValueEmpty(sl.fitScore) ||
+        !isLeadValueEmpty(sl.fitReason))
+  );
+
+  const timelineItems = sl
+    ? [
+        { label: "Lead added", value: sl.dateAdded },
+        { label: "Email sent date", value: sl.emailSentDate },
+        { label: "Reply date", value: sl.replyDate },
+        { label: "LinkedIn sent date", value: sl.linkedSentDate }
+      ].filter((item) => !isLeadValueEmpty(item.value))
+    : [];
+
+  const sheetTitleLabel =
+    isFetchingDetail && !drawerLead ? "Loading lead details" : drawerLead ? `Lead details: ${drawerLead.name}` : "Lead details";
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-lg p-0">
+        <SheetTitle className="sr-only">{sheetTitleLabel}</SheetTitle>
+        {isFetchingDetail && !drawerLead ? (
+          <div className="flex h-full items-center justify-center p-6">
+            <p className="text-sm text-muted-foreground">Loading lead details...</p>
+          </div>
+        ) : null}
+        {drawerLead && selectedLead ? (
+          <div className="flex h-full flex-col bg-background">
+            <div className="flex items-start gap-4 border-b border-border bg-muted/25 p-6">
+              <Avatar name={drawerLead.name} size={56} />
+              <div className="min-w-0 flex-1">
+                <h3 className="font-display text-xl font-bold text-foreground">{drawerLead.name}</h3>
+                {[selectedLead.title, selectedLead.company].some((p) => !isLeadValueEmpty(p)) ? (
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {[selectedLead.title, selectedLead.company].filter((p) => !isLeadValueEmpty(p)).join(" · ")}
+                  </p>
+                ) : null}
+                {!isLeadValueEmpty(selectedLead.email) ? (
+                  <p className="mt-2 truncate text-sm font-medium text-brand-text">{selectedLead.email.trim()}</p>
+                ) : null}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <StatusPill status={drawerLead.status} />
+                  {!isLeadValueEmpty(selectedLead.outreachStatus) ? (
+                    <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand-text">
+                      Outreach: {selectedLead.outreachStatus.trim()}
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+            <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
+              <TabsList className="mx-4 mt-3 grid h-auto w-[calc(100%-2rem)] grid-cols-2 gap-1 rounded-lg bg-muted p-1 sm:mx-6 sm:w-[calc(100%-3rem)] sm:grid-cols-4">
+                <TabsTrigger value="overview" className="text-xs">
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="email" className="text-xs">
+                  Email
+                </TabsTrigger>
+                <TabsTrigger value="linkedin" className="text-xs">
+                  LinkedIn
+                </TabsTrigger>
+                <TabsTrigger value="fit" className="text-xs">
+                  Fit / sources
+                </TabsTrigger>
+              </TabsList>
+              <div className="flex-1 overflow-y-auto p-4 scrollbar-thin sm:p-6">
+                <TabsContent value="overview" className="m-0 mt-4 space-y-4">
+                  <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                    <SectionTitle>Record</SectionTitle>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <DetailRow label="ID" value={String(selectedLead.id)} alwaysShow />
+                      <DetailRow label="Date added" value={selectedLead.dateAdded} />
+                    </div>
+                  </Card>
+
+                  {showPersonCard ? (
+                    <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                      <SectionTitle>Person</SectionTitle>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <DetailRow label="Full name" value={selectedLead.fullName} />
+                        <DetailRow label="First name" value={selectedLead.firstName} />
+                        <DetailRow label="Last name" value={selectedLead.lastName} />
+                        <DetailRow label="Email" value={selectedLead.email} />
+                        <DetailRow label="Email status" value={selectedLead.emailStatus} />
+                        <DetailRow label="Title" value={selectedLead.title} />
+                        <DetailRow label="Seniority" value={selectedLead.seniority} />
+                        <DetailRow label="Department" value={selectedLead.department} />
+                      </div>
+                    </Card>
+                  ) : null}
+
+                  {!isLeadValueEmpty(selectedLead.city) ||
+                  !isLeadValueEmpty(selectedLead.state) ||
+                  !isLeadValueEmpty(selectedLead.country) ? (
+                    <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                      <SectionTitle>Location</SectionTitle>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <DetailRow label="City" value={selectedLead.city} />
+                        <DetailRow label="State" value={selectedLead.state} />
+                        <DetailRow label="Country" value={selectedLead.country} />
+                      </div>
+                    </Card>
+                  ) : null}
+
+                  {showCompanyCard ? (
+                    <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                      <SectionTitle>Company</SectionTitle>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <DetailRow label="Company" value={selectedLead.company} />
+                        <DetailRow label="Domain" value={selectedLead.domain} />
+                        <DetailRow label="Company city" value={selectedLead.companyCity} />
+                        <DetailRow label="Company state (API)" value={selectedLead.compantyState} />
+                        <DetailRow label="Industry" value={selectedLead.industry} />
+                        <DetailRow label="Employees" value={selectedLead.employees} />
+                        <DetailRow label="Revenue" value={selectedLead.revenue} />
+                        <DetailRow label="Company phone" value={selectedLead.companyPhone} />
+                      </div>
+                    </Card>
+                  ) : null}
+
+                  {showProfileCard ? (
+                    <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                      <SectionTitle>Profile & notes</SectionTitle>
+                      <div className="grid gap-2">
+                        <DetailRow label="Notes" value={selectedLead.notes} multiline />
+                      </div>
+                    </Card>
+                  ) : null}
+                </TabsContent>
+
+                <TabsContent value="email" className="m-0 mt-4 space-y-4">
+                  {showEmailOutreachCard ? (
+                    <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                      <SectionTitle>Email outreach</SectionTitle>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <DetailRow label="Email source" value={selectedLead.emailSource} />
+                        <DetailRow label="Email sent" value={selectedLead.emailSent} />
+                        <DetailRow label="Email sent date" value={selectedLead.emailSentDate} />
+                        <DetailRow label="Reply received" value={selectedLead.replyReceived} />
+                        <DetailRow label="Reply date" value={selectedLead.replyDate} />
+                        <DetailRow label="Outreach status" value={selectedLead.outreachStatus} />
+                      </div>
+                      <DetailRow label="Email subject" value={selectedLead.emailSubject} />
+                      {!isLeadValueEmpty(selectedLead.emailBody) ? (
+                        <div className="rounded-lg border border-border bg-muted/20 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Email body
+                          </p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                            {String(selectedLead.emailBody ?? "").trim()}
+                          </p>
+                        </div>
+                      ) : null}
+                      {!isLeadValueEmpty(selectedLead.emailSentDate) &&
+                      toRelativeDate(selectedLead.emailSentDate) !== "—" ? (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>Relative sent:</span>
+                          <span className="font-medium text-brand-text">
+                            {toRelativeDate(selectedLead.emailSentDate)}
+                          </span>
+                        </div>
+                      ) : null}
+                    </Card>
+                  ) : null}
+                </TabsContent>
+
+                <TabsContent value="linkedin" className="m-0 mt-4 space-y-4">
+                  {showLinkedInCard ? (
+                    <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                      <SectionTitle>LinkedIn outreach</SectionTitle>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <DetailRow label="LinkedIn sent" value={selectedLead.linkedinSent} />
+                        <DetailRow label="LinkedIn sent date" value={selectedLead.linkedSentDate} />
+                      </div>
+                      {!isLeadValueEmpty(selectedLead.linkedinMessage) ? (
+                        <div className="rounded-lg border border-border bg-muted/20 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            LinkedIn message
+                          </p>
+                          <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                            {String(selectedLead.linkedinMessage ?? "").trim()}
+                          </p>
+                        </div>
+                      ) : null}
+                      <DetailRow label="Profile URL" value={selectedLead.linkedin} href />
+                    </Card>
+                  ) : null}
+                </TabsContent>
+
+                <TabsContent value="fit" className="m-0 mt-4 space-y-4">
+                  {showFitScoringCard ? (
+                    <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                      <div className="flex items-start justify-between gap-3">
+                        <SectionTitle>Fit scoring</SectionTitle>
+                        <Button variant="outline" size="sm">
+                          <RefreshCw className="mr-2 h-3.5 w-3.5" /> Re-enrich
+                        </Button>
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <DetailRow label="Fit tag" value={selectedLead.fitTag} />
+                        <DetailRow label="Fit score" value={selectedLead.fitScore} />
+                      </div>
+                      {!isLeadValueEmpty(selectedLead.fitReason) ? (
+                        <div className="rounded-lg border border-border bg-muted/20 p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Fit reason
+                          </p>
+                          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                            {String(selectedLead.fitReason ?? "").trim()}
+                          </p>
+                        </div>
+                      ) : null}
+                    </Card>
+                  ) : null}
+
+                  {timelineItems.length ? (
+                    <Card className="space-y-3 border-border bg-card p-4 shadow-card">
+                      <SectionTitle>Activity timeline</SectionTitle>
+                      <ol className="relative space-y-3 border-l border-primary/25 pl-5">
+                        {timelineItems.map((item, i) => (
+                          <li key={`${item.label}-${i}`} className="relative">
+                            <span className="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                            <p className="text-sm font-medium text-foreground">{item.label}</p>
+                            <p className="text-xs text-muted-foreground">{String(item.value).trim()}</p>
+                            {item.value?.trim() && toRelativeDate(item.value) !== "—" ? (
+                              <p className="mt-0.5 text-[10px] text-brand-text/80">
+                                {toRelativeDate(item.value)}
+                              </p>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ol>
+                    </Card>
+                  ) : null}
+                </TabsContent>
+              </div>
+            </Tabs>
+          </div>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}

@@ -1,15 +1,21 @@
 import { useState } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Bot, Hand, Check, ArrowLeft, ArrowRight, X, Plus, Trash2, Users } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import { createCampaignSchema } from "@/validators";
+import { useCampaignStore } from "@/store/campaign/campaignStore";
+import type { CampaignLeadSource, CreateCampaignRequest } from "@/types";
+import type { CreateCampaignFormValues } from "@/validators";
+import type { ZodError } from "zod";
 
 const tones = ["Friendly", "Professional", "Direct", "Consultative"] as const;
 type Tone = (typeof tones)[number];
+type CampaignFormErrors = Partial<Record<keyof CreateCampaignFormValues, string>>;
 
 interface Props {
   open: boolean;
@@ -17,30 +23,102 @@ interface Props {
 }
 
 export function NewCampaignWizard({ open, onOpenChange }: Props) {
+  const createCampaign = useCampaignStore((state) => state.createCampaign);
+  const isCreating = useCampaignStore((state) => state.isCreating);
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
+  const [targetZone, setTargetZone] = useState("");
   const [tone, setTone] = useState<Tone>("Consultative");
   const [cta, setCta] = useState("");
-  const [mode, setMode] = useState<"automatic" | "manual">("automatic");
+  const [mode, setMode] = useState<"auto" | "manual">("auto");
+  const [leadSource, setLeadSource] = useState<CampaignLeadSource>("both");
   const [instructions, setInstructions] = useState("");
   const [leadCount, setLeadCount] = useState<number | "">(100);
   const [examples, setExamples] = useState<{ subject: string; body: string }[]>([]);
   const [exSubject, setExSubject] = useState("");
   const [exBody, setExBody] = useState("");
+  const [errors, setErrors] = useState<CampaignFormErrors>({});
 
   const totalSteps = 5;
+
+  const getExampleTraining = () =>
+    [
+      `Preferred tone: ${tone}`,
+      ...examples.map((ex) => `Subject: ${ex.subject}\nBody: ${ex.body}`)
+    ].join("\n\n");
+
+  const getDraftPayload = (): CreateCampaignFormValues => ({
+    name,
+    goal,
+    target_zone: targetZone,
+    call_to_action: cta,
+    run_mode: mode,
+    lead_source: leadSource,
+    mail_template: instructions,
+    example_training: getExampleTraining(),
+    target_leads: typeof leadCount === "number" ? leadCount : 0,
+    status: "draft" as const
+  });
+
+  const getStepFields = (currentStep: number): Array<keyof CreateCampaignFormValues> => {
+    if (currentStep === 1) return ["name", "goal", "target_zone", "call_to_action", "lead_source"];
+    if (currentStep === 2) return ["run_mode"];
+    if (currentStep === 3) return ["mail_template"];
+    if (currentStep === 4) return ["example_training"];
+    return ["target_leads"];
+  };
+
+  const mapZodErrors = (error: ZodError<CreateCampaignFormValues>): CampaignFormErrors => {
+    const fieldErrors = error.flatten().fieldErrors;
+    return {
+      name: fieldErrors.name?.[0],
+      goal: fieldErrors.goal?.[0],
+      target_zone: fieldErrors.target_zone?.[0],
+      call_to_action: fieldErrors.call_to_action?.[0],
+      run_mode: fieldErrors.run_mode?.[0],
+      lead_source: fieldErrors.lead_source?.[0],
+      mail_template: fieldErrors.mail_template?.[0],
+      example_training: fieldErrors.example_training?.[0],
+      target_leads: fieldErrors.target_leads?.[0],
+      status: fieldErrors.status?.[0]
+    };
+  };
+
+  const validateCurrentStep = (currentStep: number) => {
+    const parsed = createCampaignSchema.safeParse(getDraftPayload());
+    const stepFields = getStepFields(currentStep);
+    const nextErrors: CampaignFormErrors = {};
+    const allErrors = !parsed.success ? mapZodErrors(parsed.error) : {};
+
+    stepFields.forEach((field) => {
+      nextErrors[field] = allErrors[field] || "";
+    });
+
+    setErrors((prev) => ({ ...prev, ...nextErrors }));
+    return stepFields.every((field) => !nextErrors[field]);
+  };
+
+  const handleNext = () => {
+    if (!validateCurrentStep(step)) return;
+    setStep((s) => s + 1);
+  };
 
   const reset = () => {
     setStep(1);
     setName("");
     setGoal("");
+    setTargetZone("");
     setTone("Consultative");
     setCta("");
-    setMode("automatic");
+    setMode("auto");
+    setLeadSource("both");
     setInstructions("");
     setLeadCount(100);
     setExamples([]);
+    setExSubject("");
+    setExBody("");
+    setErrors({});
   };
 
   const close = () => {
@@ -48,9 +126,23 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     setTimeout(reset, 200);
   };
 
-  const create = () => {
-    toast({ title: "Campaign created", description: `"${name || "Untitled"}" is ready to launch.` });
-    close();
+  const create = async () => {
+    const parsed = createCampaignSchema.safeParse(getDraftPayload());
+
+    if (!parsed.success) {
+      setErrors(mapZodErrors(parsed.error));
+      showApiErrorToast(new Error("Please fix campaign form errors."));
+      return;
+    }
+
+    try {
+      const payload = parsed.data as CreateCampaignRequest;
+      const response = await createCampaign(payload);
+      showApiSuccessToast(`Campaign "${response.name}" created successfully.`);
+      close();
+    } catch (error) {
+      showApiErrorToast(error);
+    }
   };
 
   const stepLabels = ["Basics", "Run Mode", "AI Instructions", "Training", "Target Leads"];
@@ -63,12 +155,9 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border p-5">
           <div>
-            <h2 className="font-display text-lg font-bold">Create New Campaign</h2>
+            <DialogTitle className="font-display text-lg font-bold">Create New Campaign</DialogTitle>
             <p className="text-xs text-muted-foreground">Step {step} of {totalSteps} · {stepLabels[step - 1]}</p>
           </div>
-          <button onClick={close} className="rounded-lg p-1 text-muted-foreground hover:bg-muted">
-            <X className="h-4 w-4" />
-          </button>
         </div>
 
         {/* Stepper */}
@@ -104,11 +193,43 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="name">Campaign name</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Q2 Outbound — SaaS" />
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (errors.name) setErrors((prev) => ({ ...prev, name: "" }));
+                  }}
+                  placeholder="e.g. Q2 Outbound — SaaS"
+                />
+                {errors.name ? <p className="text-xs text-destructive">{errors.name}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="goal">Campaign goal / description</Label>
-                <Textarea id="goal" rows={3} value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="What is the objective of this campaign?" />
+                <Textarea
+                  id="goal"
+                  rows={3}
+                  value={goal}
+                  onChange={(e) => {
+                    setGoal(e.target.value);
+                    if (errors.goal) setErrors((prev) => ({ ...prev, goal: "" }));
+                  }}
+                  placeholder="What is the objective of this campaign?"
+                />
+                {errors.goal ? <p className="text-xs text-destructive">{errors.goal}</p> : null}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="targetZone">Target zone</Label>
+                <Input
+                  id="targetZone"
+                  value={targetZone}
+                  onChange={(e) => {
+                    setTargetZone(e.target.value);
+                    if (errors.target_zone) setErrors((prev) => ({ ...prev, target_zone: "" }));
+                  }}
+                  placeholder="e.g. North America - SaaS Companies"
+                />
+                {errors.target_zone ? <p className="text-xs text-destructive">{errors.target_zone}</p> : null}
               </div>
               <div className="space-y-2">
                 <Label>Target tone</Label>
@@ -127,21 +248,61 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="cta">Call to action</Label>
-                <Input id="cta" value={cta} onChange={(e) => setCta(e.target.value)} placeholder="What action do you want leads to take?" />
+                <Input
+                  id="cta"
+                  value={cta}
+                  onChange={(e) => {
+                    setCta(e.target.value);
+                    if (errors.call_to_action) setErrors((prev) => ({ ...prev, call_to_action: "" }));
+                  }}
+                  placeholder="What action do you want leads to take?"
+                />
+                {errors.call_to_action ? <p className="text-xs text-destructive">{errors.call_to_action}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <Label>Lead source</Label>
+                <div className="flex flex-wrap gap-2">
+                  {(["new", "existing", "both"] as const).map((source) => (
+                    <button
+                      key={source}
+                      type="button"
+                      onClick={() => {
+                        setLeadSource(source);
+                        if (errors.lead_source) setErrors((prev) => ({ ...prev, lead_source: "" }));
+                      }}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                        leadSource === source
+                          ? "border-primary bg-primary/15 text-brand-text"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {source}
+                    </button>
+                  ))}
+                </div>
+                {errors.lead_source ? <p className="text-xs text-destructive">{errors.lead_source}</p> : null}
               </div>
             </div>
           )}
 
           {step === 2 && (
+            <>
             <div className="grid gap-4 sm:grid-cols-2">
-              {([
-                { id: "automatic", icon: Bot, title: "Automatic Mode", desc: "Emails and follow-ups send automatically on schedule. AI handles replies when enabled. Best for high-volume campaigns.", color: "primary" },
+                {([
+                { id: "auto", icon: Bot, title: "Automatic Mode", desc: "Emails and follow-ups send automatically on schedule. AI handles replies when enabled. Best for high-volume campaigns.", color: "primary" },
                 { id: "manual", icon: Hand, title: "Manual Mode", desc: "Every email goes to your drafts for review before sending. You stay in control of every message sent.", color: "warning" },
               ] as const).map((c) => {
                 const selected = mode === c.id;
                 const Icon = c.icon;
                 return (
-                  <button key={c.id} type="button" onClick={() => setMode(c.id)}
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => {
+                      setMode(c.id);
+                      if (errors.run_mode) setErrors((prev) => ({ ...prev, run_mode: "" }));
+                    }}
                     className={cn(
                       "relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all",
                       selected
@@ -167,6 +328,8 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 );
               })}
             </div>
+            {errors.run_mode ? <p className="text-xs text-destructive">{errors.run_mode}</p> : null}
+            </>
           )}
 
           {step === 3 && (
@@ -176,10 +339,14 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Textarea
                   id="ai" rows={10}
                   value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
+                  onChange={(e) => {
+                    setInstructions(e.target.value);
+                    if (errors.mail_template) setErrors((prev) => ({ ...prev, mail_template: "" }));
+                  }}
                   placeholder="Example: Write in a warm, conversational tone. Mention the company's recent product launches if available from their website. Always reference the specific pain point of scaling sales teams. Keep emails under 120 words. End with a soft CTA asking for a 15-minute call."
                 />
                 <p className="text-right text-[11px] text-muted-foreground">{instructions.length} / 2000</p>
+                {errors.mail_template ? <p className="text-xs text-destructive">{errors.mail_template}</p> : null}
               </div>
             </div>
           )}
@@ -223,6 +390,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   </div>
                 ))}
                 {examples.length === 0 && <p className="text-center text-xs text-muted-foreground">No examples yet — optional but recommended.</p>}
+                {errors.example_training ? <p className="text-xs text-destructive">{errors.example_training}</p> : null}
               </div>
             </div>
           )}
@@ -252,6 +420,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                       onChange={(e) => {
                         const v = e.target.value;
                         setLeadCount(v === "" ? "" : Math.max(0, parseInt(v, 10) || 0));
+                        if (errors.target_leads) setErrors((prev) => ({ ...prev, target_leads: "" }));
                       }}
                       placeholder="e.g. 250"
                       className="h-12 pl-9 font-display text-lg font-bold"
@@ -284,6 +453,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   Targeting <span className="font-bold">{leadCount.toLocaleString()}</span> leads in this campaign
                 </div>
               )}
+              {errors.target_leads ? <p className="text-xs text-destructive">{errors.target_leads}</p> : null}
             </div>
           )}
         </div>
@@ -296,9 +466,11 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
               <Button variant="outline" onClick={() => setStep((s) => s - 1)}><ArrowLeft className="h-4 w-4" /> Back</Button>
             )}
             {step < totalSteps ? (
-              <Button onClick={() => setStep((s) => s + 1)}>Next <ArrowRight className="h-4 w-4" /></Button>
+              <Button onClick={handleNext}>Next <ArrowRight className="h-4 w-4" /></Button>
             ) : (
-              <Button onClick={create}>Create Campaign</Button>
+              <Button onClick={create} disabled={isCreating}>
+                {isCreating ? "Creating..." : "Create Campaign"}
+              </Button>
             )}
           </div>
         </div>
