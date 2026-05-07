@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { useAuthStore } from "@/store/auth/authStore";
+import { showApiErrorToast } from "@/lib/apiToast";
 
 const sections = [
   { id: "profile", label: "Profile", icon: User },
@@ -26,10 +29,13 @@ const sections = [
 ] as const;
 
 export default function Settings() {
+  const navigate = useNavigate();
+  const logoutAllDevices = useAuthStore((state) => state.logoutAllDevices);
   const [section, setSection] = useState<(typeof sections)[number]["id"]>("profile");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [logoutAllLoading, setLogoutAllLoading] = useState(false);
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px,1fr]">
@@ -299,6 +305,29 @@ export default function Settings() {
           <Card className="border-destructive/40 p-6 shadow-card">
             <h3 className="font-display text-lg font-bold text-destructive">Danger Zone</h3>
             <p className="mt-1 text-sm text-muted-foreground">Irreversible actions. Proceed with caution.</p>
+            <div className="mt-4 flex items-center justify-between rounded-lg border border-warning/30 bg-warning/5 p-4">
+              <div>
+                <p className="font-semibold">Logout from all devices</p>
+                <p className="text-sm text-muted-foreground">Sign out all active sessions across devices.</p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    setLogoutAllLoading(true);
+                    await logoutAllDevices();
+                    navigate("/login", { replace: true });
+                  } catch (error) {
+                    showApiErrorToast(error);
+                  } finally {
+                    setLogoutAllLoading(false);
+                  }
+                }}
+                disabled={logoutAllLoading}
+              >
+                {logoutAllLoading ? "Logging out..." : "Logout All Devices"}
+              </Button>
+            </div>
             <div className="mt-4 flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 p-4">
               <div>
                 <p className="font-semibold">Delete Account</p>

@@ -3,6 +3,8 @@ import { Search, Bell, Sun, Moon, ChevronDown } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/store/auth/authStore";
+import { getUserDisplayEmail, getUserDisplayName, getUserInitials } from "@/lib/userDisplay";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -22,8 +24,13 @@ export function Topbar() {
   const { theme, toggle } = useTheme();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const base = "/" + (pathname.split("/")[1] || "dashboard");
   const title = titles[base] ?? "Dashboard";
+  const userInitials = getUserInitials(user);
+  const userDisplayName = getUserDisplayName(user);
+  const userDisplayEmail = getUserDisplayEmail(user);
 
   return (
     <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border bg-background/80 px-6 backdrop-blur-md">
@@ -65,7 +72,7 @@ export function Topbar() {
           <DropdownMenuTrigger asChild>
             <button className="ml-1 flex items-center gap-2 rounded-lg p-1 pr-2 transition-colors hover:bg-muted">
               <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-brand text-xs font-semibold text-primary-foreground">
-                AR
+                {userInitials}
               </div>
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
             </button>
@@ -73,8 +80,8 @@ export function Topbar() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold">Alex Rivera</span>
-                <span className="text-xs font-normal text-muted-foreground">alex@rapidships.com</span>
+                <span className="text-sm font-semibold">{userDisplayName}</span>
+                <span className="text-xs font-normal text-muted-foreground">{userDisplayEmail}</span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -82,7 +89,15 @@ export function Topbar() {
             <DropdownMenuItem>Billing</DropdownMenuItem>
             <DropdownMenuItem>Team</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">Sign out</DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={async () => {
+                await logout();
+                navigate("/login", { replace: true });
+              }}
+            >
+              Sign out
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

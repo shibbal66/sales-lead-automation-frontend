@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,29 +14,167 @@ import {
   ArrowLeft, Bot, Hand, Plus, GripVertical, Trash2, Pencil, Sparkles, Play, Pause, X,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "@/hooks/use-toast";
+import { useCampaignStore } from "@/store/campaign/campaignStore";
+import { showApiSuccessToast } from "@/lib/apiToast";
+import type { UpdateCampaignRequest } from "@/types";
 
 const tones = ["Friendly", "Professional", "Direct", "Consultative"] as const;
+const leadSourceOptions = ["new", "existing", "both"] as const;
+const statusOptions = ["draft", "active", "paused", "completed"] as const;
 type Tone = (typeof tones)[number];
+type LeadSource = (typeof leadSourceOptions)[number];
+type CampaignStatusOption = (typeof statusOptions)[number];
+type CampaignWithApiDetails = Campaign & {
+  targetZone?: string;
+  leadSource?: "new" | "existing" | "both";
+  mailTemplate?: string;
+  exampleTraining?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
-export function CampaignDetail({ campaign, onBack }: { campaign: Campaign; onBack: () => void }) {
+export function CampaignDetail({ campaign, onBack }: { campaign: CampaignWithApiDetails; onBack: () => void }) {
+  const campaignStatus = String(campaign.status === "running" ? "active" : campaign.status);
+  const updateCampaign = useCampaignStore((state) => state.updateCampaign);
+  const deleteCampaign = useCampaignStore((state) => state.deleteCampaign);
+  const isUpdating = useCampaignStore((state) => state.isUpdating);
+  const isDeleting = useCampaignStore((state) => state.isDeleting);
+  const [name, setName] = useState(campaign.name);
+  const [goal, setGoal] = useState(campaign.goal);
+  const [targetZone, setTargetZone] = useState(campaign.targetZone ?? "");
+  const [cta, setCta] = useState(campaign.cta);
+  const [targetLeads, setTargetLeads] = useState(campaign.leadsAssigned);
+  const [leadSource, setLeadSource] = useState<LeadSource>(campaign.leadSource ?? "both");
+  const [exampleTraining, setExampleTraining] = useState(campaign.exampleTraining ?? "");
   const [mode, setMode] = useState<"automatic" | "manual">(campaign.runMode);
-  const [active, setActive] = useState(campaign.status !== "paused");
+  const [status, setStatus] = useState<CampaignStatusOption>(
+    statusOptions.includes(campaignStatus as CampaignStatusOption)
+      ? (campaignStatus as CampaignStatusOption)
+      : "draft"
+  );
   const [tone, setTone] = useState<Tone>(campaign.tone);
-  const [examples, setExamples] = useState(trainingEmails);
+  const [examples, setExamples] = useState(
+    campaign.exampleTraining
+      ? [{ id: "api-training", subject: "Imported Training Style", body: campaign.exampleTraining }]
+      : trainingEmails
+  );
   const [addingExample, setAddingExample] = useState(false);
   const [exSubject, setExSubject] = useState("");
   const [exBody, setExBody] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [steps, setSteps] = useState(followupSteps);
   const [instructions, setInstructions] = useState(
-    "Write in a warm, conversational tone. Mention the company's recent product launches if available from their website. Always reference the specific pain point of scaling sales teams. Keep emails under 120 words. End with a soft CTA asking for a 15-minute call.",
+    campaign.mailTemplate ||
+      "Write in a warm, conversational tone. Mention the company's recent product launches if available from their website. Always reference the specific pain point of scaling sales teams. Keep emails under 120 words. End with a soft CTA asking for a 15-minute call.",
   );
+  const initialState = useMemo(
+    () => ({
+      name: campaign.name,
+      goal: campaign.goal,
+      targetZone: campaign.targetZone ?? "",
+      cta: campaign.cta,
+      leadSource: campaign.leadSource ?? "both",
+      runMode: campaign.runMode,
+      mailTemplate: campaign.mailTemplate ?? "",
+      exampleTraining: campaign.exampleTraining ?? "",
+      tone: campaign.tone,
+      targetLeads: campaign.leadsAssigned,
+      status: statusOptions.includes(campaignStatus as CampaignStatusOption)
+        ? (campaignStatus as CampaignStatusOption)
+        : "draft"
+    }),
+    [campaign, campaignStatus]
+  );
+
+  useEffect(() => {
+    setName(campaign.name);
+    setGoal(campaign.goal);
+    setTargetZone(campaign.targetZone ?? "");
+    setCta(campaign.cta);
+    setTargetLeads(campaign.leadsAssigned);
+    setLeadSource(campaign.leadSource ?? "both");
+    setExampleTraining(campaign.exampleTraining ?? "");
+    setMode(campaign.runMode);
+    setTone(campaign.tone);
+    setStatus(
+      statusOptions.includes(campaignStatus as CampaignStatusOption)
+        ? (campaignStatus as CampaignStatusOption)
+        : "draft"
+    );
+    setInstructions(campaign.mailTemplate ?? "");
+  }, [campaign, campaignStatus]);
+  const formatDate = (value?: string) => {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
+  };
+
+  const hasChanges =
+    name !== initialState.name ||
+    goal !== initialState.goal ||
+    targetZone !== initialState.targetZone ||
+    cta !== initialState.cta ||
+    leadSource !== initialState.leadSource ||
+    mode !== initialState.runMode ||
+    instructions !== initialState.mailTemplate ||
+    exampleTraining !== initialState.exampleTraining ||
+    tone !== initialState.tone ||
+    targetLeads !== initialState.targetLeads ||
+    status !== initialState.status;
+
+  const handleSaveChanges = async () => {
+    const payload: UpdateCampaignRequest = {};
+    if (name !== initialState.name) payload.name = name;
+    if (goal !== initialState.goal) payload.goal = goal;
+    if (targetZone !== initialState.targetZone) payload.target_zone = targetZone;
+    if (cta !== initialState.cta) payload.call_to_action = cta;
+    if (leadSource !== initialState.leadSource) payload.lead_source = leadSource;
+    if (mode !== initialState.runMode) payload.run_mode = mode === "automatic" ? "auto" : "manual";
+    if (instructions !== initialState.mailTemplate) payload.mail_template = instructions;
+    if (exampleTraining !== initialState.exampleTraining) payload.example_training = exampleTraining;
+    // Persist tone selection via example_training when no explicit text was changed.
+    if (tone !== initialState.tone && !payload.example_training) payload.example_training = tone;
+    if (targetLeads !== initialState.targetLeads) payload.target_leads = targetLeads;
+    if (status !== initialState.status) payload.status = status;
+
+    if (Object.keys(payload).length === 0) {
+      showApiSuccessToast("No changes to save.");
+      return;
+    }
+
+    try {
+      await updateCampaign(campaign.id, payload);
+      showApiSuccessToast("Campaign updated successfully.");
+    } catch {
+      // Error toast is handled in store for update failures.
+    }
+  };
+
+  const handleDeleteCampaign = async () => {
+    try {
+      const message = await deleteCampaign(campaign.id);
+      showApiSuccessToast(message);
+      setDeleteOpen(false);
+      onBack();
+    } catch {
+      // Error toast is handled in store.
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Back to campaigns</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="destructive" onClick={() => setDeleteOpen(true)} disabled={isDeleting}>
+            {isDeleting ? "Deleting..." : "Delete Campaign"}
+          </Button>
+          <Button onClick={handleSaveChanges} disabled={!hasChanges || isUpdating}>
+            {isUpdating ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px,1fr]">
@@ -45,20 +183,34 @@ export function CampaignDetail({ campaign, onBack }: { campaign: Campaign; onBac
           <Card className="p-5 shadow-card">
             <div className="flex items-start justify-between gap-3">
               <input
-                defaultValue={campaign.name}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="w-full bg-transparent font-display text-lg font-bold focus:outline-none focus:ring-0"
               />
               <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
             </div>
 
             <div className="mt-4 space-y-4">
-              {/* Active toggle */}
-              <div className="flex items-center justify-between rounded-lg border border-border p-3">
-                <div className="flex items-center gap-2 text-sm font-semibold">
-                  {active ? <Play className="h-3.5 w-3.5 text-success" /> : <Pause className="h-3.5 w-3.5 text-warning" />}
-                  {active ? "Active" : "Paused"}
+              {/* Campaign status */}
+              <div className="space-y-2 rounded-lg border border-border p-3">
+                <Label>Campaign Status</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {statusOptions.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setStatus(option)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors",
+                        status === option
+                          ? "border-primary bg-primary/15 text-brand-text"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {option}
+                    </button>
+                  ))}
                 </div>
-                <Switch checked={active} onCheckedChange={setActive} />
               </div>
 
               {/* Run mode segmented */}
@@ -96,7 +248,7 @@ export function CampaignDetail({ campaign, onBack }: { campaign: Campaign; onBac
 
               <div className="space-y-1.5">
                 <Label htmlFor="goal">Campaign Goal</Label>
-                <Textarea id="goal" rows={3} defaultValue={campaign.goal} />
+                <Textarea id="goal" rows={3} value={goal} onChange={(e) => setGoal(e.target.value)} />
               </div>
 
               <div className="space-y-2">
@@ -114,14 +266,62 @@ export function CampaignDetail({ campaign, onBack }: { campaign: Campaign; onBac
 
               <div className="space-y-1.5">
                 <Label htmlFor="cta">Call to Action</Label>
-                <Input id="cta" defaultValue={campaign.cta} />
+                <Input id="cta" value={cta} onChange={(e) => setCta(e.target.value)} />
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <p className="text-xs font-semibold text-muted-foreground">API Campaign Details</p>
+                <div className="mt-2 space-y-2 text-xs">
+                  <div className="space-y-1">
+                    <Label htmlFor="target-zone">Target zone</Label>
+                    <Input id="target-zone" value={targetZone} onChange={(e) => setTargetZone(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="target-leads">Target leads</Label>
+                    <Input
+                      id="target-leads"
+                      type="number"
+                      min={0}
+                      value={targetLeads}
+                      onChange={(e) => setTargetLeads(Number(e.target.value) || 0)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Lead Source</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {leadSourceOptions.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setLeadSource(option)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors",
+                        leadSource === option
+                          ? "border-primary bg-primary/15 text-brand-text"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      )}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="rounded-lg border border-border bg-muted/40 p-3">
                 <p className="text-xs text-muted-foreground">Assigned leads</p>
                 <div className="mt-1 flex items-center justify-between">
-                  <p className="font-display text-2xl font-bold">{campaign.leadsAssigned}</p>
-                  <Button variant="outline" size="sm">Manage Leads</Button>
+                  <p className="font-display text-2xl font-bold">{targetLeads}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <p className="text-xs font-semibold text-muted-foreground">Timeline</p>
+                <div className="mt-2 space-y-1.5 text-xs">
+                  <p><span className="text-muted-foreground">Created:</span> {formatDate(campaign.createdAt)}</p>
+                  <p><span className="text-muted-foreground">Updated:</span> {formatDate(campaign.updatedAt)}</p>
                 </div>
               </div>
             </div>
@@ -146,6 +346,17 @@ export function CampaignDetail({ campaign, onBack }: { campaign: Campaign; onBac
               placeholder="Example: Write in a warm, conversational tone..."
             />
             <p className="mt-1 text-right text-[11px] text-muted-foreground">{instructions.length} chars</p>
+
+            <div className="mt-3 space-y-1.5">
+              <Label htmlFor="example-training">Example Training</Label>
+              <Textarea
+                id="example-training"
+                rows={2}
+                value={exampleTraining}
+                onChange={(e) => setExampleTraining(e.target.value)}
+                placeholder="Professional, concise, value-focused"
+              />
+            </div>
 
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {[
@@ -173,12 +384,44 @@ export function CampaignDetail({ campaign, onBack }: { campaign: Campaign; onBac
               <Button variant="outline" onClick={() => setAddingExample(true)}><Plus className="h-4 w-4" /> Add</Button>
             </div>
 
+            <div className="mt-4 space-y-1.5">
+              <Label htmlFor="primary-email-template">Primary Email Template</Label>
+              <Textarea
+                id="primary-email-template"
+                rows={4}
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                placeholder="Hi {{firstName}}, I wanted to reach out about..."
+              />
+            </div>
+
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {examples.map((ex) => (
                 <div key={ex.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface/40 p-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold leading-tight">{ex.subject}</p>
-                    <p className="mt-1 truncate text-xs text-muted-foreground">{ex.body.slice(0, 60)}…</p>
+                    <Input
+                      value={ex.subject}
+                      onChange={(e) =>
+                        setExamples((prev) =>
+                          prev.map((item) =>
+                            item.id === ex.id ? { ...item, subject: e.target.value } : item
+                          )
+                        )
+                      }
+                      className="h-8 text-sm"
+                    />
+                    <Textarea
+                      rows={3}
+                      value={ex.body}
+                      onChange={(e) =>
+                        setExamples((prev) =>
+                          prev.map((item) =>
+                            item.id === ex.id ? { ...item, body: e.target.value } : item
+                          )
+                        )
+                      }
+                      className="mt-2 text-xs"
+                    />
                   </div>
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExamples((p) => p.filter((e) => e.id !== ex.id))}>
                     <Trash2 className="h-3.5 w-3.5" />
@@ -281,7 +524,7 @@ export function CampaignDetail({ campaign, onBack }: { campaign: Campaign; onBac
               if (!exSubject.trim()) return;
               setExamples((p) => [...p, { id: `te${Date.now()}`, subject: exSubject, body: exBody }]);
               setExSubject(""); setExBody(""); setAddingExample(false);
-              toast({ title: "Example saved", description: "AI will use this in future generations." });
+              showApiSuccessToast("Example saved. AI will use it in future generations.");
             }}>Save Example</Button>
           </div>
         </DialogContent>
@@ -307,6 +550,22 @@ export function CampaignDetail({ campaign, onBack }: { campaign: Campaign; onBac
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setPreviewOpen(false)}><X className="h-4 w-4" /> Close</Button>
             <Button><Sparkles className="h-4 w-4" /> Regenerate</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation modal */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Delete campaign?</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This action cannot be undone. This will permanently delete <span className="font-semibold">{name}</span>.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isDeleting}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteCampaign} disabled={isDeleting}>
+              {isDeleting ? "Deleting..." : "Yes, delete"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

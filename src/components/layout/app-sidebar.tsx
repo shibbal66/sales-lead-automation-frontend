@@ -2,6 +2,8 @@ import { useState } from "react";
 import { NavLink } from "@/components/NavLink";
 import { Logo } from "@/components/logo";
 import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth/authStore";
+import { getUserDisplayEmail, getUserDisplayName, getUserInitials } from "@/lib/userDisplay";
 import {
   LayoutGrid, Users, Megaphone, Calendar, BarChart3, Settings, Bell,
   ChevronLeft, ChevronRight, Sparkles,
@@ -19,6 +21,10 @@ const items = [
 
 export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
+  const user = useAuthStore((state) => state.user);
+  const userInitials = getUserInitials(user);
+  const userDisplayName = getUserDisplayName(user);
+  const userDisplayEmail = getUserDisplayEmail(user);
 
   return (
     <aside
@@ -72,11 +78,12 @@ export function AppSidebar() {
           )}
         >
           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-brand text-sm font-semibold text-primary-foreground">
-            AR
+            {userInitials}
           </div>
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold leading-tight">Alex Rivera</p>
+              <p className="truncate text-sm font-semibold leading-tight">{userDisplayName}</p>
+              <p className="truncate text-xs text-muted-foreground">{userDisplayEmail}</p>
               <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-brand-text">
                 <Sparkles className="h-2.5 w-2.5" /> Pro Plan
               </span>
