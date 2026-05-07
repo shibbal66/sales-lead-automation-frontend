@@ -1,0 +1,206 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Rapid AI Design System
+   All colors HSL. Teal-forward premium B2B SaaS palette.
+*/
+
+@layer base {
+  :root {
+    /* Surfaces */
+    --background: 165 22% 97%;          /* #F7FAF9 */
+    --foreground: 180 40% 9%;           /* #0D1F1E */
+    --surface: 0 0% 100%;
+    --surface-foreground: 180 40% 9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 180 40% 9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 180 40% 9%;
+
+    /* Brand: teal */
+    --primary: 167 68% 55%;              /* #3DDBB8 */
+    --primary-foreground: 180 40% 9%;
+    --primary-hover: 168 62% 49%;        /* #2FC9A6 */
+    --primary-glow: 167 70% 70%;
+    --brand-deep: 170 58% 39%;           /* #2A9E8A */
+    --brand-text: 168 62% 52%;           /* #3DCBB5 */
+
+    --secondary: 168 30% 92%;
+    --secondary-foreground: 180 40% 9%;
+
+    --muted: 168 25% 94%;
+    --muted-foreground: 170 22% 36%;     /* #4A6B63 */
+
+    --accent: 167 68% 55%;
+    --accent-foreground: 180 40% 9%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --warning: 35 92% 55%;
+    --warning-foreground: 30 50% 12%;
+
+    --success: 152 60% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --info: 215 80% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 168 30% 86%;               /* #D4E5E0 */
+    --input: 168 30% 86%;
+    --ring: 167 68% 55%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar */
+    --sidebar-background: 165 22% 95%;   /* #F0F5F3 */
+    --sidebar-foreground: 180 40% 9%;
+    --sidebar-primary: 167 68% 55%;
+    --sidebar-primary-foreground: 180 40% 9%;
+    --sidebar-accent: 167 50% 90%;
+    --sidebar-accent-foreground: 180 40% 9%;
+    --sidebar-border: 168 30% 86%;
+    --sidebar-ring: 167 68% 55%;
+
+    /* Gradients & effects */
+    --gradient-brand: linear-gradient(180deg, hsl(167 68% 55%), hsl(170 58% 39%));
+    --gradient-mesh: radial-gradient(at 20% 20%, hsl(167 68% 55% / 0.35), transparent 50%),
+                     radial-gradient(at 80% 30%, hsl(170 58% 39% / 0.45), transparent 55%),
+                     radial-gradient(at 50% 80%, hsl(168 62% 52% / 0.30), transparent 60%);
+    --shadow-card: 0 1px 3px hsl(180 40% 9% / 0.06), 0 1px 2px hsl(180 40% 9% / 0.04);
+    --shadow-elevated: 0 8px 24px hsl(180 40% 9% / 0.08);
+    --shadow-glow: 0 0 0 3px hsl(167 68% 55% / 0.2);
+
+    --dot-color: 168 30% 80%;
+  }
+
+  .dark {
+    --background: 180 40% 9%;            /* #0D1F1E */
+    --foreground: 168 40% 93%;           /* #E8F5F2 */
+    --surface: 175 36% 12%;              /* #122926 */
+    --surface-foreground: 168 40% 93%;
+
+    --card: 175 36% 12%;
+    --card-foreground: 168 40% 93%;
+
+    --popover: 175 36% 12%;
+    --popover-foreground: 168 40% 93%;
+
+    --primary: 167 68% 55%;
+    --primary-foreground: 180 40% 9%;
+    --primary-hover: 168 62% 49%;
+    --primary-glow: 167 70% 65%;
+    --brand-deep: 170 58% 39%;
+    --brand-text: 168 62% 60%;
+
+    --secondary: 175 30% 16%;
+    --secondary-foreground: 168 40% 93%;
+
+    --muted: 175 30% 16%;
+    --muted-foreground: 168 25% 60%;     /* #7AB5A8 */
+
+    --accent: 167 68% 55%;
+    --accent-foreground: 180 40% 9%;
+
+    --destructive: 0 65% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --warning: 35 92% 60%;
+    --warning-foreground: 30 50% 10%;
+
+    --success: 152 55% 50%;
+    --success-foreground: 0 0% 100%;
+
+    --info: 215 75% 60%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 175 36% 18%;               /* #1E3D38 */
+    --input: 175 36% 18%;
+    --ring: 167 68% 55%;
+
+    --sidebar-background: 178 50% 8%;    /* #0A1E1C */
+    --sidebar-foreground: 168 40% 93%;
+    --sidebar-primary: 167 68% 55%;
+    --sidebar-primary-foreground: 180 40% 9%;
+    --sidebar-accent: 175 36% 16%;
+    --sidebar-accent-foreground: 168 40% 93%;
+    --sidebar-border: 175 36% 18%;
+    --sidebar-ring: 167 68% 55%;
+
+    --gradient-brand: linear-gradient(180deg, hsl(167 68% 55%), hsl(170 58% 30%));
+    --gradient-mesh: radial-gradient(at 20% 20%, hsl(167 68% 45% / 0.35), transparent 55%),
+                     radial-gradient(at 80% 30%, hsl(170 58% 30% / 0.55), transparent 60%),
+                     radial-gradient(at 50% 80%, hsl(168 62% 40% / 0.30), transparent 60%);
+    --shadow-card: 0 1px 2px hsl(0 0% 0% / 0.3);
+    --shadow-elevated: 0 8px 24px hsl(0 0% 0% / 0.4);
+    --shadow-glow: 0 0 0 3px hsl(167 68% 55% / 0.25);
+
+    --dot-color: 175 36% 22%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: "DM Sans", system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  h1, h2, h3, h4, h5, h6,
+  .font-display {
+    font-family: "Sora", system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  .font-mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+  }
+}
+
+@layer utilities {
+  .bg-dot-pattern {
+    background-image: radial-gradient(hsl(var(--dot-color) / 0.5) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  .bg-gradient-brand {
+    background: var(--gradient-brand);
+  }
+
+  .bg-gradient-mesh {
+    background: var(--gradient-mesh);
+  }
+
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .focus-glow:focus-visible {
+    box-shadow: var(--shadow-glow);
+    outline: none;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+}
