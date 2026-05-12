@@ -1,5 +1,5 @@
 // Centralized mock data for Rapid AI
-export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "unsubscribed";
+export type LeadStatus = "new" | "contacted" | "replied" | "booked" | "unsubscribed" | "sent" | "failed";
 export type CampaignStatus = "running" | "active" | "paused" | "completed" | "draft";
 export type RunMode = "automatic" | "manual";
 

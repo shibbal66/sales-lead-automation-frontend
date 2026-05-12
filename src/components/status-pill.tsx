@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
-import type { CampaignStatus, LeadStatus, RunMode } from "@/lib/mock-data";
+import type { CampaignStatus, RunMode } from "@/lib/mock-data";
+import type { LeadPresentationStatus } from "@/types";
 
 export function StatusPill({
   status,
   className,
 }: {
-  status: LeadStatus | CampaignStatus | "Interested" | "Not Interested" | "Out of Office" | "Question" | "Meeting Request" | "Upcoming" | "Completed" | "Cancelled" | "Enriched" | "Pending";
+  status: LeadPresentationStatus | CampaignStatus | "Interested" | "Not Interested" | "Out of Office" | "Question" | "Meeting Request" | "Upcoming" | "Completed" | "failed" | "Enriched" | "Pending" | "sent" | string;
   className?: string;
 }) {
   const map: Record<string, string> = {
@@ -25,9 +26,10 @@ export function StatusPill({
     "Meeting Request": "bg-primary/15 text-brand-text border-primary/20",
     Upcoming: "bg-primary/15 text-brand-text border-primary/20",
     Completed: "bg-success/15 text-success border-success/30",
-    Cancelled: "bg-destructive/10 text-destructive border-destructive/20",
-    Enriched: "bg-primary/15 text-brand-text border-primary/20",
-    Pending: "bg-muted text-muted-foreground border-border",
+    failed: "bg-destructive/10 text-destructive border-destructive/20",
+    enriched: "bg-primary/15 text-brand-text border-primary/20",
+    pending: "bg-muted text-muted-foreground border-border",
+    sent: "bg-primary/15 text-brand-text border-primary/20",
   };
   const label =
     typeof status === "string" && status.length > 0

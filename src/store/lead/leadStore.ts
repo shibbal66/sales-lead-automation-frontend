@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { getLeadById as getLeadByIdApi, getLeads as getLeadsApi } from "@/services/lead/leadServices";
 import { showApiErrorToast } from "@/lib/apiToast";
-import type { LeadApiModel } from "@/types";
+import type { GetLeadsQuery, LeadApiModel } from "@/types";
 
 interface LeadStoreState {
   leads: LeadApiModel[];
@@ -11,12 +11,13 @@ interface LeadStoreState {
   total: number;
   isFetching: boolean;
   isFetchingDetail: boolean;
-  fetchLeads: (page?: number, limit?: number) => Promise<void>;
+  fetchLeads: (query?: GetLeadsQuery) => Promise<void>;
+  setPage: (page: number) => void;
   fetchLeadById: (leadId: number | string) => Promise<LeadApiModel>;
   clearSelectedLead: () => void;
 }
 
-export const useLeadStore = create<LeadStoreState>((set) => ({
+export const useLeadStore = create<LeadStoreState>((set, get) => ({
   leads: [],
   selectedLead: null,
   page: 1,
@@ -25,10 +26,14 @@ export const useLeadStore = create<LeadStoreState>((set) => ({
   isFetching: false,
   isFetchingDetail: false,
 
-  fetchLeads: async (page = 1, limit = 20) => {
+  setPage: (page) => set({ page }),
+
+  fetchLeads: async (query = {}) => {
+    const { page: currentPage, limit: currentLimit } = get();
+    const { page = currentPage, limit = currentLimit, search, country, industry } = query;
     set({ isFetching: true });
     try {
-      const response = await getLeadsApi(page, limit);
+      const response = await getLeadsApi({ page, limit, search, country, industry });
       if (!response.success || !response.data?.leads) {
         showApiErrorToast(response);
         return;

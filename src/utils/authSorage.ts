@@ -7,6 +7,20 @@ const PENDING_VERIFY_KEY = "pending_verify";
 
 const isBrowser = () => typeof window !== "undefined";
 
+type AccessTokenSyncHandler = (accessToken: string) => void;
+type AuthClearSyncHandler = () => void;
+
+let accessTokenSyncHandler: AccessTokenSyncHandler | null = null;
+let authClearSyncHandler: AuthClearSyncHandler | null = null;
+
+export function registerAccessTokenSync(handler: AccessTokenSyncHandler): void {
+  accessTokenSyncHandler = handler;
+}
+
+export function registerAuthClearSync(handler: AuthClearSyncHandler): void {
+  authClearSyncHandler = handler;
+}
+
 export function getAuthToken(): string | null {
   if (!isBrowser()) return null;
   return localStorage.getItem(AUTH_TOKEN_KEY);
@@ -14,7 +28,7 @@ export function getAuthToken(): string | null {
 
 export function getRefreshToken(): string | null {
   if (!isBrowser()) return null;
-  // Keep refresh token in session storage to reduce persistence risk.
+  // Session-scoped storage limits refresh-token persistence; access tokens in localStorage remain XSS-sensitive.
   return sessionStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
@@ -32,6 +46,7 @@ export function getStoredUser(): AuthUser | null {
 export function setAuthToken(token: string): void {
   if (!isBrowser()) return;
   localStorage.setItem(AUTH_TOKEN_KEY, token);
+  accessTokenSyncHandler?.(token);
 }
 
 export function setRefreshToken(token: string): void {
@@ -71,4 +86,5 @@ export function clearAuthStorage(): void {
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   clearPendingVerification();
+  authClearSyncHandler?.();
 }

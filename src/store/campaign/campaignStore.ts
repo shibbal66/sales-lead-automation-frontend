@@ -1,12 +1,22 @@
 import { create } from "zustand";
 import {
+  addCampaignLead as addCampaignLeadApi,
   createCampaign as createCampaignApi,
   deleteCampaign as deleteCampaignApi,
   getCampaignById as getCampaignByIdApi,
+  getCampaignLeads as getCampaignLeadsApi,
   getCampaigns as getCampaignsApi,
   updateCampaign as updateCampaignApi
 } from "@/services/campaign/campaignServices";
-import type { CampaignApiModel, CampaignStatus, CreateCampaignRequest, UpdateCampaignRequest } from "@/types";
+import type {
+  AddCampaignLeadRequest,
+  CampaignApiModel,
+  CampaignLeadApiModel,
+  CampaignStatus,
+  CreateCampaignRequest,
+  GetCampaignLeadsQuery,
+  UpdateCampaignRequest
+} from "@/types";
 import { showApiErrorToast } from "@/lib/apiToast";
 
 interface CampaignStoreState {
@@ -21,15 +31,25 @@ interface CampaignStoreState {
   isDeleting: boolean;
   isFetching: boolean;
   isFetchingDetail: boolean;
+  campaignLeads: CampaignLeadApiModel[];
+  campaignLeadsTotal: number;
+  campaignLeadsPage: number;
+  campaignLeadsLimit: number;
+  isFetchingCampaignLeads: boolean;
+  isAddingCampaignLead: boolean;
   createCampaign: (payload: CreateCampaignRequest) => Promise<CampaignApiModel>;
   updateCampaign: (campaignId: string, payload: UpdateCampaignRequest) => Promise<CampaignApiModel>;
   deleteCampaign: (campaignId: string) => Promise<string>;
   fetchCampaigns: (page?: number, limit?: number, status?: CampaignStatus) => Promise<void>;
   fetchCampaignById: (campaignId: string) => Promise<CampaignApiModel>;
+  fetchCampaignLeads: (campaignId: string, query?: GetCampaignLeadsQuery) => Promise<void>;
+  setCampaignLeadsPage: (page: number) => void;
+  addCampaignLead: (campaignId: string, payload: AddCampaignLeadRequest) => Promise<CampaignLeadApiModel>;
   clearSelectedCampaign: () => void;
+  clearCampaignLeads: () => void;
 }
 
-export const useCampaignStore = create<CampaignStoreState>((set) => ({
+export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
   campaigns: [],
   selectedCampaign: null,
   total: 0,
@@ -41,6 +61,12 @@ export const useCampaignStore = create<CampaignStoreState>((set) => ({
   isDeleting: false,
   isFetching: false,
   isFetchingDetail: false,
+  campaignLeads: [],
+  campaignLeadsTotal: 0,
+  campaignLeadsPage: 1,
+  campaignLeadsLimit: 20,
+  isFetchingCampaignLeads: false,
+  isAddingCampaignLead: false,
 
   createCampaign: async (payload) => {
     set({ isCreating: true });
@@ -133,5 +159,51 @@ export const useCampaignStore = create<CampaignStoreState>((set) => ({
     }
   },
 
-  clearSelectedCampaign: () => set({ selectedCampaign: null })
+  fetchCampaignLeads: async (campaignId, query = {}) => {
+    const { campaignLeadsPage, campaignLeadsLimit } = get();
+    const page = query.page ?? campaignLeadsPage;
+    const limit = query.limit ?? campaignLeadsLimit;
+    set({ isFetchingCampaignLeads: true });
+    try {
+      const response = await getCampaignLeadsApi(campaignId, { page, limit });
+      if (!response.success || !response.data?.leads) {
+        showApiErrorToast(response);
+        return;
+      }
+      set({
+        campaignLeads: response.data.leads,
+        campaignLeadsTotal: response.data.total ?? response.data.leads.length,
+        campaignLeadsPage: response.data.page ?? page,
+        campaignLeadsLimit: response.data.limit ?? limit
+      });
+    } finally {
+      set({ isFetchingCampaignLeads: false });
+    }
+  },
+
+  addCampaignLead: async (campaignId, payload) => {
+    set({ isAddingCampaignLead: true });
+    try {
+      const response = await addCampaignLeadApi(campaignId, payload);
+      if (!response.success || !response.data?.lead) {
+        showApiErrorToast(response);
+        return Promise.reject(response);
+      }
+      return response.data.lead;
+    } finally {
+      set({ isAddingCampaignLead: false });
+    }
+  },
+
+  setCampaignLeadsPage: (page) => set({ campaignLeadsPage: page }),
+
+  clearSelectedCampaign: () => set({ selectedCampaign: null }),
+
+  clearCampaignLeads: () =>
+    set({
+      campaignLeads: [],
+      campaignLeadsTotal: 0,
+      campaignLeadsPage: 1,
+      campaignLeadsLimit: 20
+    })
 }));

@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "@/components/NavLink";
 import { Logo } from "@/components/logo";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth/authStore";
 import { getUserDisplayEmail, getUserDisplayName, getUserInitials } from "@/lib/userDisplay";
@@ -19,30 +21,38 @@ const items = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
-export function AppSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+const sidebarSurfaceClass =
+  "flex flex-col border-sidebar-border bg-sidebar text-sidebar-foreground";
+
+const sidebarSurfaceStyle = {
+  background:
+    "linear-gradient(180deg, hsl(var(--sidebar-background)) 0%, hsl(var(--sidebar-background) / 0.92) 100%)",
+} as const;
+
+interface SidebarPanelProps {
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  showCollapseControl: boolean;
+  onNavigate?: () => void;
+}
+
+function SidebarPanel({
+  collapsed,
+  onToggleCollapsed,
+  showCollapseControl,
+  onNavigate,
+}: SidebarPanelProps) {
   const user = useAuthStore((state) => state.user);
   const userInitials = getUserInitials(user);
   const userDisplayName = getUserDisplayName(user);
   const userDisplayEmail = getUserDisplayEmail(user);
 
   return (
-    <aside
-      className={cn(
-        "relative z-30 flex flex-col border-r border-sidebar-border bg-sidebar transition-[width] duration-250 ease-out",
-        collapsed ? "w-[64px]" : "w-[240px]",
-      )}
-      style={{
-        background:
-          "linear-gradient(180deg, hsl(var(--sidebar-background)) 0%, hsl(var(--sidebar-background) / 0.92) 100%)",
-      }}
-    >
-      {/* Brand */}
-      <div className={cn("flex h-16 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "px-4")}>
+    <>
+      <div className={cn("flex h-16 shrink-0 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "px-4")}>
         <Logo showWordmark={!collapsed} size={collapsed ? "sm" : "md"} />
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-3 scrollbar-thin">
         {items.map((item) => {
           const Icon = item.icon;
@@ -50,6 +60,7 @@ export function AppSidebar() {
             <NavLink
               key={item.to}
               to={item.to}
+              onClick={onNavigate}
               className={cn(
                 "group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
                 collapsed && "justify-center px-0",
@@ -69,8 +80,7 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* User card */}
-      <div className="border-t border-sidebar-border p-3">
+      <div className="shrink-0 border-t border-sidebar-border p-3">
         <div
           className={cn(
             "flex items-center gap-3 rounded-lg p-2",
@@ -91,20 +101,76 @@ export function AppSidebar() {
           )}
         </div>
 
-        <button
-          onClick={() => setCollapsed((c) => !c)}
-          className={cn(
-            "mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-sidebar-border bg-sidebar px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
-          )}
-        >
-          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : (
-            <>
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Collapse
-            </>
-          )}
-        </button>
+        {showCollapseControl ? (
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-sidebar-border bg-sidebar px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+          >
+            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : (
+              <>
+                <ChevronLeft className="h-3.5 w-3.5" />
+                Collapse
+              </>
+            )}
+          </button>
+        ) : null}
       </div>
-    </aside>
+    </>
+  );
+}
+
+interface AppSidebarProps {
+  mobileOpen: boolean;
+  onMobileOpenChange: (open: boolean) => void;
+}
+
+export function AppSidebar({ mobileOpen, onMobileOpenChange }: AppSidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (!isMobile && mobileOpen) {
+      onMobileOpenChange(false);
+    }
+  }, [isMobile, mobileOpen, onMobileOpenChange]);
+
+  return (
+    <>
+      <Sheet open={mobileOpen} onOpenChange={onMobileOpenChange}>
+        <SheetContent
+          side="left"
+          className={cn(
+            sidebarSurfaceClass,
+            "w-[min(18rem,85vw)] max-w-[85vw] border-r p-0 md:hidden",
+          )}
+          style={sidebarSurfaceStyle}
+        >
+          <SheetTitle className="sr-only">Navigation</SheetTitle>
+          <div className="flex h-full min-h-0 flex-col">
+            <SidebarPanel
+              collapsed={false}
+              onToggleCollapsed={() => setCollapsed((current) => !current)}
+              showCollapseControl={false}
+              onNavigate={() => onMobileOpenChange(false)}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <aside
+        className={cn(
+          "relative z-30 hidden h-svh min-h-0 shrink-0 flex-col border-r border-sidebar-border transition-[width] duration-250 ease-out md:flex md:flex-col",
+          collapsed ? "w-16" : "w-60",
+        )}
+        style={sidebarSurfaceStyle}
+      >
+        <SidebarPanel
+          collapsed={collapsed}
+          onToggleCollapsed={() => setCollapsed((current) => !current)}
+          showCollapseControl
+        />
+      </aside>
+    </>
   );
 }

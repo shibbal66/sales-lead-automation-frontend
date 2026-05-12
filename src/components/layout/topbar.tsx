@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom";
-import { Search, Bell, Sun, Moon, ChevronDown } from "lucide-react";
+import { Search, Bell, Sun, Moon, ChevronDown, Menu } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,11 @@ const titles: Record<string, string> = {
   "/settings": "Settings",
 };
 
-export function Topbar() {
+interface TopbarProps {
+  onMenuClick?: () => void;
+}
+
+export function Topbar({ onMenuClick }: TopbarProps) {
   const { theme, toggle } = useTheme();
   const { pathname } = useLocation();
   const navigate = useNavigate();
@@ -33,10 +37,21 @@ export function Topbar() {
   const userDisplayEmail = getUserDisplayEmail(user);
 
   return (
-    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border bg-background/80 px-6 backdrop-blur-md">
-      <h1 className="font-display text-[20px] font-bold tracking-tight">{title}</h1>
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-md sm:h-16 sm:gap-4 sm:px-6">
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9 shrink-0 rounded-lg md:hidden"
+        onClick={onMenuClick}
+        aria-label="Open navigation menu"
+      >
+        <Menu className="h-4 w-4" />
+      </Button>
 
-      <div className="relative ml-6 hidden max-w-md flex-1 md:block">
+      <h1 className="min-w-0 truncate font-display text-lg font-bold tracking-tight sm:text-[20px]">{title}</h1>
+
+      <div className="relative ml-2 hidden max-w-md flex-1 md:ml-6 md:block">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search leads, campaigns..."

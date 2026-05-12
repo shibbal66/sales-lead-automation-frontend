@@ -1,3 +1,12 @@
+export type LeadPresentationStatus =
+  | "new"
+  | "contacted"
+  | "replied"
+  | "booked"
+  | "unsubscribed"
+  | "sent"
+  | "failed";
+
 export interface LeadApiModel {
   id: number;
   created_at: string;
@@ -37,6 +46,14 @@ export interface LeadApiModel {
   companyCity: string;
   notes: string;
   outreachStatus: string;
+}
+
+export interface GetLeadsQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  country?: string;
+  industry?: string;
 }
 
 export interface GetLeadsResponse {

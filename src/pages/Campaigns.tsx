@@ -12,18 +12,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CampaignDetail } from "@/components/campaigns/campaign-detail";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
+import { mapCampaignApiToDetail, mapCampaignApiToListCard } from "@/lib/campaignPresentation";
 import type { CampaignApiModel, CampaignStatus, CreateCampaignRequest, UpdateCampaignRequest } from "@/types";
-import type { Campaign, RunMode, CampaignStatus as UiCampaignStatus } from "@/lib/mock-data";
-import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
-
-type CampaignWithApiDetails = Campaign & {
-  targetZone?: string;
-  leadSource?: "new" | "existing" | "both";
-  mailTemplate?: string;
-  exampleTraining?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
+import { showApiSuccessToast } from "@/lib/apiToast";
 
 export default function CampaignsPage() {
   const { id } = useParams();
@@ -42,12 +33,9 @@ export default function CampaignsPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const apiStatus: CampaignStatus | undefined = tab === "all" ? undefined : tab === "running" ? "active" : tab;
 
-  const mapApiStatusToUi = (status: CampaignStatus): UiCampaignStatus =>
-    status === "active" ? "running" : (status as UiCampaignStatus);
-
   useEffect(() => {
     if (id) return;
-    fetchCampaigns(1, 20, apiStatus).catch((error) => showApiErrorToast(error));
+    void fetchCampaigns(1, 20, apiStatus);
   }, [fetchCampaigns, apiStatus, id]);
 
   useEffect(() => {
@@ -55,28 +43,11 @@ export default function CampaignsPage() {
       clearSelectedCampaign();
       return;
     }
-    fetchCampaignById(id).catch((error) => showApiErrorToast(error));
+    void fetchCampaignById(id);
   }, [id, fetchCampaignById, clearSelectedCampaign]);
 
-  const apiToUiCampaign = (campaign: CampaignApiModel): CampaignWithApiDetails => ({
-    id: campaign.id,
-    name: campaign.name,
-    goal: campaign.goal,
-    status: mapApiStatusToUi(campaign.status),
-    runMode: (campaign.run_mode === "auto" ? "automatic" : "manual") as RunMode,
-    leadsAssigned: campaign.target_leads,
-    emailsSent: 0,
-    totalEmails: campaign.target_leads,
-    replyRate: 0,
-    tone: "Professional" as const,
-    cta: campaign.call_to_action,
-    targetZone: campaign.target_zone,
-    leadSource: campaign.lead_source,
-    mailTemplate: campaign.mail_template,
-    exampleTraining: campaign.example_training,
-    createdAt: campaign.created_at,
-    updatedAt: campaign.updated_at
-  });
+  const allCampaigns = apiCampaigns.map(mapCampaignApiToListCard);
+  const selectedCampaignDetail = selectedCampaign ? mapCampaignApiToDetail(selectedCampaign) : null;
 
   const handleStatusUpdate = async (campaign: CampaignApiModel, status: CampaignStatus) => {
     try {
@@ -118,14 +89,10 @@ export default function CampaignsPage() {
     }
   };
 
-  const allCampaigns: CampaignWithApiDetails[] = apiCampaigns.map(apiToUiCampaign);
-
-  const selectedCampaignUi = selectedCampaign ? apiToUiCampaign(selectedCampaign) : null;
-
   if (id) {
-    if (isFetchingDetail && !selectedCampaignUi) return <p className="p-6">Loading campaign...</p>;
-    if (!selectedCampaignUi) return <p className="p-6">Campaign not found.</p>;
-    return <CampaignDetail campaign={selectedCampaignUi} onBack={() => navigate("/campaigns")} />;
+    if (isFetchingDetail && !selectedCampaignDetail) return <p className="p-6">Loading campaign...</p>;
+    if (!selectedCampaignDetail) return <p className="p-6">Campaign not found.</p>;
+    return <CampaignDetail campaign={selectedCampaignDetail} onBack={() => navigate("/campaigns")} />;
   }
 
   return (
@@ -155,7 +122,7 @@ export default function CampaignsPage() {
           </Card>
         ) : null}
         {allCampaigns.map((c, idx) => {
-          const pct = Math.round((c.emailsSent / Math.max(c.totalEmails, 1)) * 100);
+          const pct = Math.round((c.emailsSent / Math.max(c.targetLeads, 1)) * 100);
           return (
             <Card key={c.id} className="flex flex-col gap-3 p-5 shadow-card transition-shadow hover:shadow-elevated">
               <div className="flex items-start justify-between gap-2">
@@ -211,7 +178,7 @@ export default function CampaignsPage() {
 
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-3 text-center">
                 <div>
-                  <p className="font-display text-lg font-bold">{c.leadsAssigned}</p>
+                  <p className="font-display text-lg font-bold">{c.targetLeads}</p>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Leads</p>
                 </div>
                 <div>

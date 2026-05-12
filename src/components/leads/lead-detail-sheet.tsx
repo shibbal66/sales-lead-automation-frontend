@@ -4,43 +4,16 @@ import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusPill } from "@/components/status-pill";
+import { UserAvatar } from "@/components/user-avatar";
 import type { LeadApiModel } from "@/types";
-import type { Lead } from "@/lib/mock-data";
+import type { LeadListRowViewModel } from "@/lib/leadPresentation";
 import { ExternalLink, RefreshCw } from "lucide-react";
-
-function Avatar({ name, size = 36 }: { name: string; size?: number }) {
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  return (
-    <div
-      className="grid shrink-0 place-items-center rounded-full bg-gradient-brand text-xs font-semibold text-primary-foreground"
-      style={{ width: size, height: size }}
-    >
-      {initials}
-    </div>
-  );
-}
+import { formatRelativeDate, hasPresentableDate } from "@/lib/dateFormatting";
 
 function isLeadValueEmpty(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   return String(value).trim() === "";
 }
-
-const toRelativeDate = (value?: string): string => {
-  if (!value?.trim()) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  const diffMs = Date.now() - date.getTime();
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  if (diffHours < 1) return "just now";
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
-};
 
 function DetailRow({
   label,
@@ -92,16 +65,16 @@ interface LeadDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isFetchingDetail: boolean;
-  drawerLead: Lead | null;
   selectedLead: LeadApiModel | null;
+  selectedLeadRow: LeadListRowViewModel | null;
 }
 
 export function LeadDetailSheet({
   open,
   onOpenChange,
   isFetchingDetail,
-  drawerLead,
-  selectedLead
+  selectedLead,
+  selectedLeadRow
 }: LeadDetailSheetProps) {
   const sl = selectedLead;
 
@@ -178,23 +151,27 @@ export function LeadDetailSheet({
     : [];
 
   const sheetTitleLabel =
-    isFetchingDetail && !drawerLead ? "Loading lead details" : drawerLead ? `Lead details: ${drawerLead.name}` : "Lead details";
+    isFetchingDetail && !selectedLeadRow
+      ? "Loading lead details"
+      : selectedLeadRow
+        ? `Lead details: ${selectedLeadRow.name}`
+        : "Lead details";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-lg p-0">
         <SheetTitle className="sr-only">{sheetTitleLabel}</SheetTitle>
-        {isFetchingDetail && !drawerLead ? (
+        {isFetchingDetail && !selectedLeadRow ? (
           <div className="flex h-full items-center justify-center p-6">
             <p className="text-sm text-muted-foreground">Loading lead details...</p>
           </div>
         ) : null}
-        {drawerLead && selectedLead ? (
+        {selectedLeadRow && selectedLead ? (
           <div className="flex h-full flex-col bg-background">
             <div className="flex items-start gap-4 border-b border-border bg-muted/25 p-6">
-              <Avatar name={drawerLead.name} size={56} />
+              <UserAvatar name={selectedLeadRow.name} size={56} />
               <div className="min-w-0 flex-1">
-                <h3 className="font-display text-xl font-bold text-foreground">{drawerLead.name}</h3>
+                <h3 className="font-display text-xl font-bold text-foreground">{selectedLeadRow.name}</h3>
                 {[selectedLead.title, selectedLead.company].some((p) => !isLeadValueEmpty(p)) ? (
                   <p className="mt-0.5 text-sm text-muted-foreground">
                     {[selectedLead.title, selectedLead.company].filter((p) => !isLeadValueEmpty(p)).join(" · ")}
@@ -204,7 +181,7 @@ export function LeadDetailSheet({
                   <p className="mt-2 truncate text-sm font-medium text-brand-text">{selectedLead.email.trim()}</p>
                 ) : null}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <StatusPill status={drawerLead.status} />
+                  <StatusPill status={selectedLeadRow.status} />
                   {!isLeadValueEmpty(selectedLead.outreachStatus) ? (
                     <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand-text">
                       Outreach: {selectedLead.outreachStatus.trim()}
@@ -317,11 +294,11 @@ export function LeadDetailSheet({
                         </div>
                       ) : null}
                       {!isLeadValueEmpty(selectedLead.emailSentDate) &&
-                      toRelativeDate(selectedLead.emailSentDate) !== "—" ? (
+                      hasPresentableDate(selectedLead.emailSentDate) ? (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <span>Relative sent:</span>
                           <span className="font-medium text-brand-text">
-                            {toRelativeDate(selectedLead.emailSentDate)}
+                            {formatRelativeDate(selectedLead.emailSentDate)}
                           </span>
                         </div>
                       ) : null}
@@ -387,9 +364,9 @@ export function LeadDetailSheet({
                             <span className="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
                             <p className="text-sm font-medium text-foreground">{item.label}</p>
                             <p className="text-xs text-muted-foreground">{String(item.value).trim()}</p>
-                            {item.value?.trim() && toRelativeDate(item.value) !== "—" ? (
+                            {item.value?.trim() && hasPresentableDate(item.value) ? (
                               <p className="mt-0.5 text-[10px] text-brand-text/80">
-                                {toRelativeDate(item.value)}
+                                {formatRelativeDate(item.value)}
                               </p>
                             ) : null}
                           </li>

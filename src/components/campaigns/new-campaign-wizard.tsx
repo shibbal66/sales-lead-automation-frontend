@@ -135,14 +135,10 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
       return;
     }
 
-    try {
-      const payload = parsed.data as CreateCampaignRequest;
-      const response = await createCampaign(payload);
-      showApiSuccessToast(`Campaign "${response.name}" created successfully.`);
-      close();
-    } catch (error) {
-      showApiErrorToast(error);
-    }
+    const payload = parsed.data as CreateCampaignRequest;
+    const response = await createCampaign(payload);
+    showApiSuccessToast(`Campaign "${response.name}" created successfully.`);
+    close();
   };
 
   const stepLabels = ["Basics", "Run Mode", "AI Instructions", "Training", "Target Leads"];
