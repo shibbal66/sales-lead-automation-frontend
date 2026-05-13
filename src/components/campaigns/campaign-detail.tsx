@@ -1,144 +1,75 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
-import { StatusPill } from "@/components/status-pill";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { followupSteps, leads, trainingEmails, type Campaign } from "@/lib/mock-data";
-import { cn } from "@/lib/utils";
-import {
-  ArrowLeft, Bot, Hand, Plus, GripVertical, Trash2, Pencil, Sparkles, Play, Pause, X,
-} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { CampaignLeadsSection } from "@/components/campaigns/campaign-leads-section";
+import { CampaignSettingsPanel } from "@/components/campaigns/campaign-settings-panel";
+import { useCampaignDetailForm } from "@/hooks/useCampaignDetailForm";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { showApiSuccessToast } from "@/lib/apiToast";
-import type { UpdateCampaignRequest } from "@/types";
+import type { CampaignDetailViewModel } from "@/lib/campaignPresentation";
+import {
+  ArrowLeft, GripVertical, Plus, Trash2, Sparkles, X,
+} from "lucide-react";
 
-const tones = ["Friendly", "Professional", "Direct", "Consultative"] as const;
-const leadSourceOptions = ["new", "existing", "both"] as const;
-const statusOptions = ["draft", "active", "paused", "completed"] as const;
-type Tone = (typeof tones)[number];
-type LeadSource = (typeof leadSourceOptions)[number];
-type CampaignStatusOption = (typeof statusOptions)[number];
-type CampaignWithApiDetails = Campaign & {
-  targetZone?: string;
-  leadSource?: "new" | "existing" | "both";
-  mailTemplate?: string;
-  exampleTraining?: string;
-  createdAt?: string;
-  updatedAt?: string;
-};
+type FollowupStep = { id: string; label: string; day: number };
+type TrainingExample = { id: string; subject: string; body: string };
 
-export function CampaignDetail({ campaign, onBack }: { campaign: CampaignWithApiDetails; onBack: () => void }) {
-  const campaignStatus = String(campaign.status === "running" ? "active" : campaign.status);
+const DEFAULT_FOLLOWUP_STEPS: FollowupStep[] = [
+  { id: "s1", label: "Initial outreach", day: 0 },
+  { id: "s2", label: "Follow-up 1", day: 3 },
+  { id: "s3", label: "Follow-up 2", day: 7 }
+];
+
+export function CampaignDetail({
+  campaign,
+  onBack
+}: {
+  campaign: CampaignDetailViewModel;
+  onBack: () => void;
+}) {
   const updateCampaign = useCampaignStore((state) => state.updateCampaign);
   const deleteCampaign = useCampaignStore((state) => state.deleteCampaign);
   const isUpdating = useCampaignStore((state) => state.isUpdating);
   const isDeleting = useCampaignStore((state) => state.isDeleting);
-  const [name, setName] = useState(campaign.name);
-  const [goal, setGoal] = useState(campaign.goal);
-  const [targetZone, setTargetZone] = useState(campaign.targetZone ?? "");
-  const [cta, setCta] = useState(campaign.cta);
-  const [targetLeads, setTargetLeads] = useState(campaign.leadsAssigned);
-  const [leadSource, setLeadSource] = useState<LeadSource>(campaign.leadSource ?? "both");
-  const [exampleTraining, setExampleTraining] = useState(campaign.exampleTraining ?? "");
-  const [mode, setMode] = useState<"automatic" | "manual">(campaign.runMode);
-  const [status, setStatus] = useState<CampaignStatusOption>(
-    statusOptions.includes(campaignStatus as CampaignStatusOption)
-      ? (campaignStatus as CampaignStatusOption)
-      : "draft"
-  );
-  const [tone, setTone] = useState<Tone>(campaign.tone);
-  const [examples, setExamples] = useState(
+  const {
+    form,
+    setName,
+    setGoal,
+    setTargetZone,
+    setCallToAction,
+    setLeadSource,
+    setRunMode,
+    setMailTemplate,
+    setExampleTraining,
+    setTone,
+    setTargetLeads,
+    setStatus,
+    hasChanges,
+    buildUpdatePayload,
+    statusOptions,
+    leadSourceOptions,
+    toneOptions
+  } = useCampaignDetailForm(campaign);
+
+  const [examples, setExamples] = useState<TrainingExample[]>(
     campaign.exampleTraining
       ? [{ id: "api-training", subject: "Imported Training Style", body: campaign.exampleTraining }]
-      : trainingEmails
+      : []
   );
   const [addingExample, setAddingExample] = useState(false);
   const [exSubject, setExSubject] = useState("");
   const [exBody, setExBody] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [steps, setSteps] = useState(followupSteps);
-  const [instructions, setInstructions] = useState(
-    campaign.mailTemplate ||
-      "Write in a warm, conversational tone. Mention the company's recent product launches if available from their website. Always reference the specific pain point of scaling sales teams. Keep emails under 120 words. End with a soft CTA asking for a 15-minute call.",
-  );
-  const initialState = useMemo(
-    () => ({
-      name: campaign.name,
-      goal: campaign.goal,
-      targetZone: campaign.targetZone ?? "",
-      cta: campaign.cta,
-      leadSource: campaign.leadSource ?? "both",
-      runMode: campaign.runMode,
-      mailTemplate: campaign.mailTemplate ?? "",
-      exampleTraining: campaign.exampleTraining ?? "",
-      tone: campaign.tone,
-      targetLeads: campaign.leadsAssigned,
-      status: statusOptions.includes(campaignStatus as CampaignStatusOption)
-        ? (campaignStatus as CampaignStatusOption)
-        : "draft"
-    }),
-    [campaign, campaignStatus]
-  );
-
-  useEffect(() => {
-    setName(campaign.name);
-    setGoal(campaign.goal);
-    setTargetZone(campaign.targetZone ?? "");
-    setCta(campaign.cta);
-    setTargetLeads(campaign.leadsAssigned);
-    setLeadSource(campaign.leadSource ?? "both");
-    setExampleTraining(campaign.exampleTraining ?? "");
-    setMode(campaign.runMode);
-    setTone(campaign.tone);
-    setStatus(
-      statusOptions.includes(campaignStatus as CampaignStatusOption)
-        ? (campaignStatus as CampaignStatusOption)
-        : "draft"
-    );
-    setInstructions(campaign.mailTemplate ?? "");
-  }, [campaign, campaignStatus]);
-  const formatDate = (value?: string) => {
-    if (!value) return "—";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleString();
-  };
-
-  const hasChanges =
-    name !== initialState.name ||
-    goal !== initialState.goal ||
-    targetZone !== initialState.targetZone ||
-    cta !== initialState.cta ||
-    leadSource !== initialState.leadSource ||
-    mode !== initialState.runMode ||
-    instructions !== initialState.mailTemplate ||
-    exampleTraining !== initialState.exampleTraining ||
-    tone !== initialState.tone ||
-    targetLeads !== initialState.targetLeads ||
-    status !== initialState.status;
+  const [steps, setSteps] = useState<FollowupStep[]>(DEFAULT_FOLLOWUP_STEPS);
 
   const handleSaveChanges = async () => {
-    const payload: UpdateCampaignRequest = {};
-    if (name !== initialState.name) payload.name = name;
-    if (goal !== initialState.goal) payload.goal = goal;
-    if (targetZone !== initialState.targetZone) payload.target_zone = targetZone;
-    if (cta !== initialState.cta) payload.call_to_action = cta;
-    if (leadSource !== initialState.leadSource) payload.lead_source = leadSource;
-    if (mode !== initialState.runMode) payload.run_mode = mode === "automatic" ? "auto" : "manual";
-    if (instructions !== initialState.mailTemplate) payload.mail_template = instructions;
-    if (exampleTraining !== initialState.exampleTraining) payload.example_training = exampleTraining;
-    // Persist tone selection via example_training when no explicit text was changed.
-    if (tone !== initialState.tone && !payload.example_training) payload.example_training = tone;
-    if (targetLeads !== initialState.targetLeads) payload.target_leads = targetLeads;
-    if (status !== initialState.status) payload.status = status;
-
+    const payload = buildUpdatePayload();
     if (Object.keys(payload).length === 0) {
       showApiSuccessToast("No changes to save.");
       return;
@@ -178,159 +109,32 @@ export function CampaignDetail({ campaign, onBack }: { campaign: CampaignWithApi
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px,1fr]">
-        {/* Left settings panel */}
+        <CampaignSettingsPanel
+          campaign={campaign}
+          name={form.name}
+          goal={form.goal}
+          targetZone={form.targetZone}
+          callToAction={form.callToAction}
+          leadSource={form.leadSource}
+          runMode={form.runMode}
+          tone={form.tone}
+          targetLeads={form.targetLeads}
+          status={form.status}
+          statusOptions={statusOptions}
+          leadSourceOptions={leadSourceOptions}
+          toneOptions={toneOptions}
+          onNameChange={setName}
+          onGoalChange={setGoal}
+          onTargetZoneChange={setTargetZone}
+          onCallToActionChange={setCallToAction}
+          onLeadSourceChange={setLeadSource}
+          onRunModeChange={setRunMode}
+          onToneChange={setTone}
+          onTargetLeadsChange={setTargetLeads}
+          onStatusChange={setStatus}
+        />
+
         <div className="space-y-4">
-          <Card className="p-5 shadow-card">
-            <div className="flex items-start justify-between gap-3">
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full bg-transparent font-display text-lg font-bold focus:outline-none focus:ring-0"
-              />
-              <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
-            </div>
-
-            <div className="mt-4 space-y-4">
-              {/* Campaign status */}
-              <div className="space-y-2 rounded-lg border border-border p-3">
-                <Label>Campaign Status</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {statusOptions.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setStatus(option)}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors",
-                        status === option
-                          ? "border-primary bg-primary/15 text-brand-text"
-                          : "border-border text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Run mode segmented */}
-              <div className="space-y-2">
-                <Label>Run Mode</Label>
-                <div className="grid grid-cols-2 rounded-lg bg-muted p-1">
-                  {([
-                    { id: "automatic", label: "Automatic", icon: Bot },
-                    { id: "manual", label: "Manual", icon: Hand },
-                  ] as const).map((m) => {
-                    const Icon = m.icon;
-                    const sel = mode === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setMode(m.id)}
-                        className={cn(
-                          "flex items-center justify-center gap-1.5 rounded-md py-1.5 text-xs font-semibold transition-all",
-                          sel && (m.id === "automatic" ? "bg-primary text-primary-foreground shadow-sm" : "bg-warning text-warning-foreground shadow-sm"),
-                          !sel && "text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        <Icon className="h-3.5 w-3.5" /> {m.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-[11px] text-muted-foreground">
-                  {mode === "automatic"
-                    ? "AI sends emails and follow-ups on schedule, no review required."
-                    : "Each email queued as draft for your review before sending."}
-                </p>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="goal">Campaign Goal</Label>
-                <Textarea id="goal" rows={3} value={goal} onChange={(e) => setGoal(e.target.value)} />
-              </div>
-
-              <div className="space-y-2">
-                <Label>Target Tone</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {tones.map((t) => (
-                    <button key={t} onClick={() => setTone(t)}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
-                        tone === t ? "border-primary bg-primary/15 text-brand-text" : "border-border text-muted-foreground hover:bg-muted",
-                      )}>{t}</button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="cta">Call to Action</Label>
-                <Input id="cta" value={cta} onChange={(e) => setCta(e.target.value)} />
-              </div>
-
-              <div className="rounded-lg border border-border bg-muted/30 p-3">
-                <p className="text-xs font-semibold text-muted-foreground">API Campaign Details</p>
-                <div className="mt-2 space-y-2 text-xs">
-                  <div className="space-y-1">
-                    <Label htmlFor="target-zone">Target zone</Label>
-                    <Input id="target-zone" value={targetZone} onChange={(e) => setTargetZone(e.target.value)} />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="target-leads">Target leads</Label>
-                    <Input
-                      id="target-leads"
-                      type="number"
-                      min={0}
-                      value={targetLeads}
-                      onChange={(e) => setTargetLeads(Number(e.target.value) || 0)}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Lead Source</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {leadSourceOptions.map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      onClick={() => setLeadSource(option)}
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors",
-                        leadSource === option
-                          ? "border-primary bg-primary/15 text-brand-text"
-                          : "border-border text-muted-foreground hover:bg-muted"
-                      )}
-                    >
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-muted/40 p-3">
-                <p className="text-xs text-muted-foreground">Assigned leads</p>
-                <div className="mt-1 flex items-center justify-between">
-                  <p className="font-display text-2xl font-bold">{targetLeads}</p>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-muted/30 p-3">
-                <p className="text-xs font-semibold text-muted-foreground">Timeline</p>
-                <div className="mt-2 space-y-1.5 text-xs">
-                  <p><span className="text-muted-foreground">Created:</span> {formatDate(campaign.createdAt)}</p>
-                  <p><span className="text-muted-foreground">Updated:</span> {formatDate(campaign.updatedAt)}</p>
-                </div>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Right AI settings */}
-        <div className="space-y-4">
-          {/* AI instructions */}
           <Card className="p-5 shadow-card">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-base font-bold">AI Instructions</h3>
@@ -341,70 +145,65 @@ export function CampaignDetail({ campaign, onBack }: { campaign: CampaignWithApi
             <Textarea
               rows={6}
               className="mt-3 font-mono text-sm"
-              value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
+              value={form.mailTemplate}
+              onChange={(event) => setMailTemplate(event.target.value)}
               placeholder="Example: Write in a warm, conversational tone..."
             />
-            <p className="mt-1 text-right text-[11px] text-muted-foreground">{instructions.length} chars</p>
-
+            <p className="mt-1 text-right text-[11px] text-muted-foreground">{form.mailTemplate.length} chars</p>
             <div className="mt-3 space-y-1.5">
               <Label htmlFor="example-training">Example Training</Label>
               <Textarea
                 id="example-training"
                 rows={2}
-                value={exampleTraining}
-                onChange={(e) => setExampleTraining(e.target.value)}
+                value={form.exampleTraining}
+                onChange={(event) => setExampleTraining(event.target.value)}
                 placeholder="Professional, concise, value-focused"
               />
             </div>
-
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {[
                 { l: "Use enriched company data in personalization", c: true },
                 { l: "Include company name in subject line", c: false },
                 { l: "Reference website content if available", c: true },
-                { l: "Auto-pause sequence when lead replies", c: true },
-              ].map((b) => (
-                <label key={b.l} className="flex items-start gap-2 rounded-lg border border-border p-2.5 text-sm">
-                  <Checkbox defaultChecked={b.c} className="mt-0.5" /> <span>{b.l}</span>
+                { l: "Auto-pause sequence when lead replies", c: true }
+              ].map((item) => (
+                <label key={item.l} className="flex items-start gap-2 rounded-lg border border-border p-2.5 text-sm">
+                  <Checkbox defaultChecked={item.c} className="mt-0.5" /> <span>{item.l}</span>
                 </label>
               ))}
             </div>
           </Card>
 
-          {/* Training emails */}
           <Card className="p-5 shadow-card">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-display text-base font-bold">Email Templates / Training Emails</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Upload past emails to train the AI on your writing style. The AI will learn your tone, phrasing, and structure from these examples and match it in generated emails.
+                  Upload past emails to train the AI on your writing style.
                 </p>
               </div>
               <Button variant="outline" onClick={() => setAddingExample(true)}><Plus className="h-4 w-4" /> Add</Button>
             </div>
-
             <div className="mt-4 space-y-1.5">
               <Label htmlFor="primary-email-template">Primary Email Template</Label>
               <Textarea
                 id="primary-email-template"
                 rows={4}
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
+                value={form.mailTemplate}
+                onChange={(event) => setMailTemplate(event.target.value)}
                 placeholder="Hi {{firstName}}, I wanted to reach out about..."
               />
             </div>
-
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {examples.map((ex) => (
-                <div key={ex.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface/40 p-3">
+              {examples.map((example) => (
+                <div key={example.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface/40 p-3">
                   <div className="min-w-0">
                     <Input
-                      value={ex.subject}
-                      onChange={(e) =>
-                        setExamples((prev) =>
-                          prev.map((item) =>
-                            item.id === ex.id ? { ...item, subject: e.target.value } : item
+                      value={example.subject}
+                      onChange={(event) =>
+                        setExamples((previous) =>
+                          previous.map((item) =>
+                            item.id === example.id ? { ...item, subject: event.target.value } : item
                           )
                         )
                       }
@@ -412,139 +211,122 @@ export function CampaignDetail({ campaign, onBack }: { campaign: CampaignWithApi
                     />
                     <Textarea
                       rows={3}
-                      value={ex.body}
-                      onChange={(e) =>
-                        setExamples((prev) =>
-                          prev.map((item) =>
-                            item.id === ex.id ? { ...item, body: e.target.value } : item
+                      value={example.body}
+                      onChange={(event) =>
+                        setExamples((previous) =>
+                          previous.map((item) =>
+                            item.id === example.id ? { ...item, body: event.target.value } : item
                           )
                         )
                       }
                       className="mt-2 text-xs"
                     />
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setExamples((p) => p.filter((e) => e.id !== ex.id))}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setExamples((previous) => previous.filter((item) => item.id !== example.id))}
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               ))}
             </div>
-
             <Button className="mt-4" variant="secondary" onClick={() => setPreviewOpen(true)}>
               <Sparkles className="h-4 w-4" /> Generate Preview Email
             </Button>
           </Card>
 
-          {/* Follow-up sequence */}
           <Card className="p-5 shadow-card">
             <h3 className="font-display text-base font-bold">Follow-up Sequence</h3>
             <p className="mt-1 text-sm text-muted-foreground">Each step is AI-generated using your instructions and tone above.</p>
-
             <ol className="mt-4 space-y-2">
-              {steps.map((s, i) => (
-                <li key={s.id} className="flex items-center gap-3 rounded-lg border border-border bg-surface/40 p-3">
+              {steps.map((step, index) => (
+                <li key={step.id} className="flex items-center gap-3 rounded-lg border border-border bg-surface/40 p-3">
                   <GripVertical className="h-4 w-4 text-muted-foreground" />
                   <div className="grid h-7 w-7 place-items-center rounded-full bg-primary/15 text-xs font-bold text-brand-text">
-                    {i + 1}
+                    {index + 1}
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold">{s.label}</p>
-                    <p className="text-xs text-muted-foreground">Day {s.day}</p>
+                    <p className="text-sm font-semibold">{step.label}</p>
+                    <p className="text-xs text-muted-foreground">Day {step.day}</p>
                   </div>
                   <select
-                    defaultValue={s.day}
+                    defaultValue={step.day}
                     className="rounded-md border border-border bg-background px-2 py-1 text-xs"
                   >
-                    {[0, 1, 2, 3, 5, 7, 10, 14].map((d) => <option key={d} value={d}>Wait {d} days</option>)}
+                    {[0, 1, 2, 3, 5, 7, 10, 14].map((day) => (
+                      <option key={day} value={day}>Wait {day} days</option>
+                    ))}
                   </select>
                   <Button variant="ghost" size="sm">Edit email</Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSteps((p) => p.filter((x) => x.id !== s.id))}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setSteps((previous) => previous.filter((item) => item.id !== step.id))}
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </li>
               ))}
             </ol>
-
-            <Button variant="outline" className="mt-3" onClick={() =>
-              setSteps((p) => [...p, { id: `s${Date.now()}`, label: `Follow-up ${p.length}`, day: (p.at(-1)?.day ?? 0) + 7 }])
-            }>
+            <Button
+              variant="outline"
+              className="mt-3"
+              onClick={() =>
+                setSteps((previous) => [
+                  ...previous,
+                  {
+                    id: `s${Date.now()}`,
+                    label: `Follow-up ${previous.length}`,
+                    day: (previous.at(-1)?.day ?? 0) + 7
+                  }
+                ])
+              }
+            >
               <Plus className="h-4 w-4" /> Add Follow-up Step
             </Button>
           </Card>
         </div>
       </div>
 
-      {/* Campaign leads table */}
-      <Card className="overflow-hidden shadow-card">
-        <div className="flex items-center justify-between p-5">
-          <h3 className="font-display text-base font-bold">Campaign Leads</h3>
-          <Button><Plus className="h-4 w-4" /> Assign More Leads</Button>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead>Name</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Email Status</TableHead>
-              <TableHead>Step</TableHead>
-              <TableHead>Last Contacted</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {leads.slice(0, 8).map((l, i) => (
-              <TableRow key={l.id} className="hover:bg-primary/5">
-                <TableCell className="font-medium">{l.name}</TableCell>
-                <TableCell>{l.company}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{l.email}</TableCell>
-                <TableCell><StatusPill status={l.status} /></TableCell>
-                <TableCell className="text-sm">Step {(i % 4) + 1}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{l.lastContacted}</TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm">View</Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
+      <CampaignLeadsSection campaignId={campaign.id} mailTemplate={form.mailTemplate} />
 
-      {/* Add example modal */}
       <Dialog open={addingExample} onOpenChange={setAddingExample}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add an email example</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5"><Label>Subject</Label><Input value={exSubject} onChange={(e) => setExSubject(e.target.value)} /></div>
-            <div className="space-y-1.5"><Label>Body</Label><Textarea rows={6} value={exBody} onChange={(e) => setExBody(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Subject</Label><Input value={exSubject} onChange={(event) => setExSubject(event.target.value)} /></div>
+            <div className="space-y-1.5"><Label>Body</Label><Textarea rows={6} value={exBody} onChange={(event) => setExBody(event.target.value)} /></div>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setAddingExample(false)}>Cancel</Button>
             <Button onClick={() => {
               if (!exSubject.trim()) return;
-              setExamples((p) => [...p, { id: `te${Date.now()}`, subject: exSubject, body: exBody }]);
-              setExSubject(""); setExBody(""); setAddingExample(false);
+              setExamples((previous) => [...previous, { id: `te${Date.now()}`, subject: exSubject, body: exBody }]);
+              setExSubject("");
+              setExBody("");
+              setAddingExample(false);
               showApiSuccessToast("Example saved. AI will use it in future generations.");
             }}>Save Example</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Preview modal */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>AI Preview Email</DialogTitle></DialogHeader>
           <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
             <div>
               <p className="text-[11px] font-semibold uppercase text-muted-foreground">Subject</p>
-              <p className="font-semibold">Quick idea for Vertex's SDR team</p>
+              <p className="font-semibold">Quick idea for Vertex&apos;s SDR team</p>
             </div>
             <div className="prose prose-sm max-w-none text-sm leading-relaxed">
               <p>Hi Sarah,</p>
-              <p>Noticed Vertex just expanded the SDR team after the Series B — congrats. Most teams scaling outbound past 5 SDRs hit the same wall: research time per lead balloons and quality drops.</p>
-              <p>We built Rapid AI to solve exactly that — our customers cut research time by ~70% while tripling reply rates with personalized outreach.</p>
+              <p>Noticed Vertex just expanded the SDR team after the Series B — congrats.</p>
               <p>Worth a 15-min chat next week?</p>
-              <p>— Alex</p>
             </div>
           </div>
           <div className="flex justify-end gap-2">
@@ -554,12 +336,11 @@ export function CampaignDetail({ campaign, onBack }: { campaign: CampaignWithApi
         </DialogContent>
       </Dialog>
 
-      {/* Delete confirmation modal */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete campaign?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
-            This action cannot be undone. This will permanently delete <span className="font-semibold">{name}</span>.
+            This action cannot be undone. This will permanently delete <span className="font-semibold">{form.name}</span>.
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={isDeleting}>Cancel</Button>

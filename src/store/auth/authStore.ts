@@ -7,6 +7,8 @@ import {
   getAuthToken,
   getRefreshToken,
   getStoredUser,
+  registerAccessTokenSync,
+  registerAuthClearSync,
   setAuthToken,
   setRefreshToken,
   setStoredUser
@@ -35,81 +37,83 @@ interface AuthState {
   initializeAuth: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: hydrated.user,
-  token: hydrated.token,
-  isAuthenticated: hydrated.isAuthenticated,
-  isLoading: !hydrated.token,
-
-  setCredentials: ({ user, token, refreshToken }) => {
-    setAuthToken(token);
-    setStoredUser(user);
-    if (refreshToken) setRefreshToken(refreshToken);
+export const useAuthStore = create<AuthState>((set) => {
+  registerAccessTokenSync((token) => {
+    const storedUser = getStoredUser();
     set({
-      user,
       token,
-      isAuthenticated: true,
+      isAuthenticated: Boolean(token && storedUser),
       isLoading: false
     });
-  },
+  });
 
-  logout: async () => {
-    const refreshToken = getRefreshToken();
-    try {
-      if (refreshToken) {
-        const response = await logoutApi({ refreshToken });
-        if (response.success) {
-          showApiSuccessToast(response.message || "Logged out successfully.");
-        }
-      }
-    } finally {
-      clearAuthStorage();
-      set({
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false
-      });
-    }
-  },
-
-  logoutAllDevices: async () => {
-    const response = await logoutAllApi();
-    if (!response.success) {
-      showApiErrorToast(response);
-      return Promise.reject(response);
-    }
-    showApiSuccessToast(response.message || "Logged out from all devices.");
-    clearAuthStorage();
+  registerAuthClearSync(() => {
     set({
       user: null,
       token: null,
       isAuthenticated: false,
       isLoading: false
     });
-  },
+  });
 
-  setLoading: (isLoading) => set({ isLoading }),
+  return {
+    user: hydrated.user,
+    token: hydrated.token,
+    isAuthenticated: hydrated.isAuthenticated,
+    isLoading: !hydrated.token,
 
-  updateUser: (payload) =>
-    set((state) => {
-      if (!state.user) return state;
-      // Merge only defined fields so API responses that omit email/role don't overwrite and break redirects
-      const definedPayload = Object.fromEntries(
-        Object.entries(payload).filter(([, v]) => v !== undefined)
-      ) as Partial<AuthUser>;
-      const user = { ...state.user, ...definedPayload };
+    setCredentials: ({ user, token, refreshToken }) => {
       setStoredUser(user);
-      return { user };
-    }),
+      if (refreshToken) setRefreshToken(refreshToken);
+      setAuthToken(token);
+      set({ user });
+    },
 
-  initializeAuth: () => {
-    const token = getAuthToken();
-    const storedUser = getStoredUser();
-    if (token && storedUser) {
-      set({ user: storedUser, token, isAuthenticated: true, isLoading: false });
-      return;
+    logout: async () => {
+      const refreshToken = getRefreshToken();
+      try {
+        if (refreshToken) {
+          const response = await logoutApi({ refreshToken });
+          if (response.success) {
+            showApiSuccessToast(response.message || "Logged out successfully.");
+          }
+        }
+      } finally {
+        clearAuthStorage();
+      }
+    },
+
+    logoutAllDevices: async () => {
+      const response = await logoutAllApi();
+      if (!response.success) {
+        showApiErrorToast(response);
+        return Promise.reject(response);
+      }
+      showApiSuccessToast(response.message || "Logged out from all devices.");
+      clearAuthStorage();
+    },
+
+    setLoading: (isLoading) => set({ isLoading }),
+
+    updateUser: (payload) =>
+      set((state) => {
+        if (!state.user) return state;
+        const definedPayload = Object.fromEntries(
+          Object.entries(payload).filter(([, value]) => value !== undefined)
+        ) as Partial<AuthUser>;
+        const user = { ...state.user, ...definedPayload };
+        setStoredUser(user);
+        return { user };
+      }),
+
+    initializeAuth: () => {
+      const token = getAuthToken();
+      const storedUser = getStoredUser();
+      if (token && storedUser) {
+        set({ user: storedUser, token, isAuthenticated: true, isLoading: false });
+        return;
+      }
+      set({ isLoading: false });
     }
-    set({ isLoading: false });
-  }
-}));
+  };
+});

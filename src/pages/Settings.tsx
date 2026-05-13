@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/auth/authStore";
-import { showApiErrorToast } from "@/lib/apiToast";
 
 const sections = [
   { id: "profile", label: "Profile", icon: User },
@@ -313,12 +312,10 @@ export default function Settings() {
               <Button
                 variant="outline"
                 onClick={async () => {
+                  setLogoutAllLoading(true);
                   try {
-                    setLogoutAllLoading(true);
                     await logoutAllDevices();
                     navigate("/login", { replace: true });
-                  } catch (error) {
-                    showApiErrorToast(error);
                   } finally {
                     setLogoutAllLoading(false);
                   }

@@ -1,14 +1,18 @@
 import apiInvoker from "../../lib/apiInvoker";
 import { END_POINT } from "../../lib/apiURL";
 import type {
+  AddCampaignLeadRequest,
+  AddCampaignLeadResponse,
   CampaignStatus,
   CreateCampaignRequest,
   CreateCampaignResponse,
   GetCampaignByIdResponse,
+  GetCampaignLeadsQuery,
+  GetCampaignLeadsResponse,
   GetCampaignsResponse,
   UpdateCampaignRequest,
   UpdateCampaignResponse
-} from "../../types/campaign";
+} from "@/types";
 
 type DeleteCampaignResponse = {
   success: boolean;
@@ -29,6 +33,23 @@ export function getCampaigns(page = 1, limit = 20, status?: CampaignStatus) {
 
 export function getCampaignById(campaignId: string) {
   return apiInvoker<GetCampaignByIdResponse>(`${END_POINT.campaign.create}/${campaignId}`, "GET");
+}
+
+export function getCampaignLeads(campaignId: string, { page = 1, limit = 20 }: GetCampaignLeadsQuery = {}) {
+  return apiInvoker<GetCampaignLeadsResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/leads`,
+    "GET",
+    undefined,
+    { page, limit }
+  );
+}
+
+export function addCampaignLead(campaignId: string, payload: AddCampaignLeadRequest) {
+  return apiInvoker<AddCampaignLeadResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/leads`,
+    "POST",
+    payload
+  );
 }
 
 export function updateCampaign(campaignId: string, payload: UpdateCampaignRequest) {

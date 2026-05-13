@@ -71,3 +71,45 @@ export interface GetCampaignByIdResponse {
     campaign: CampaignApiModel;
   };
 }
+
+export interface CampaignLeadApiModel {
+  id: string;
+  user_id: string;
+  campaign_id: string;
+  lead_data_id: string;
+  mail_template: string | null;
+  status: string;
+  sent_at: string | null;
+  error_message: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GetCampaignLeadsQuery {
+  page?: number;
+  limit?: number;
+}
+
+export interface GetCampaignLeadsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    leads: CampaignLeadApiModel[];
+    page?: number;
+    limit?: number;
+    total?: number;
+  };
+}
+
+export interface AddCampaignLeadRequest {
+  lead_data_id: string;
+  mail_template: string;
+}
+
+export interface AddCampaignLeadResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    lead: CampaignLeadApiModel;
+  };
+}
