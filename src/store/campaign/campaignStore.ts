@@ -1,28 +1,68 @@
 import { create } from "zustand";
 import {
   addCampaignLead as addCampaignLeadApi,
+  assignRandomCampaignLeads as assignRandomCampaignLeadsApi,
   createCampaign as createCampaignApi,
   deleteCampaign as deleteCampaignApi,
+  deleteCampaignLead as deleteCampaignLeadApi,
   getCampaignById as getCampaignByIdApi,
   getCampaignLeads as getCampaignLeadsApi,
   getCampaigns as getCampaignsApi,
-  updateCampaign as updateCampaignApi
+  updateCampaign as updateCampaignApi,
+  updateCampaignLead as updateCampaignLeadApi
 } from "@/services/campaign/campaignServices";
 import type {
   AddCampaignLeadRequest,
+  AssignRandomCampaignLeadsResponse,
   CampaignApiModel,
   CampaignLeadApiModel,
   CampaignStatus,
   CreateCampaignRequest,
+  GetCampaignByIdResponse,
   GetCampaignLeadsQuery,
+  GetCampaignLeadsResponse,
+  UpdateCampaignLeadRequest,
   UpdateCampaignRequest
 } from "@/types";
 import { showApiErrorToast } from "@/lib/apiToast";
+
+function campaignFromByIdData(data: NonNullable<GetCampaignByIdResponse["data"]>): CampaignApiModel | null {
+  if ("campaign" in data && data.campaign) return data.campaign;
+  return data as CampaignApiModel;
+}
+
+function parseCampaignLeadsSuccess(
+  response: GetCampaignLeadsResponse,
+  fallbackPage: number,
+  fallbackLimit: number
+): { leads: CampaignLeadApiModel[]; page: number; limit: number; total: number } | null {
+  if (!response.success || response.data === undefined) return null;
+  const d = response.data;
+  const p = response.pagination;
+  if (Array.isArray(d)) {
+    return {
+      leads: d,
+      page: p?.page ?? fallbackPage,
+      limit: p?.limit ?? fallbackLimit,
+      total: p?.total ?? d.length
+    };
+  }
+  if (d && typeof d === "object" && Array.isArray(d.leads)) {
+    return {
+      leads: d.leads,
+      page: p?.page ?? d.page ?? fallbackPage,
+      limit: p?.limit ?? d.limit ?? fallbackLimit,
+      total: p?.total ?? d.total ?? d.leads.length
+    };
+  }
+  return null;
+}
 
 interface CampaignStoreState {
   campaigns: CampaignApiModel[];
   selectedCampaign: CampaignApiModel | null;
   total: number;
+  totalPages: number;
   page: number;
   limit: number;
   statusFilter: CampaignStatus | undefined;
@@ -37,6 +77,9 @@ interface CampaignStoreState {
   campaignLeadsLimit: number;
   isFetchingCampaignLeads: boolean;
   isAddingCampaignLead: boolean;
+  isUpdatingCampaignLead: boolean;
+  isDeletingCampaignLead: boolean;
+  isAssigningRandomLeads: boolean;
   createCampaign: (payload: CreateCampaignRequest) => Promise<CampaignApiModel>;
   updateCampaign: (campaignId: string, payload: UpdateCampaignRequest) => Promise<CampaignApiModel>;
   deleteCampaign: (campaignId: string) => Promise<string>;
@@ -45,6 +88,13 @@ interface CampaignStoreState {
   fetchCampaignLeads: (campaignId: string, query?: GetCampaignLeadsQuery) => Promise<void>;
   setCampaignLeadsPage: (page: number) => void;
   addCampaignLead: (campaignId: string, payload: AddCampaignLeadRequest) => Promise<CampaignLeadApiModel>;
+  updateCampaignLead: (
+    campaignId: string,
+    campaignLeadId: string,
+    payload: UpdateCampaignLeadRequest
+  ) => Promise<void>;
+  deleteCampaignLead: (campaignId: string, campaignLeadId: string) => Promise<void>;
+  assignRandomCampaignLeads: (campaignId: string) => Promise<AssignRandomCampaignLeadsResponse>;
   clearSelectedCampaign: () => void;
   clearCampaignLeads: () => void;
 }
@@ -53,6 +103,7 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
   campaigns: [],
   selectedCampaign: null,
   total: 0,
+  totalPages: 1,
   page: 1,
   limit: 20,
   statusFilter: undefined,
@@ -67,6 +118,9 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
   campaignLeadsLimit: 20,
   isFetchingCampaignLeads: false,
   isAddingCampaignLead: false,
+  isUpdatingCampaignLead: false,
+  isDeletingCampaignLead: false,
+  isAssigningRandomLeads: false,
 
   createCampaign: async (payload) => {
     set({ isCreating: true });
@@ -97,7 +151,7 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
         campaigns: state.campaigns.filter((campaign) => campaign.id !== campaignId),
         selectedCampaign: state.selectedCampaign?.id === campaignId ? null : state.selectedCampaign
       }));
-      return response.message || "Campaign deleted successfully.";
+      return response.message ?? "Campaign deleted successfully.";
     } finally {
       set({ isDeleting: false });
     }
@@ -128,15 +182,22 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
     set({ isFetching: true });
     try {
       const response = await getCampaignsApi(page, limit, status);
-      if (!response.success || !response.data) {
+      if (!response.success) {
         showApiErrorToast(response);
         return;
       }
+      const list = Array.isArray(response.data) ? response.data : [];
+      const p = response.pagination;
+      const total = p?.total ?? list.length;
+      const limitResolved = p?.limit ?? limit;
+      const totalPages =
+        p?.totalPages ?? Math.max(1, Math.ceil(total / Math.max(limitResolved, 1)));
       set({
-        campaigns: response.data.campaigns ?? [],
-        total: response.data.total ?? 0,
-        page: response.data.page ?? page,
-        limit: response.data.limit ?? limit,
+        campaigns: list,
+        total,
+        totalPages,
+        page: p?.page ?? page,
+        limit: limitResolved,
         statusFilter: status
       });
     } finally {
@@ -148,12 +209,13 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
     set({ isFetchingDetail: true });
     try {
       const response = await getCampaignByIdApi(campaignId);
-      if (!response.success || !response.data?.campaign) {
+      const campaign = response.data ? campaignFromByIdData(response.data) : null;
+      if (!response.success || !campaign) {
         showApiErrorToast(response);
         return Promise.reject(response);
       }
-      set({ selectedCampaign: response.data.campaign });
-      return response.data.campaign;
+      set({ selectedCampaign: campaign });
+      return campaign;
     } finally {
       set({ isFetchingDetail: false });
     }
@@ -166,15 +228,16 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
     set({ isFetchingCampaignLeads: true });
     try {
       const response = await getCampaignLeadsApi(campaignId, { page, limit });
-      if (!response.success || !response.data?.leads) {
+      const parsed = parseCampaignLeadsSuccess(response, page, limit);
+      if (!parsed) {
         showApiErrorToast(response);
         return;
       }
       set({
-        campaignLeads: response.data.leads,
-        campaignLeadsTotal: response.data.total ?? response.data.leads.length,
-        campaignLeadsPage: response.data.page ?? page,
-        campaignLeadsLimit: response.data.limit ?? limit
+        campaignLeads: parsed.leads,
+        campaignLeadsTotal: parsed.total,
+        campaignLeadsPage: parsed.page,
+        campaignLeadsLimit: parsed.limit
       });
     } finally {
       set({ isFetchingCampaignLeads: false });
@@ -192,6 +255,68 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
       return response.data.lead;
     } finally {
       set({ isAddingCampaignLead: false });
+    }
+  },
+
+  updateCampaignLead: async (campaignId, campaignLeadId, payload) => {
+    set({ isUpdatingCampaignLead: true });
+    try {
+      const response = await updateCampaignLeadApi(campaignId, campaignLeadId, payload);
+      if (!response.success) {
+        showApiErrorToast(response);
+        return Promise.reject(response);
+      }
+      if (response.data?.lead) {
+        set((state) => ({
+          campaignLeads: state.campaignLeads.map((l) => (l.id === campaignLeadId ? response.data!.lead! : l))
+        }));
+      } else {
+        set((state) => ({
+          campaignLeads: state.campaignLeads.map((l) =>
+            l.id === campaignLeadId
+              ? {
+                  ...l,
+                  status: payload.status,
+                  sent_at: payload.sent_at,
+                  mail_template: payload.mail_template,
+                }
+              : l
+          )
+        }));
+      }
+    } finally {
+      set({ isUpdatingCampaignLead: false });
+    }
+  },
+
+  deleteCampaignLead: async (campaignId, campaignLeadId) => {
+    set({ isDeletingCampaignLead: true });
+    try {
+      const response = await deleteCampaignLeadApi(campaignId, campaignLeadId);
+      if (!response.success) {
+        showApiErrorToast(response);
+        return Promise.reject(response);
+      }
+      set((state) => ({
+        campaignLeads: state.campaignLeads.filter((l) => l.id !== campaignLeadId),
+        campaignLeadsTotal: Math.max(0, state.campaignLeadsTotal - 1)
+      }));
+    } finally {
+      set({ isDeletingCampaignLead: false });
+    }
+  },
+
+  assignRandomCampaignLeads: async (campaignId) => {
+    set({ isAssigningRandomLeads: true });
+    try {
+      const response = await assignRandomCampaignLeadsApi(campaignId);
+      if (!response.success) {
+        showApiErrorToast(response);
+        return Promise.reject(response);
+      }
+      return response;
+    } finally {
+      set({ isAssigningRandomLeads: false });
     }
   },
 

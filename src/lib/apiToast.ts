@@ -4,37 +4,51 @@ import { toast } from "@/components/ui/sonner";
 const DEFAULT_ERROR_MESSAGE = "Something went wrong. Please try again.";
 const ERROR_TOAST_SHOWN = "__api_error_toast_shown__";
 
-/**
- * Extract error message from API error (AxiosError.response.data).
- * Handles 422/400: message, or errors[] array (e.g. validation).
- */
-export function getApiErrorMessage(error: unknown): string {
-  if (error && typeof error === "object") {
-    const plainMessage = (error as { message?: unknown }).message;
-    if (typeof plainMessage === "string" && plainMessage.trim()) return plainMessage;
-    const plainErrors = (error as { errors?: unknown[] }).errors;
-    if (Array.isArray(plainErrors) && plainErrors.length > 0) {
-      const first = plainErrors[0];
+function messageFromApiBody(data: unknown): string | null {
+  if (typeof data === "string") {
+    const trimmed = data.trim();
+    if (!trimmed) return null;
+    try {
+      const parsed = JSON.parse(trimmed) as { message?: unknown; errors?: unknown[] };
+      return messageFromApiBody(parsed);
+    } catch {
+      return trimmed;
+    }
+  }
+  if (data && typeof data === "object") {
+    const msg = (data as { message?: unknown }).message;
+    if (typeof msg === "string" && msg.trim()) return msg;
+    const errors = (data as { errors?: unknown[] }).errors;
+    if (Array.isArray(errors) && errors.length > 0) {
+      const first = errors[0];
       const str =
         typeof first === "string" ? first : ((first as { message?: string })?.message ?? JSON.stringify(first));
       if (str && str !== "{}") return str;
     }
   }
+  return null;
+}
 
+/**
+ * Extract error message from API error (AxiosError.response.data).
+ * Handles 422/400: message, or errors[] array (e.g. validation).
+ */
+export function getApiErrorMessage(error: unknown): string {
+  if (typeof error === "string" && error.trim()) return error;
+
+  // AxiosError extends Error — must read response.data before error.message
+  // or we return "Request failed with status code …" instead of the API body.
   if (error instanceof AxiosError) {
-    const data = error.response?.data;
-    if (data && typeof data === "object") {
-      const msg = (data as { message?: string }).message;
-      if (typeof msg === "string" && msg.trim()) return msg;
-      const errors = (data as { errors?: unknown[] }).errors;
-      if (Array.isArray(errors) && errors.length > 0) {
-        const first = errors[0];
-        const str =
-          typeof first === "string" ? first : ((first as { message?: string })?.message ?? JSON.stringify(first));
-        if (str && str !== "{}") return str;
-      }
-    }
+    const fromBody = messageFromApiBody(error.response?.data);
+    if (fromBody) return fromBody;
   }
+
+  // Plain API-shaped reject payloads, e.g. { success: false, message: "…" }
+  if (error && typeof error === "object" && !(error instanceof Error)) {
+    const fromBody = messageFromApiBody(error);
+    if (fromBody) return fromBody;
+  }
+
   if (error instanceof Error && error.message?.trim()) return error.message;
   return DEFAULT_ERROR_MESSAGE;
 }

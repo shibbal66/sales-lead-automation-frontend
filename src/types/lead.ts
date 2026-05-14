@@ -1,3 +1,5 @@
+import type { ApiPagination } from "./campaign";
+
 export type LeadPresentationStatus =
   | "new"
   | "contacted"
@@ -56,21 +58,27 @@ export interface GetLeadsQuery {
   industry?: string;
 }
 
+/** Legacy list body before `data` + top-level `pagination`. */
+export interface GetLeadsLegacyData {
+  leads: LeadApiModel[];
+  page?: number;
+  limit?: number;
+  total?: number;
+}
+
+/** GET `/leads`: success `{ data: LeadApiModel[], pagination }`; errors `{ message, code? }`. */
 export interface GetLeadsResponse {
   success: boolean;
   message?: string;
-  data?: {
-    leads: LeadApiModel[];
-    page?: number;
-    limit?: number;
-    total?: number;
-  };
+  code?: string;
+  data?: LeadApiModel[] | GetLeadsLegacyData;
+  pagination?: ApiPagination;
 }
 
 export interface GetLeadByIdResponse {
   success: boolean;
   message?: string;
-  data?: {
-    lead: LeadApiModel;
-  };
+  code?: string;
+  /** Single lead row or `{ lead }` (both accepted). */
+  data?: LeadApiModel | { lead: LeadApiModel };
 }

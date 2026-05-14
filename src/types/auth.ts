@@ -69,7 +69,9 @@ export interface RefreshTokenRequest {
 
 export interface RefreshTokenResponse {
   success: boolean;
-  message: string;
+  message?: string;
+  /** When `success` is false, e.g. `TOKEN_EXPIRED`. */
+  code?: string;
   data?: {
     accessToken: string;
     refreshToken: string;

@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { clearAuthStorage, getAuthToken } from "../utils/authSorage";
-import { isAuthEndpoint } from "./authTokenErrors";
-import { refreshSession } from "./refreshSession";
+import { clearAuthStorage, getAuthToken } from "@/utils/authSorage";
+import { refreshSession } from "@/lib/refreshSession";
+import { END_POINT } from "@/lib/apiURL";
 
 const LOGIN_PATH = "/login";
 
@@ -15,7 +15,7 @@ type QueueItem = {
 let isRefreshing = false;
 let failedQueue: QueueItem[] = [];
 
-const processQueue = (error: unknown | null = null, token: string | null = null) => {
+const processQueue = (error: unknown = null, token: string | null = null) => {
   failedQueue.forEach((promise) => {
     if (error != null) {
       promise.reject(error);
@@ -32,36 +32,41 @@ const setAuthorizationHeader = (request: InternalAxiosRequestConfig, token: stri
 
 const isOnLoginPage = () => window.location.pathname === LOGIN_PATH;
 
-/** Clear auth and redirect to login. If already on login, only clear (no redirect). */
+/** Clears persisted auth via `authSorage` only, then redirects to login when appropriate. */
 const clearAuthAndRedirect = () => {
   clearAuthStorage();
   if (isOnLoginPage()) return;
   window.location.href = LOGIN_PATH;
 };
 
-/** Backend may signal an expired access token with 401 or 500 on protected routes. */
-const shouldAttemptTokenRefresh = (error: AxiosError, request?: RetryableAxiosRequestConfig): boolean => {
-  const status = error.response?.status;
-  if (!request || request._retry) return false;
-  if (isAuthEndpoint(request.url)) return false;
-  return status === 401 || status === 500;
+/** Do not run refresh for auth endpoints (avoids loops and masks real login errors). */
+const shouldSkipRefreshForRequest = (url?: string): boolean => {
+  if (!url) return true;
+  return (
+    url.includes(END_POINT.auth.login) ||
+    url.includes(END_POINT.auth.refresh) ||
+    url.includes(END_POINT.auth.signup) ||
+    url.includes(END_POINT.auth.verifyOtp) ||
+    url.includes(END_POINT.auth.resendOtp) ||
+    url.includes(END_POINT.auth.googleLogin)
+  );
 };
 
 const axiosInstance: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 30000,
-  withCredentials: true,
+  withCredentials: true
 });
 
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = getAuthToken();
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      setAuthorizationHeader(config, token);
     }
     return config;
   },
-  (error) => Promise.reject(error),
+  (error) => Promise.reject(error)
 );
 
 axiosInstance.interceptors.response.use(
@@ -69,7 +74,12 @@ axiosInstance.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableAxiosRequestConfig;
 
-    if (shouldAttemptTokenRefresh(error, originalRequest)) {
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !shouldSkipRefreshForRequest(originalRequest.url)
+    ) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -89,8 +99,8 @@ axiosInstance.interceptors.response.use(
         setAuthorizationHeader(originalRequest, newAccessToken);
         processQueue(null, newAccessToken);
         return axiosInstance(originalRequest);
-      } catch (refreshError: unknown) {
-        processQueue(refreshError, null);
+      } catch {
+        processQueue(error, null);
         clearAuthAndRedirect();
         return Promise.reject(error);
       } finally {
@@ -99,7 +109,7 @@ axiosInstance.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  },
+  }
 );
 
 export default axiosInstance;
