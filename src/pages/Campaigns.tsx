@@ -20,6 +20,7 @@ export default function CampaignsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const apiCampaigns = useCampaignStore((state) => state.campaigns);
+  const campaignsListTotal = useCampaignStore((state) => state.total);
   const selectedCampaign = useCampaignStore((state) => state.selectedCampaign);
   const isFetching = useCampaignStore((state) => state.isFetching);
   const isFetchingDetail = useCampaignStore((state) => state.isFetchingDetail);
@@ -100,7 +101,11 @@ export default function CampaignsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl font-bold">Campaigns</h2>
-          <p className="text-sm text-muted-foreground">{allCampaigns.length} shown</p>
+          <p className="text-sm text-muted-foreground">
+            {apiCampaigns.length === campaignsListTotal
+              ? `${campaignsListTotal} campaign${campaignsListTotal === 1 ? "" : "s"}`
+              : `${apiCampaigns.length} on this page · ${campaignsListTotal} total`}
+          </p>
         </div>
         <Button onClick={() => setWizardOpen(true)}><Plus className="h-4 w-4" /> New Campaign</Button>
       </div>

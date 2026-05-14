@@ -6,7 +6,7 @@ export function StatusPill({
   status,
   className,
 }: {
-  status: LeadPresentationStatus | CampaignStatus | "Interested" | "Not Interested" | "Out of Office" | "Question" | "Meeting Request" | "Upcoming" | "Completed" | "failed" | "Enriched" | "Pending" | "sent" | string;
+  status: LeadPresentationStatus | CampaignStatus | "Interested" | "Not Interested" | "Out of Office" | "Question" | "Meeting Request" | "Upcoming" | "Completed" | "failed" | "Enriched" | "Pending" | "sent" | "skipped" | string;
   className?: string;
 }) {
   const map: Record<string, string> = {
@@ -30,6 +30,7 @@ export function StatusPill({
     enriched: "bg-primary/15 text-brand-text border-primary/20",
     pending: "bg-muted text-muted-foreground border-border",
     sent: "bg-primary/15 text-brand-text border-primary/20",
+    skipped: "bg-muted text-muted-foreground border-border",
   };
   const label =
     typeof status === "string" && status.length > 0

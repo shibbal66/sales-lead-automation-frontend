@@ -3,21 +3,21 @@ import { END_POINT } from "../../lib/apiURL";
 import type {
   AddCampaignLeadRequest,
   AddCampaignLeadResponse,
+  AssignRandomCampaignLeadsResponse,
   CampaignStatus,
   CreateCampaignRequest,
   CreateCampaignResponse,
+  DeleteCampaignLeadResponse,
+  DeleteCampaignResponse,
   GetCampaignByIdResponse,
   GetCampaignLeadsQuery,
   GetCampaignLeadsResponse,
   GetCampaignsResponse,
+  UpdateCampaignLeadRequest,
+  UpdateCampaignLeadResponse,
   UpdateCampaignRequest,
   UpdateCampaignResponse
 } from "@/types";
-
-type DeleteCampaignResponse = {
-  success: boolean;
-  message: string;
-};
 
 export function createCampaign(payload: CreateCampaignRequest) {
   return apiInvoker<CreateCampaignResponse>(END_POINT.campaign.create, "POST", payload);
@@ -49,6 +49,32 @@ export function addCampaignLead(campaignId: string, payload: AddCampaignLeadRequ
     `${END_POINT.campaign.create}/${campaignId}/leads`,
     "POST",
     payload
+  );
+}
+
+export function updateCampaignLead(
+  campaignId: string,
+  campaignLeadId: string,
+  payload: UpdateCampaignLeadRequest
+) {
+  return apiInvoker<UpdateCampaignLeadResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/leads/${campaignLeadId}`,
+    "PATCH",
+    payload
+  );
+}
+
+export function deleteCampaignLead(campaignId: string, campaignLeadId: string) {
+  return apiInvoker<DeleteCampaignLeadResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/leads/${campaignLeadId}`,
+    "DELETE"
+  );
+}
+
+export function assignRandomCampaignLeads(campaignId: string) {
+  return apiInvoker<AssignRandomCampaignLeadsResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/leads/assign-random`,
+    "POST"
   );
 }
 

@@ -2,6 +2,14 @@ export type CampaignRunMode = "auto" | "manual";
 export type CampaignLeadSource = "new" | "existing" | "both";
 export type CampaignStatus = "draft" | "running" | "active" | "paused" | "completed";
 
+/** Pagination returned with list endpoints (e.g. GET `/campaigns`). */
+export interface ApiPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface CreateCampaignRequest {
   name: string;
   goal: string;
@@ -34,7 +42,8 @@ export interface CampaignApiModel {
 
 export interface CreateCampaignResponse {
   success: boolean;
-  message: string;
+  message?: string;
+  code?: string;
   data?: {
     campaign: CampaignApiModel;
   };
@@ -44,7 +53,8 @@ export type UpdateCampaignRequest = Partial<CreateCampaignRequest>;
 
 export interface UpdateCampaignResponse {
   success: boolean;
-  message: string;
+  message?: string;
+  code?: string;
   data?: {
     campaign: CampaignApiModel;
   };
@@ -52,24 +62,25 @@ export interface UpdateCampaignResponse {
 
 export interface DeleteCampaignResponse {
   success: boolean;
-  message: string;
+  message?: string;
+  code?: string;
 }
 
+/** GET `/campaigns`: success `{ data: CampaignApiModel[], pagination }`; errors `{ message, code? }`. */
 export interface GetCampaignsResponse {
   success: boolean;
-  data?: {
-    campaigns: CampaignApiModel[];
-    total: number;
-    page: number;
-    limit: number;
-  };
+  message?: string;
+  code?: string;
+  data?: CampaignApiModel[];
+  pagination?: ApiPagination;
 }
 
 export interface GetCampaignByIdResponse {
   success: boolean;
-  data?: {
-    campaign: CampaignApiModel;
-  };
+  message?: string;
+  code?: string;
+  /** Either a single campaign object or `{ campaign }` (both accepted). */
+  data?: CampaignApiModel | { campaign: CampaignApiModel };
 }
 
 export interface CampaignLeadApiModel {
@@ -93,12 +104,15 @@ export interface GetCampaignLeadsQuery {
 export interface GetCampaignLeadsResponse {
   success: boolean;
   message?: string;
-  data?: {
+  code?: string;
+  /** Success: either a flat list or legacy `{ leads, page, limit, total }`. */
+  data?: CampaignLeadApiModel[] | {
     leads: CampaignLeadApiModel[];
     page?: number;
     limit?: number;
     total?: number;
   };
+  pagination?: ApiPagination;
 }
 
 export interface AddCampaignLeadRequest {
@@ -108,8 +122,51 @@ export interface AddCampaignLeadRequest {
 
 export interface AddCampaignLeadResponse {
   success: boolean;
-  message: string;
+  message?: string;
+  code?: string;
   data?: {
     lead: CampaignLeadApiModel;
   };
+}
+
+/** Allowed campaign-assignment lead statuses (API + edit dialog). */
+export const CAMPAIGN_LEAD_STATUSES = ["pending", "sent", "failed", "skipped"] as const;
+export type CampaignLeadStatus = (typeof CAMPAIGN_LEAD_STATUSES)[number];
+
+export interface UpdateCampaignLeadRequest {
+  status: CampaignLeadStatus;
+  sent_at: string | null;
+  mail_template: string;
+}
+
+export interface UpdateCampaignLeadResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data?: {
+    lead: CampaignLeadApiModel;
+  };
+}
+
+export interface DeleteCampaignLeadResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+}
+
+export interface AssignRandomCampaignLeadsData {
+  inserted: CampaignLeadApiModel[];
+  duplicates: unknown[];
+  totalRequested: number;
+  totalAvailable: number;
+  totalInserted: number;
+  totalDuplicates: number;
+  leadSource: CampaignLeadSource;
+}
+
+export interface AssignRandomCampaignLeadsResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data?: AssignRandomCampaignLeadsData;
 }
