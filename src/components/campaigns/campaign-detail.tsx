@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CampaignLeadsSection } from "@/components/campaigns/campaign-leads-section";
 import { CampaignSettingsPanel } from "@/components/campaigns/campaign-settings-panel";
+import { FollowUpStepRow } from "@/components/campaigns/follow-up-step-row";
 import { useCampaignDetailForm } from "@/hooks/useCampaignDetailForm";
 import { useCampaignFollowUps } from "@/hooks/useCampaignFollowUps";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
@@ -15,12 +16,11 @@ import { showApiSuccessToast } from "@/lib/apiToast";
 import { cn } from "@/lib/utils";
 import { mailTemplateSampleSchema } from "@/validators";
 import type { CampaignDetailViewModel } from "@/lib/campaignPresentation";
-import type { CampaignFollowUpApiModel } from "@/types";
 import {
-  ArrowLeft, Plus, Trash2, Sparkles, X,
+  ArrowLeft, ChevronDown, Plus, Trash2, Sparkles, X,
 } from "lucide-react";
 
-const WAIT_DAY_OPTIONS = [ 1, 2, 3, 5, 7] as const;
+const WAIT_DAY_OPTIONS = [1, 2, 3, 5, 7] as const;
 
 function getWaitDayOptions(current: number) {
   const options = new Set<number>([...WAIT_DAY_OPTIONS, current]);
@@ -33,18 +33,6 @@ const sampleContentFormats = [
   { id: "text", label: "Plain text" }
 ] as const;
 type SampleContentFormat = (typeof sampleContentFormats)[number]["id"];
-
-type FollowUpDraft = { name: string; waiting_days: number };
-
-function buildFollowUpDrafts(followUps: CampaignFollowUpApiModel[]): Record<string, FollowUpDraft> {
-  return Object.fromEntries(
-    followUps.map((step) => [step.id, { name: step.name, waiting_days: step.waiting_days }])
-  );
-}
-
-function isFollowUpDraftDirty(step: CampaignFollowUpApiModel, draft: FollowUpDraft) {
-  return draft.name.trim() !== step.name || draft.waiting_days !== step.waiting_days;
-}
 
 export function CampaignDetail({
   campaign,
@@ -80,13 +68,23 @@ export function CampaignDetail({
 
   const {
     campaignFollowUps,
+    followUpDrafts,
+    dirtyFollowUpIds,
+    hasFollowUpChanges,
+    expandedBodyIds,
+    editingIds,
     isFetchingCampaignFollowUps,
     isCreatingCampaignFollowUp,
     isUpdatingCampaignFollowUp,
     isDeletingCampaignFollowUp,
     addFollowUp,
-    saveFollowUp,
-    removeFollowUp
+    removeFollowUp,
+    updateDraft,
+    toggleBodyExpanded,
+    startEditing,
+    stopEditing,
+    discardChanges,
+    saveDirtyChanges
   } = useCampaignFollowUps(campaign.id);
 
   const [addingExample, setAddingExample] = useState(false);
@@ -99,24 +97,8 @@ export function CampaignDetail({
   const [addFollowUpOpen, setAddFollowUpOpen] = useState(false);
   const [newFollowUpName, setNewFollowUpName] = useState("");
   const [newFollowUpDays, setNewFollowUpDays] = useState<number>(3);
-  const [followUpDrafts, setFollowUpDrafts] = useState<Record<string, FollowUpDraft>>({});
-
-  useEffect(() => {
-    setFollowUpDrafts(buildFollowUpDrafts(campaignFollowUps));
-  }, [campaignFollowUps]);
-
-  const dirtyFollowUpIds = useMemo(
-    () =>
-      campaignFollowUps
-        .filter((step) => {
-          const draft = followUpDrafts[step.id];
-          return draft ? isFollowUpDraftDirty(step, draft) : false;
-        })
-        .map((step) => step.id),
-    [campaignFollowUps, followUpDrafts]
-  );
-
-  const hasFollowUpChanges = dirtyFollowUpIds.length > 0;
+  const [newFollowUpBodyTemplate, setNewFollowUpBodyTemplate] = useState("");
+  const [addFollowUpBodyExpanded, setAddFollowUpBodyExpanded] = useState(false);
 
   const handleSaveChanges = async () => {
     const payload = buildUpdatePayload();
@@ -170,12 +152,16 @@ export function CampaignDetail({
   const resetAddFollowUpDialog = () => {
     setNewFollowUpName("");
     setNewFollowUpDays(3);
+    setNewFollowUpBodyTemplate("");
+    setAddFollowUpBodyExpanded(false);
   };
 
   const handleAddFollowUpOpenChange = (open: boolean) => {
     setAddFollowUpOpen(open);
     if (open) {
       setNewFollowUpName(`Follow-up ${campaignFollowUps.length + 1}`);
+      setNewFollowUpBodyTemplate("");
+      setAddFollowUpBodyExpanded(false);
       return;
     }
     resetAddFollowUpDialog();
@@ -183,38 +169,14 @@ export function CampaignDetail({
 
   const handleCreateFollowUp = async () => {
     const name = newFollowUpName.trim() || `Follow-up ${campaignFollowUps.length + 1}`;
-    const ok = await addFollowUp({ name, waiting_days: newFollowUpDays });
+    const ok = await addFollowUp({
+      name,
+      waiting_days: newFollowUpDays,
+      body_template: newFollowUpBodyTemplate
+    });
     if (!ok) return;
     resetAddFollowUpDialog();
     setAddFollowUpOpen(false);
-  };
-
-  const updateFollowUpDraft = (followUpId: string, patch: Partial<FollowUpDraft>) => {
-    setFollowUpDrafts((previous) => {
-      const current = previous[followUpId];
-      if (!current) return previous;
-      return { ...previous, [followUpId]: { ...current, ...patch } };
-    });
-  };
-
-  const handleDiscardFollowUpChanges = () => {
-    setFollowUpDrafts(buildFollowUpDrafts(campaignFollowUps));
-  };
-
-  const handleSaveFollowUpChanges = async () => {
-    const results = await Promise.all(
-      dirtyFollowUpIds.map((followUpId) => {
-        const draft = followUpDrafts[followUpId];
-        if (!draft) return Promise.resolve(false);
-        return saveFollowUp(followUpId, {
-          name: draft.name.trim(),
-          waiting_days: draft.waiting_days
-        });
-      })
-    );
-    if (results.every(Boolean)) {
-      showApiSuccessToast("Follow-up steps saved.");
-    }
   };
 
   const handleDeleteCampaign = async () => {
@@ -339,7 +301,8 @@ export function CampaignDetail({
               <div>
                 <h3 className="font-display text-base font-bold">Follow-up Sequence</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Configure when each follow-up runs after the previous step.
+                  Configure timing and message body for each follow-up step. Use placeholders like{" "}
+                  <code className="rounded bg-muted px-1 py-0.5 text-xs">{"{{firstName}}"}</code>.
                 </p>
               </div>
               {hasFollowUpChanges && (
@@ -348,14 +311,14 @@ export function CampaignDetail({
                     variant="outline"
                     size="sm"
                     disabled={isUpdatingCampaignFollowUp}
-                    onClick={handleDiscardFollowUpChanges}
+                    onClick={discardChanges}
                   >
                     Discard
                   </Button>
                   <Button
                     size="sm"
                     disabled={isUpdatingCampaignFollowUp}
-                    onClick={() => void handleSaveFollowUpChanges()}
+                    onClick={() => void saveDirtyChanges()}
                   >
                     {isUpdatingCampaignFollowUp ? "Saving..." : "Save changes"}
                   </Button>
@@ -366,77 +329,34 @@ export function CampaignDetail({
               <p className="mt-4 text-sm text-muted-foreground">Loading follow-ups...</p>
             ) : (
               <>
-                {campaignFollowUps.length > 0 && (
-                  <div className="mt-4 hidden grid-cols-[2.5rem_minmax(0,1fr)_9.5rem_2.5rem] items-center gap-3 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
-                    <span>#</span>
-                    <span>Name</span>
-                    <span>Wait</span>
-                    <span className="sr-only">Actions</span>
-                  </div>
-                )}
-                <ol className="mt-2 space-y-2 sm:mt-3">
+                <ol className="mt-4 space-y-2">
                   {campaignFollowUps.map((step, index) => {
                     const draft = followUpDrafts[step.id];
                     if (!draft) return null;
-                    const isDirty = isFollowUpDraftDirty(step, draft);
+                    const isDirty = dirtyFollowUpIds.includes(step.id);
+                    const isEditing = editingIds.includes(step.id);
+                    const isBodyExpanded = expandedBodyIds.includes(step.id);
+                    const isRowBusy = isUpdatingCampaignFollowUp || isDeletingCampaignFollowUp;
+                    const blockOtherEdits = hasFollowUpChanges && !isDirty && !isEditing;
 
                     return (
-                      <li
+                      <FollowUpStepRow
                         key={step.id}
-                        className={cn(
-                          "grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 rounded-lg border bg-surface/40 p-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_9.5rem_2.5rem]",
-                          isDirty ? "border-primary/40 ring-1 ring-primary/20" : "border-border"
-                        )}
-                      >
-                        <div className="grid h-8 w-8 place-items-center rounded-full bg-primary/15 text-xs font-bold text-brand-text">
-                          {index + 1}
-                        </div>
-                        <div className="col-span-2 min-w-0 sm:col-span-1">
-                          <Label htmlFor={`follow-up-name-${step.id}`} className="sr-only">
-                            Step name
-                          </Label>
-                          <Input
-                            id={`follow-up-name-${step.id}`}
-                            value={draft.name}
-                            className="h-9"
-                            disabled={isUpdatingCampaignFollowUp || isDeletingCampaignFollowUp}
-                            onChange={(event) => updateFollowUpDraft(step.id, { name: event.target.value })}
-                          />
-                        </div>
-                        <div className="col-span-2 sm:col-span-1">
-                          <Label
-                            htmlFor={`follow-up-days-${step.id}`}
-                            className="mb-1 block text-xs text-muted-foreground sm:sr-only"
-                          >
-                            Wait days
-                          </Label>
-                          <select
-                            id={`follow-up-days-${step.id}`}
-                            value={draft.waiting_days}
-                            className="flex h-9 w-full min-w-[8.5rem] rounded-md border border-input bg-background px-3 text-sm"
-                            disabled={isUpdatingCampaignFollowUp || isDeletingCampaignFollowUp}
-                            onChange={(event) =>
-                              updateFollowUpDraft(step.id, { waiting_days: Number(event.target.value) })
-                            }
-                          >
-                            {getWaitDayOptions(draft.waiting_days).map((day) => (
-                              <option key={day} value={day}>
-                                {day === 0 ? "Same day" : day === 1 ? "1 day" : `${day} days`}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0 justify-self-end sm:justify-self-auto"
-                          disabled={isDeletingCampaignFollowUp || hasFollowUpChanges}
-                          title={hasFollowUpChanges ? "Save or discard changes before deleting" : "Delete step"}
-                          onClick={() => void removeFollowUp(step.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </li>
+                        step={step}
+                        index={index}
+                        draft={draft}
+                        isDirty={isDirty}
+                        isEditing={isEditing}
+                        isBodyExpanded={isBodyExpanded}
+                        isRowBusy={isRowBusy}
+                        blockOtherEdits={blockOtherEdits}
+                        hasFollowUpChanges={hasFollowUpChanges}
+                        onDraftChange={(patch) => updateDraft(step.id, patch)}
+                        onToggleBody={() => toggleBodyExpanded(step.id)}
+                        onStartEdit={() => startEditing(step.id)}
+                        onStopEdit={() => stopEditing(step.id)}
+                        onDelete={() => void removeFollowUp(step.id)}
+                      />
                     );
                   })}
                   {campaignFollowUps.length === 0 && (
@@ -549,6 +469,36 @@ export function CampaignDetail({
                   <option key={day} value={day}>Wait {day} days</option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="newFollowUpBodyTemplate">Mail template</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  title={addFollowUpBodyExpanded ? "Hide mail template" : "Show mail template"}
+                  aria-expanded={addFollowUpBodyExpanded}
+                  onClick={() => setAddFollowUpBodyExpanded((previous) => !previous)}
+                >
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 transition-transform",
+                      !addFollowUpBodyExpanded && "-rotate-90"
+                    )}
+                  />
+                </Button>
+              </div>
+              {addFollowUpBodyExpanded ? (
+                <Textarea
+                  id="newFollowUpBodyTemplate"
+                  rows={5}
+                  value={newFollowUpBodyTemplate}
+                  onChange={(event) => setNewFollowUpBodyTemplate(event.target.value)}
+                  placeholder="Hi {{firstName}}, ..."
+                />
+              ) : null}
             </div>
           </div>
           <div className="flex justify-end gap-2">

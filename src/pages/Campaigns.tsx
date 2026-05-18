@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,10 @@ export default function CampaignsPage() {
   }, [id, fetchCampaignById, clearSelectedCampaign]);
 
   const allCampaigns = apiCampaigns.map(mapCampaignApiToListCard);
-  const selectedCampaignDetail = selectedCampaign ? mapCampaignApiToDetail(selectedCampaign) : null;
+  const selectedCampaignDetail = useMemo(
+    () => (selectedCampaign ? mapCampaignApiToDetail(selectedCampaign) : null),
+    [selectedCampaign]
+  );
 
   const handleStatusUpdate = async (campaign: CampaignApiModel, status: CampaignStatus) => {
     try {

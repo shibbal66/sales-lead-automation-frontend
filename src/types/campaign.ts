@@ -189,6 +189,7 @@ export interface CampaignFollowUpApiModel {
   campaign_id: string;
   name: string;
   waiting_days: number;
+  body_template: string;
   created_at: string;
   updated_at: string;
 }
@@ -196,6 +197,7 @@ export interface CampaignFollowUpApiModel {
 export interface CreateCampaignFollowUpRequest {
   name: string;
   waiting_days: number;
+  body_template: string;
 }
 
 export type UpdateCampaignFollowUpRequest = CreateCampaignFollowUpRequest;

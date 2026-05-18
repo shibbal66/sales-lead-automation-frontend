@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { teamMembers, billingHistory } from "@/lib/mock-data";
+import { billingHistory } from "@/lib/mock-data";
+import { getUserDisplayEmail, getUserDisplayName, getUserInitials } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
+import type { AuthUser } from "@/core/types/user.types";
 import {
-  User, Mail, CreditCard, Users, Bell, AlertTriangle, Check, X, Plus, Trash2,
+  User, Mail, CreditCard, Users, Bell, AlertTriangle, Check, Plus,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -28,14 +30,95 @@ const sections = [
   { id: "danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
 
+type ProfileFormState = {
+  name: string;
+  email: string;
+  contact: string;
+  address: string;
+  timezone: string;
+};
+
+function formatUserRole(role?: string) {
+  if (!role) return "User";
+  const normalized = role.trim().toLowerCase();
+  if (normalized === "admin") return "Admin";
+  if (normalized === "manager") return "Manager";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function formatAuthProvider(provider?: string) {
+  if (!provider) return "Email";
+  if (provider.toLowerCase() === "google") return "Gmail";
+  return provider.charAt(0).toUpperCase() + provider.slice(1);
+}
+
+function UserAvatarCircle({ user, className }: { user: AuthUser | null; className?: string }) {
+  const displayName = getUserDisplayName(user);
+  const initials = getUserInitials(user);
+
+  if (user?.avatarUrl) {
+    return (
+      <img
+        src={user.avatarUrl}
+        alt={displayName}
+        className={cn("rounded-full object-cover", className)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "grid place-items-center rounded-full bg-gradient-brand font-bold text-primary-foreground",
+        className
+      )}
+    >
+      {initials}
+    </div>
+  );
+}
+
 export default function Settings() {
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const updateUser = useAuthStore((state) => state.updateUser);
   const logoutAllDevices = useAuthStore((state) => state.logoutAllDevices);
   const [section, setSection] = useState<(typeof sections)[number]["id"]>("profile");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [logoutAllLoading, setLogoutAllLoading] = useState(false);
+  const [profileForm, setProfileForm] = useState<ProfileFormState>({
+    name: "",
+    email: "",
+    contact: "",
+    address: "",
+    timezone: "pt"
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    setProfileForm({
+      name: getUserDisplayName(user),
+      email: user.email,
+      contact: user.contact ?? "",
+      address: user.address ?? "",
+      timezone: "pt"
+    });
+  }, [user]);
+
+  const currentTeamMember = useMemo(() => {
+    if (!user) return null;
+    return {
+      id: user.id,
+      name: getUserDisplayName(user),
+      email: getUserDisplayEmail(user),
+      role: formatUserRole(user.role)
+    };
+  }, [user]);
+
+
+  const isGoogleAccount = user?.authProvider?.toLowerCase() === "google";
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px,1fr]">
@@ -66,15 +149,48 @@ export default function Settings() {
           <Card className="p-6 shadow-card">
             <h3 className="font-display text-lg font-bold">Profile</h3>
             <div className="mt-4 flex items-center gap-4">
-              <div className="grid h-16 w-16 place-items-center rounded-full bg-gradient-brand text-lg font-bold text-primary-foreground">AR</div>
-              <Button variant="outline">Upload Avatar</Button>
+              <UserAvatarCircle user={user} className="h-16 w-16 text-lg" />
+              <Button variant="outline" disabled={!user}>Upload Avatar</Button>
             </div>
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5"><Label>Full name</Label><Input defaultValue="Alex Rivera" /></div>
-              <div className="space-y-1.5"><Label>Email</Label><Input defaultValue="alex@rapidships.com" /></div>
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-name">Full name</Label>
+                <Input
+                  id="profile-name"
+                  value={profileForm.name}
+                  disabled={!user}
+                  onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-email">Email</Label>
+                <Input id="profile-email" value={profileForm.email} disabled readOnly />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="profile-contact">Phone</Label>
+                <Input
+                  id="profile-contact"
+                  value={profileForm.contact}
+                  disabled={!user}
+                  onChange={(event) => setProfileForm((current) => ({ ...current, contact: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5 md:col-span-2">
+                <Label htmlFor="profile-address">Address</Label>
+                <Input
+                  id="profile-address"
+                  value={profileForm.address}
+                  disabled={!user}
+                  onChange={(event) => setProfileForm((current) => ({ ...current, address: event.target.value }))}
+                />
+              </div>
               <div className="space-y-1.5">
                 <Label>Timezone</Label>
-                <Select defaultValue="pt">
+                <Select
+                  value={profileForm.timezone}
+                  disabled={!user}
+                  onValueChange={(value) => setProfileForm((current) => ({ ...current, timezone: value }))}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pt">(GMT-08:00) Pacific Time</SelectItem>
@@ -85,7 +201,11 @@ export default function Settings() {
                 </Select>
               </div>
             </div>
-            <div className="mt-6 flex justify-end"><Button onClick={() => toast({ title: "Profile saved" })}>Save Changes</Button></div>
+            <div className="mt-6 flex justify-end">
+              <Button disabled={!user}>
+                Save Changes
+              </Button>
+            </div>
           </Card>
         )}
 
@@ -97,13 +217,18 @@ export default function Settings() {
               <p className="mt-1 text-sm text-muted-foreground">Connect Gmail to send personalized outreach from your address.</p>
               <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-surface/40 p-4">
                 <div className="flex items-center gap-3">
-                  <div className="grid h-10 w-10 place-items-center rounded-full bg-gradient-brand text-sm font-bold text-primary-foreground">AR</div>
+                  <UserAvatarCircle user={user} className="h-10 w-10 text-sm" />
                   <div>
-                    <p className="font-semibold">alex@rapidships.com</p>
-                    <p className="text-xs text-muted-foreground">Gmail · 200 emails/day</p>
+                    <p className="font-semibold">{getUserDisplayEmail(user)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatAuthProvider(user?.authProvider)}
+                      {user?.isVerified ? " · Verified" : ""}
+                    </p>
                   </div>
                 </div>
-                <Button variant="outline">Disconnect</Button>
+                <Button variant="outline" disabled={!isGoogleAccount}>
+                  {isGoogleAccount ? "Disconnect" : "Not connected"}
+                </Button>
               </div>
               
             </Card>
@@ -251,23 +376,25 @@ export default function Settings() {
                 <Button onClick={() => setInviteOpen(true)}><Plus className="h-4 w-4" /> Invite Member</Button>
               </div>
               <div className="mt-4 space-y-2">
-                {teamMembers.map((m) => (
-                  <div key={m.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                    <div className="grid h-9 w-9 place-items-center rounded-full bg-gradient-brand text-xs font-semibold text-primary-foreground">
-                      {m.name.split(" ").map((n) => n[0]).join("")}
-                    </div>
+                {currentTeamMember ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-border p-3">
+                    <UserAvatarCircle user={user} className="h-9 w-9 text-xs" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold">{m.name}</p>
-                      <p className="text-xs text-muted-foreground">{m.email}</p>
+                      <p className="text-sm font-semibold">{currentTeamMember.name}</p>
+                      <p className="text-xs text-muted-foreground">{currentTeamMember.email}</p>
                     </div>
                     <span className={cn(
                       "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold",
-                      m.role === "Admin" ? "border-primary/30 bg-primary/15 text-brand-text" :
-                      m.role === "Manager" ? "border-info/30 bg-info/15 text-info" : "border-border bg-muted text-muted-foreground"
-                    )}>{m.role}</span>
-                    <Button variant="ghost" size="icon" className="h-8 w-8"><Trash2 className="h-3.5 w-3.5" /></Button>
+                      currentTeamMember.role === "Admin" ? "border-primary/30 bg-primary/15 text-brand-text" :
+                      currentTeamMember.role === "Manager" ? "border-info/30 bg-info/15 text-info" : "border-border bg-muted text-muted-foreground"
+                    )}>{currentTeamMember.role}</span>
+                    <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      You
+                    </span>
                   </div>
-                ))}
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sign in to view your team profile.</p>
+                )}
               </div>
             </Card>
 
