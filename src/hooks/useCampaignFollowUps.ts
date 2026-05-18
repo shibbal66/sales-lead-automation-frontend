@@ -1,95 +1,62 @@
-import { useCallback, useEffect } from "react";
-import { useCampaignStore } from "@/store/campaign/campaignStore";
-import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
-import type { CreateCampaignFollowUpRequest, UpdateCampaignFollowUpRequest } from "@/types";
+import { useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { getDirtyFollowUpIds } from "@/lib/followUpDraft";
+import {
+  selectCampaignFollowUps,
+  selectFollowUpDrafts,
+  useCampaignFollowUpStore
+} from "@/store/campaign/campaignFollowUpStore";
+import type { CreateCampaignFollowUpRequest } from "@/types";
 
 export function useCampaignFollowUps(campaignId: string) {
-  const campaignFollowUps = useCampaignStore((state) => state.campaignFollowUps);
-  const isFetchingCampaignFollowUps = useCampaignStore((state) => state.isFetchingCampaignFollowUps);
-  const isCreatingCampaignFollowUp = useCampaignStore((state) => state.isCreatingCampaignFollowUp);
-  const isUpdatingCampaignFollowUp = useCampaignStore((state) => state.isUpdatingCampaignFollowUp);
-  const isDeletingCampaignFollowUp = useCampaignStore((state) => state.isDeletingCampaignFollowUp);
-  const fetchCampaignFollowUps = useCampaignStore((state) => state.fetchCampaignFollowUps);
-  const createCampaignFollowUp = useCampaignStore((state) => state.createCampaignFollowUp);
-  const updateCampaignFollowUp = useCampaignStore((state) => state.updateCampaignFollowUp);
-  const deleteCampaignFollowUp = useCampaignStore((state) => state.deleteCampaignFollowUp);
-  const clearCampaignFollowUps = useCampaignStore((state) => state.clearCampaignFollowUps);
+  const items = useCampaignFollowUpStore(selectCampaignFollowUps);
+  const drafts = useCampaignFollowUpStore(selectFollowUpDrafts);
+  const dirtyFollowUpIds = useCampaignFollowUpStore(
+    useShallow((state) => getDirtyFollowUpIds(state.items, state.drafts))
+  );
+  const hasFollowUpChanges = dirtyFollowUpIds.length > 0;
+  const expandedBodyIds = useCampaignFollowUpStore((state) => state.expandedBodyIds);
+  const editingIds = useCampaignFollowUpStore((state) => state.editingIds);
+  const isFetching = useCampaignFollowUpStore((state) => state.isFetching);
+  const isCreating = useCampaignFollowUpStore((state) => state.isCreating);
+  const isUpdating = useCampaignFollowUpStore((state) => state.isUpdating);
+  const isDeleting = useCampaignFollowUpStore((state) => state.isDeleting);
+  const createFollowUp = useCampaignFollowUpStore((state) => state.createFollowUp);
+  const deleteFollowUp = useCampaignFollowUpStore((state) => state.deleteFollowUp);
+  const updateDraft = useCampaignFollowUpStore((state) => state.updateDraft);
+  const toggleBodyExpanded = useCampaignFollowUpStore((state) => state.toggleBodyExpanded);
+  const startEditing = useCampaignFollowUpStore((state) => state.startEditing);
+  const stopEditing = useCampaignFollowUpStore((state) => state.stopEditing);
+  const discardChanges = useCampaignFollowUpStore((state) => state.discardChanges);
+  const saveDirtyChanges = useCampaignFollowUpStore((state) => state.saveDirtyChanges);
 
   useEffect(() => {
-    clearCampaignFollowUps();
-  }, [campaignId, clearCampaignFollowUps]);
+    void useCampaignFollowUpStore.getState().loadFollowUps(campaignId);
+    return () => useCampaignFollowUpStore.getState().reset();
+  }, [campaignId]);
 
-  useEffect(() => {
-    void fetchCampaignFollowUps(campaignId);
-  }, [campaignId, fetchCampaignFollowUps]);
+  const addFollowUp = (payload: CreateCampaignFollowUpRequest) => createFollowUp(campaignId, payload);
 
-  useEffect(() => {
-    return () => {
-      clearCampaignFollowUps();
-    };
-  }, [clearCampaignFollowUps]);
-
-  const addFollowUp = useCallback(
-    async (payload: CreateCampaignFollowUpRequest) => {
-      const name = payload.name.trim();
-      if (!name) {
-        showApiErrorToast("Follow-up name is required.");
-        return false;
-      }
-
-      try {
-        await createCampaignFollowUp(campaignId, { name, waiting_days: payload.waiting_days });
-        showApiSuccessToast("Follow-up step added.");
-        return true;
-      } catch (error) {
-        showApiErrorToast(error);
-        return false;
-      }
-    },
-    [campaignId, createCampaignFollowUp]
-  );
-
-  const saveFollowUp = useCallback(
-    async (followUpId: string, payload: UpdateCampaignFollowUpRequest) => {
-      const name = payload.name.trim();
-      if (!name) {
-        showApiErrorToast("Follow-up name is required.");
-        return false;
-      }
-
-      try {
-        await updateCampaignFollowUp(campaignId, followUpId, { name, waiting_days: payload.waiting_days });
-        return true;
-      } catch (error) {
-        showApiErrorToast(error);
-        return false;
-      }
-    },
-    [campaignId, updateCampaignFollowUp]
-  );
-
-  const removeFollowUp = useCallback(
-    async (followUpId: string) => {
-      try {
-        await deleteCampaignFollowUp(campaignId, followUpId);
-        showApiSuccessToast("Follow-up step removed.");
-        return true;
-      } catch (error) {
-        showApiErrorToast(error);
-        return false;
-      }
-    },
-    [campaignId, deleteCampaignFollowUp]
-  );
+  const removeFollowUp = (followUpId: string) => deleteFollowUp(campaignId, followUpId);
 
   return {
-    campaignFollowUps,
-    isFetchingCampaignFollowUps,
-    isCreatingCampaignFollowUp,
-    isUpdatingCampaignFollowUp,
-    isDeletingCampaignFollowUp,
+    campaignFollowUps: items,
+    followUpDrafts: drafts,
+    dirtyFollowUpIds,
+    hasFollowUpChanges,
+    expandedBodyIds,
+    editingIds,
+    isFetchingCampaignFollowUps: isFetching,
+    isCreatingCampaignFollowUp: isCreating,
+    isUpdatingCampaignFollowUp: isUpdating,
+    isDeletingCampaignFollowUp: isDeleting,
     addFollowUp,
-    saveFollowUp,
-    removeFollowUp
+    removeFollowUp,
+    updateDraft,
+    toggleBodyExpanded,
+    startEditing,
+    stopEditing,
+    discardChanges,
+    saveDirtyChanges
   };
 }
