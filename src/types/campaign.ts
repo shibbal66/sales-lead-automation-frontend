@@ -10,16 +10,27 @@ export interface ApiPagination {
   totalPages: number;
 }
 
+export interface MailTemplateSample {
+  subject: string;
+  body: string;
+  html: string;
+  text: string;
+}
+
 export interface CreateCampaignRequest {
   name: string;
   goal: string;
   target_zone: string;
   call_to_action: string;
   run_mode: CampaignRunMode;
-  lead_source: CampaignLeadSource;
-  mail_template: string;
-  example_training: string;
+  target_tone: string;
+  mail_training_instruction: string;
+  mail_template_samples: MailTemplateSample[];
   target_leads: number;
+  lead_source: CampaignLeadSource;
+  sender_display_name: string;
+  sender_address: string;
+  sender_phone: string;
   status: CampaignStatus;
 }
 
@@ -32,8 +43,12 @@ export interface CampaignApiModel {
   call_to_action: string;
   run_mode: CampaignRunMode;
   lead_source: CampaignLeadSource;
-  mail_template: string;
-  example_training: string;
+  target_tone: string;
+  mail_training_instruction: string | null;
+  mail_template_samples: MailTemplateSample[] | null;
+  sender_display_name: string | null;
+  sender_address: string | null;
+  sender_phone: string | null;
   target_leads: number;
   status: CampaignStatus;
   created_at: string;
@@ -42,7 +57,7 @@ export interface CampaignApiModel {
 
 export interface CreateCampaignResponse {
   success: boolean;
-  message?: string;
+  message: string;
   code?: string;
   data?: {
     campaign: CampaignApiModel;
@@ -129,6 +144,21 @@ export interface AddCampaignLeadResponse {
   };
 }
 
+export interface BulkAddCampaignLeadItem {
+  lead_data_id: string;
+}
+
+export interface BulkAddCampaignLeadsRequest {
+  leads: BulkAddCampaignLeadItem[];
+}
+
+export interface BulkAddCampaignLeadsResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data?: unknown;
+}
+
 /** Allowed campaign-assignment lead statuses (API + edit dialog). */
 export const CAMPAIGN_LEAD_STATUSES = ["pending", "sent", "failed", "skipped"] as const;
 export type CampaignLeadStatus = (typeof CAMPAIGN_LEAD_STATUSES)[number];
@@ -154,19 +184,53 @@ export interface DeleteCampaignLeadResponse {
   code?: string;
 }
 
-export interface AssignRandomCampaignLeadsData {
-  inserted: CampaignLeadApiModel[];
-  duplicates: unknown[];
-  totalRequested: number;
-  totalAvailable: number;
-  totalInserted: number;
-  totalDuplicates: number;
-  leadSource: CampaignLeadSource;
+export interface CampaignFollowUpApiModel {
+  id: string;
+  campaign_id: string;
+  name: string;
+  waiting_days: number;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface AssignRandomCampaignLeadsResponse {
+export interface CreateCampaignFollowUpRequest {
+  name: string;
+  waiting_days: number;
+}
+
+export type UpdateCampaignFollowUpRequest = CreateCampaignFollowUpRequest;
+
+export interface GetCampaignFollowUpsResponse {
   success: boolean;
   message?: string;
   code?: string;
-  data?: AssignRandomCampaignLeadsData;
+  data?: {
+    followUps: CampaignFollowUpApiModel[];
+  };
 }
+
+export interface CreateCampaignFollowUpResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data?: {
+    followUp: CampaignFollowUpApiModel;
+  };
+}
+
+export interface UpdateCampaignFollowUpResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data?: {
+    followUp: CampaignFollowUpApiModel;
+  };
+}
+
+export interface DeleteCampaignFollowUpResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data?: string;
+}
+

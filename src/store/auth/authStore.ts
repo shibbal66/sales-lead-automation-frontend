@@ -66,7 +66,7 @@ export const useAuthStore = create<AuthState>((set) => {
       setStoredUser(user);
       if (refreshToken) setRefreshToken(refreshToken);
       setAuthToken(token);
-      set({ user });
+      set({ user, token, isAuthenticated: true, isLoading: false });
     },
 
     logout: async () => {

@@ -1,29 +1,50 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CampaignLeadsSection } from "@/components/campaigns/campaign-leads-section";
 import { CampaignSettingsPanel } from "@/components/campaigns/campaign-settings-panel";
 import { useCampaignDetailForm } from "@/hooks/useCampaignDetailForm";
+import { useCampaignFollowUps } from "@/hooks/useCampaignFollowUps";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { showApiSuccessToast } from "@/lib/apiToast";
+import { cn } from "@/lib/utils";
+import { mailTemplateSampleSchema } from "@/validators";
 import type { CampaignDetailViewModel } from "@/lib/campaignPresentation";
+import type { CampaignFollowUpApiModel } from "@/types";
 import {
-  ArrowLeft, GripVertical, Plus, Trash2, Sparkles, X,
+  ArrowLeft, Plus, Trash2, Sparkles, X,
 } from "lucide-react";
 
-type FollowupStep = { id: string; label: string; day: number };
-type TrainingExample = { id: string; subject: string; body: string };
+const WAIT_DAY_OPTIONS = [ 1, 2, 3, 5, 7] as const;
 
-const DEFAULT_FOLLOWUP_STEPS: FollowupStep[] = [
-  { id: "s1", label: "Initial outreach", day: 0 },
-  { id: "s2", label: "Follow-up 1", day: 3 },
-  { id: "s3", label: "Follow-up 2", day: 7 }
-];
+function getWaitDayOptions(current: number) {
+  const options = new Set<number>([...WAIT_DAY_OPTIONS, current]);
+  return [...options].sort((a, b) => a - b);
+}
+
+const sampleContentFormats = [
+  { id: "body", label: "Plain body" },
+  { id: "html", label: "HTML" },
+  { id: "text", label: "Plain text" }
+] as const;
+type SampleContentFormat = (typeof sampleContentFormats)[number]["id"];
+
+type FollowUpDraft = { name: string; waiting_days: number };
+
+function buildFollowUpDrafts(followUps: CampaignFollowUpApiModel[]): Record<string, FollowUpDraft> {
+  return Object.fromEntries(
+    followUps.map((step) => [step.id, { name: step.name, waiting_days: step.waiting_days }])
+  );
+}
+
+function isFollowUpDraftDirty(step: CampaignFollowUpApiModel, draft: FollowUpDraft) {
+  return draft.name.trim() !== step.name || draft.waiting_days !== step.waiting_days;
+}
 
 export function CampaignDetail({
   campaign,
@@ -46,6 +67,7 @@ export function CampaignDetail({
     setRunMode,
     setMailTemplate,
     setExampleTraining,
+    setMailTemplateSamples,
     setTone,
     setTargetLeads,
     setStatus,
@@ -56,17 +78,45 @@ export function CampaignDetail({
     toneOptions
   } = useCampaignDetailForm(campaign);
 
-  const [examples, setExamples] = useState<TrainingExample[]>(
-    campaign.exampleTraining
-      ? [{ id: "api-training", subject: "Imported Training Style", body: campaign.exampleTraining }]
-      : []
-  );
+  const {
+    campaignFollowUps,
+    isFetchingCampaignFollowUps,
+    isCreatingCampaignFollowUp,
+    isUpdatingCampaignFollowUp,
+    isDeletingCampaignFollowUp,
+    addFollowUp,
+    saveFollowUp,
+    removeFollowUp
+  } = useCampaignFollowUps(campaign.id);
+
   const [addingExample, setAddingExample] = useState(false);
   const [exSubject, setExSubject] = useState("");
-  const [exBody, setExBody] = useState("");
+  const [exContentFormat, setExContentFormat] = useState<SampleContentFormat>("body");
+  const [exContent, setExContent] = useState("");
+  const [addExampleError, setAddExampleError] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [steps, setSteps] = useState<FollowupStep[]>(DEFAULT_FOLLOWUP_STEPS);
+  const [addFollowUpOpen, setAddFollowUpOpen] = useState(false);
+  const [newFollowUpName, setNewFollowUpName] = useState("");
+  const [newFollowUpDays, setNewFollowUpDays] = useState<number>(3);
+  const [followUpDrafts, setFollowUpDrafts] = useState<Record<string, FollowUpDraft>>({});
+
+  useEffect(() => {
+    setFollowUpDrafts(buildFollowUpDrafts(campaignFollowUps));
+  }, [campaignFollowUps]);
+
+  const dirtyFollowUpIds = useMemo(
+    () =>
+      campaignFollowUps
+        .filter((step) => {
+          const draft = followUpDrafts[step.id];
+          return draft ? isFollowUpDraftDirty(step, draft) : false;
+        })
+        .map((step) => step.id),
+    [campaignFollowUps, followUpDrafts]
+  );
+
+  const hasFollowUpChanges = dirtyFollowUpIds.length > 0;
 
   const handleSaveChanges = async () => {
     const payload = buildUpdatePayload();
@@ -80,6 +130,90 @@ export function CampaignDetail({
       showApiSuccessToast("Campaign updated successfully.");
     } catch {
       // Error toast is handled in store for update failures.
+    }
+  };
+
+  const resetAddExampleDialog = () => {
+    setExSubject("");
+    setExContentFormat("body");
+    setExContent("");
+    setAddExampleError("");
+  };
+
+  const handleExContentFormatChange = (format: SampleContentFormat) => {
+    setExContentFormat(format);
+    setExContent("");
+    setAddExampleError("");
+  };
+
+  const handleAddExampleOpenChange = (open: boolean) => {
+    setAddingExample(open);
+    if (!open) resetAddExampleDialog();
+  };
+
+  const handleSaveExample = () => {
+    const parsed = mailTemplateSampleSchema.safeParse({
+      subject: exSubject,
+      body: exContentFormat === "body" ? exContent : "",
+      html: exContentFormat === "html" ? exContent : "",
+      text: exContentFormat === "text" ? exContent : ""
+    });
+    if (!parsed.success) {
+      setAddExampleError(parsed.error.errors[0]?.message ?? "Please complete subject and email content.");
+      return;
+    }
+    setMailTemplateSamples([...form.mailTemplateSamples, parsed.data]);
+    resetAddExampleDialog();
+    setAddingExample(false);
+  };
+
+  const resetAddFollowUpDialog = () => {
+    setNewFollowUpName("");
+    setNewFollowUpDays(3);
+  };
+
+  const handleAddFollowUpOpenChange = (open: boolean) => {
+    setAddFollowUpOpen(open);
+    if (open) {
+      setNewFollowUpName(`Follow-up ${campaignFollowUps.length + 1}`);
+      return;
+    }
+    resetAddFollowUpDialog();
+  };
+
+  const handleCreateFollowUp = async () => {
+    const name = newFollowUpName.trim() || `Follow-up ${campaignFollowUps.length + 1}`;
+    const ok = await addFollowUp({ name, waiting_days: newFollowUpDays });
+    if (!ok) return;
+    resetAddFollowUpDialog();
+    setAddFollowUpOpen(false);
+  };
+
+  const updateFollowUpDraft = (followUpId: string, patch: Partial<FollowUpDraft>) => {
+    setFollowUpDrafts((previous) => {
+      const current = previous[followUpId];
+      if (!current) return previous;
+      return { ...previous, [followUpId]: { ...current, ...patch } };
+    });
+  };
+
+  const handleDiscardFollowUpChanges = () => {
+    setFollowUpDrafts(buildFollowUpDrafts(campaignFollowUps));
+  };
+
+  const handleSaveFollowUpChanges = async () => {
+    const results = await Promise.all(
+      dirtyFollowUpIds.map((followUpId) => {
+        const draft = followUpDrafts[followUpId];
+        if (!draft) return Promise.resolve(false);
+        return saveFollowUp(followUpId, {
+          name: draft.name.trim(),
+          waiting_days: draft.waiting_days
+        });
+      })
+    );
+    if (results.every(Boolean)) {
+      showApiSuccessToast("Follow-up steps saved.");
     }
   };
 
@@ -150,28 +284,6 @@ export function CampaignDetail({
               placeholder="Example: Write in a warm, conversational tone..."
             />
             <p className="mt-1 text-right text-[11px] text-muted-foreground">{form.mailTemplate.length} chars</p>
-            <div className="mt-3 space-y-1.5">
-              <Label htmlFor="example-training">Example Training</Label>
-              <Textarea
-                id="example-training"
-                rows={2}
-                value={form.exampleTraining}
-                onChange={(event) => setExampleTraining(event.target.value)}
-                placeholder="Professional, concise, value-focused"
-              />
-            </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {[
-                { l: "Use enriched company data in personalization", c: true },
-                { l: "Include company name in subject line", c: false },
-                { l: "Reference website content if available", c: true },
-                { l: "Auto-pause sequence when lead replies", c: true }
-              ].map((item) => (
-                <label key={item.l} className="flex items-start gap-2 rounded-lg border border-border p-2.5 text-sm">
-                  <Checkbox defaultChecked={item.c} className="mt-0.5" /> <span>{item.l}</span>
-                </label>
-              ))}
-            </div>
           </Card>
 
           <Card className="p-5 shadow-card">
@@ -179,59 +291,43 @@ export function CampaignDetail({
               <div>
                 <h3 className="font-display text-base font-bold">Email Templates / Training Emails</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Upload past emails to train the AI on your writing style.
+                  Add example emails with a subject and one content format (plain body, HTML, or plain text).
                 </p>
               </div>
-              <Button variant="outline" onClick={() => setAddingExample(true)}><Plus className="h-4 w-4" /> Add</Button>
+              <Button variant="outline" onClick={() => setAddingExample(true)}>
+                <Plus className="h-4 w-4" /> Add
+              </Button>
             </div>
-            <div className="mt-4 space-y-1.5">
-              <Label htmlFor="primary-email-template">Primary Email Template</Label>
-              <Textarea
-                id="primary-email-template"
-                rows={4}
-                value={form.mailTemplate}
-                onChange={(event) => setMailTemplate(event.target.value)}
-                placeholder="Hi {{firstName}}, I wanted to reach out about..."
-              />
-            </div>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {examples.map((example) => (
-                <div key={example.id} className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface/40 p-3">
-                  <div className="min-w-0">
-                    <Input
-                      value={example.subject}
-                      onChange={(event) =>
-                        setExamples((previous) =>
-                          previous.map((item) =>
-                            item.id === example.id ? { ...item, subject: event.target.value } : item
-                          )
-                        )
-                      }
-                      className="h-8 text-sm"
-                    />
-                    <Textarea
-                      rows={3}
-                      value={example.body}
-                      onChange={(event) =>
-                        setExamples((previous) =>
-                          previous.map((item) =>
-                            item.id === example.id ? { ...item, body: event.target.value } : item
-                          )
-                        )
-                      }
-                      className="mt-2 text-xs"
-                    />
+            <div className="mt-4 space-y-2">
+              {form.mailTemplateSamples.map((sample, index) => (
+                <div
+                  key={`${sample.subject}-${index}`}
+                  className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface/40 p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold">{sample.subject}</p>
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                      {sample.body || sample.html || sample.text}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {sample.body ? "Plain body" : sample.html ? "HTML" : "Plain text"}
+                    </p>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setExamples((previous) => previous.filter((item) => item.id !== example.id))}
+                    className="h-7 w-7 shrink-0"
+                    onClick={() =>
+                      setMailTemplateSamples(form.mailTemplateSamples.filter((_, itemIndex) => itemIndex !== index))
+                    }
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               ))}
+              {form.mailTemplateSamples.length === 0 && (
+                <p className="text-center text-xs text-muted-foreground">No template samples yet.</p>
+              )}
             </div>
             <Button className="mt-4" variant="secondary" onClick={() => setPreviewOpen(true)}>
               <Sparkles className="h-4 w-4" /> Generate Preview Email
@@ -239,52 +335,127 @@ export function CampaignDetail({
           </Card>
 
           <Card className="p-5 shadow-card">
-            <h3 className="font-display text-base font-bold">Follow-up Sequence</h3>
-            <p className="mt-1 text-sm text-muted-foreground">Each step is AI-generated using your instructions and tone above.</p>
-            <ol className="mt-4 space-y-2">
-              {steps.map((step, index) => (
-                <li key={step.id} className="flex items-center gap-3 rounded-lg border border-border bg-surface/40 p-3">
-                  <GripVertical className="h-4 w-4 text-muted-foreground" />
-                  <div className="grid h-7 w-7 place-items-center rounded-full bg-primary/15 text-xs font-bold text-brand-text">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold">{step.label}</p>
-                    <p className="text-xs text-muted-foreground">Day {step.day}</p>
-                  </div>
-                  <select
-                    defaultValue={step.day}
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs"
-                  >
-                    {[0, 1, 2, 3, 5, 7, 10, 14].map((day) => (
-                      <option key={day} value={day}>Wait {day} days</option>
-                    ))}
-                  </select>
-                  <Button variant="ghost" size="sm">Edit email</Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="font-display text-base font-bold">Follow-up Sequence</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Configure when each follow-up runs after the previous step.
+                </p>
+              </div>
+              {hasFollowUpChanges && (
+                <div className="flex shrink-0 items-center gap-2">
                   <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setSteps((previous) => previous.filter((item) => item.id !== step.id))}
+                    variant="outline"
+                    size="sm"
+                    disabled={isUpdatingCampaignFollowUp}
+                    onClick={handleDiscardFollowUpChanges}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    Discard
                   </Button>
-                </li>
-              ))}
-            </ol>
+                  <Button
+                    size="sm"
+                    disabled={isUpdatingCampaignFollowUp}
+                    onClick={() => void handleSaveFollowUpChanges()}
+                  >
+                    {isUpdatingCampaignFollowUp ? "Saving..." : "Save changes"}
+                  </Button>
+                </div>
+              )}
+            </div>
+            {isFetchingCampaignFollowUps ? (
+              <p className="mt-4 text-sm text-muted-foreground">Loading follow-ups...</p>
+            ) : (
+              <>
+                {campaignFollowUps.length > 0 && (
+                  <div className="mt-4 hidden grid-cols-[2.5rem_minmax(0,1fr)_9.5rem_2.5rem] items-center gap-3 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:grid">
+                    <span>#</span>
+                    <span>Name</span>
+                    <span>Wait</span>
+                    <span className="sr-only">Actions</span>
+                  </div>
+                )}
+                <ol className="mt-2 space-y-2 sm:mt-3">
+                  {campaignFollowUps.map((step, index) => {
+                    const draft = followUpDrafts[step.id];
+                    if (!draft) return null;
+                    const isDirty = isFollowUpDraftDirty(step, draft);
+
+                    return (
+                      <li
+                        key={step.id}
+                        className={cn(
+                          "grid grid-cols-[2.5rem_1fr_auto] items-center gap-3 rounded-lg border bg-surface/40 p-3 sm:grid-cols-[2.5rem_minmax(0,1fr)_9.5rem_2.5rem]",
+                          isDirty ? "border-primary/40 ring-1 ring-primary/20" : "border-border"
+                        )}
+                      >
+                        <div className="grid h-8 w-8 place-items-center rounded-full bg-primary/15 text-xs font-bold text-brand-text">
+                          {index + 1}
+                        </div>
+                        <div className="col-span-2 min-w-0 sm:col-span-1">
+                          <Label htmlFor={`follow-up-name-${step.id}`} className="sr-only">
+                            Step name
+                          </Label>
+                          <Input
+                            id={`follow-up-name-${step.id}`}
+                            value={draft.name}
+                            className="h-9"
+                            disabled={isUpdatingCampaignFollowUp || isDeletingCampaignFollowUp}
+                            onChange={(event) => updateFollowUpDraft(step.id, { name: event.target.value })}
+                          />
+                        </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <Label
+                            htmlFor={`follow-up-days-${step.id}`}
+                            className="mb-1 block text-xs text-muted-foreground sm:sr-only"
+                          >
+                            Wait days
+                          </Label>
+                          <select
+                            id={`follow-up-days-${step.id}`}
+                            value={draft.waiting_days}
+                            className="flex h-9 w-full min-w-[8.5rem] rounded-md border border-input bg-background px-3 text-sm"
+                            disabled={isUpdatingCampaignFollowUp || isDeletingCampaignFollowUp}
+                            onChange={(event) =>
+                              updateFollowUpDraft(step.id, { waiting_days: Number(event.target.value) })
+                            }
+                          >
+                            {getWaitDayOptions(draft.waiting_days).map((day) => (
+                              <option key={day} value={day}>
+                                {day === 0 ? "Same day" : day === 1 ? "1 day" : `${day} days`}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 justify-self-end sm:justify-self-auto"
+                          disabled={isDeletingCampaignFollowUp || hasFollowUpChanges}
+                          title={hasFollowUpChanges ? "Save or discard changes before deleting" : "Delete step"}
+                          onClick={() => void removeFollowUp(step.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </li>
+                    );
+                  })}
+                  {campaignFollowUps.length === 0 && (
+                    <p className="py-6 text-center text-sm text-muted-foreground">No follow-up steps yet.</p>
+                  )}
+                </ol>
+                {hasFollowUpChanges && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    You have unsaved changes to {dirtyFollowUpIds.length} step
+                    {dirtyFollowUpIds.length === 1 ? "" : "s"}.
+                  </p>
+                )}
+              </>
+            )}
             <Button
               variant="outline"
-              className="mt-3"
-              onClick={() =>
-                setSteps((previous) => [
-                  ...previous,
-                  {
-                    id: `s${Date.now()}`,
-                    label: `Follow-up ${previous.length}`,
-                    day: (previous.at(-1)?.day ?? 0) + 7
-                  }
-                ])
-              }
+              className="mt-4 w-full sm:w-auto"
+              disabled={isCreatingCampaignFollowUp || isFetchingCampaignFollowUps || hasFollowUpChanges}
+              onClick={() => handleAddFollowUpOpenChange(true)}
             >
               <Plus className="h-4 w-4" /> Add Follow-up Step
             </Button>
@@ -294,23 +465,97 @@ export function CampaignDetail({
 
       <CampaignLeadsSection campaignId={campaign.id} mailTemplate={form.mailTemplate} />
 
-      <Dialog open={addingExample} onOpenChange={setAddingExample}>
+      <Dialog open={addingExample} onOpenChange={handleAddExampleOpenChange}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Add an email example</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>Add mail template sample</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5"><Label>Subject</Label><Input value={exSubject} onChange={(event) => setExSubject(event.target.value)} /></div>
-            <div className="space-y-1.5"><Label>Body</Label><Textarea rows={6} value={exBody} onChange={(event) => setExBody(event.target.value)} /></div>
+            <div className="space-y-1.5">
+              <Label htmlFor="exSubject">Subject</Label>
+              <Input
+                id="exSubject"
+                value={exSubject}
+                onChange={(event) => {
+                  setExSubject(event.target.value);
+                  setAddExampleError("");
+                }}
+                placeholder="Subject line"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email content</Label>
+              <Tabs
+                value={exContentFormat}
+                onValueChange={(value) => handleExContentFormatChange(value as SampleContentFormat)}
+              >
+                <TabsList className="grid h-10 w-full grid-cols-3">
+                  {sampleContentFormats.map((format) => (
+                    <TabsTrigger key={format.id} value={format.id} className="text-xs sm:text-sm">
+                      {format.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              <Textarea
+                id="exContent"
+                rows={6}
+                className="mt-3"
+                value={exContent}
+                onChange={(event) => {
+                  setExContent(event.target.value);
+                  setAddExampleError("");
+                }}
+                placeholder={
+                  exContentFormat === "body"
+                    ? "Email body content"
+                    : exContentFormat === "html"
+                      ? "<p>HTML version...</p>"
+                      : "Plain-text content"
+                }
+              />
+              <p className="text-xs text-muted-foreground">Enter content in one format only.</p>
+            </div>
+            {addExampleError ? <p className="text-xs text-destructive">{addExampleError}</p> : null}
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setAddingExample(false)}>Cancel</Button>
-            <Button onClick={() => {
-              if (!exSubject.trim()) return;
-              setExamples((previous) => [...previous, { id: `te${Date.now()}`, subject: exSubject, body: exBody }]);
-              setExSubject("");
-              setExBody("");
-              setAddingExample(false);
-              showApiSuccessToast("Example saved. AI will use it in future generations.");
-            }}>Save Example</Button>
+            <Button variant="outline" onClick={() => handleAddExampleOpenChange(false)}>Cancel</Button>
+            <Button onClick={handleSaveExample}>Add sample</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
+      <Dialog open={addFollowUpOpen} onOpenChange={handleAddFollowUpOpenChange}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add follow-up step</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="newFollowUpName">Name</Label>
+              <Input
+                id="newFollowUpName"
+                value={newFollowUpName}
+                onChange={(event) => setNewFollowUpName(event.target.value)}
+                placeholder="Follow-up 1"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="newFollowUpDays">Wait days</Label>
+              <select
+                id="newFollowUpDays"
+                value={newFollowUpDays}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                onChange={(event) => setNewFollowUpDays(Number(event.target.value))}
+              >
+                {WAIT_DAY_OPTIONS.map((day) => (
+                  <option key={day} value={day}>Wait {day} days</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => handleAddFollowUpOpenChange(false)}>Cancel</Button>
+            <Button onClick={() => void handleCreateFollowUp()} disabled={isCreatingCampaignFollowUp}>
+              {isCreatingCampaignFollowUp ? "Adding..." : "Add step"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

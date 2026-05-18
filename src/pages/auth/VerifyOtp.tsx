@@ -2,22 +2,21 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { resendOtp, verifyOtp } from "@/services/auth/authServices";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
-import { verifyOtpSchema } from "@/validators";
+import { resendOtpSchema, verifyOtpSchema } from "@/validators";
 import { useAuthStore } from "@/store/auth/authStore";
 import { clearPendingVerification, getPendingVerification } from "@/utils/authSorage";
-import type { AuthUser } from "@/core/types/user.types";
+import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
 
 type VerifyOtpLocationState = {
-  userId?: string;
   email?: string;
 };
 
 type VerifyOtpErrors = {
-  userId?: string;
+  email?: string;
   otp?: string;
 };
 
@@ -25,9 +24,8 @@ export default function VerifyOtp() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const pending = getPendingVerification();
-  const { userId, email } = ((state as VerifyOtpLocationState) || {}) as VerifyOtpLocationState;
-  const resolvedUserId = userId || pending?.userId;
-  const resolvedEmail = email || pending?.email;
+  const { email: routeEmail } = ((state as VerifyOtpLocationState) || {}) as VerifyOtpLocationState;
+  const resolvedEmail = routeEmail || pending?.email;
   const setCredentials = useAuthStore((s) => s.setCredentials);
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
@@ -36,11 +34,11 @@ export default function VerifyOtp() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = verifyOtpSchema.safeParse({ userId: resolvedUserId, otp });
+    const parsed = verifyOtpSchema.safeParse({ email: resolvedEmail, otp });
     if (!parsed.success) {
       const fieldErrors = parsed.error.flatten().fieldErrors;
       setErrors({
-        userId: fieldErrors.userId?.[0],
+        email: fieldErrors.email?.[0],
         otp: fieldErrors.otp?.[0]
       });
       return;
@@ -49,22 +47,21 @@ export default function VerifyOtp() {
 
     setLoading(true);
     try {
-      const response = await verifyOtp({ userId: parsed.data.userId, otp: parsed.data.otp });
-      if (!response.success || !response.data?.accessToken || !response.data?.refreshToken) {
+      const response = await verifyOtp({
+        email: parsed.data.email,
+        otp: parsed.data.otp
+      });
+
+      const { data } = response;
+      if (!response.success || !data?.accessToken || !data.refreshToken || !data.user?.id) {
         showApiErrorToast(response);
         return;
       }
 
-      const user: AuthUser = {
-        id: parsed.data.userId,
-        email: resolvedEmail || "unknown@example.com",
-        isVerified: true
-      };
-
       setCredentials({
-        user,
-        token: response.data.accessToken,
-        refreshToken: response.data.refreshToken
+        user: mapApiUserToAuthUser(data.user),
+        token: data.accessToken,
+        refreshToken: data.refreshToken
       });
       clearPendingVerification();
 
@@ -78,18 +75,28 @@ export default function VerifyOtp() {
   };
 
   const onResendCode = async () => {
-    if (!resolvedUserId) {
-      setErrors((prev) => ({ ...prev, userId: "Missing signup context. Please create your account again." }));
+    const parsed = resendOtpSchema.safeParse({ email: resolvedEmail });
+    if (!parsed.success) {
+      const emailError = parsed.error.flatten().fieldErrors.email?.[0];
+      setErrors((prev) => ({
+        ...prev,
+        email: emailError || "Missing signup context. Please create your account again."
+      }));
       return;
     }
+    setErrors((prev) => ({ ...prev, email: undefined }));
+
     setResending(true);
     try {
-      const response = await resendOtp({ userId: resolvedUserId });
+      const response = await resendOtp({ email: parsed.data.email });
       if (!response.success) {
         showApiErrorToast(response);
         return;
       }
-      showApiSuccessToast(response.message || "A new verification code has been sent to your email.");
+      setOtp("");
+      showApiSuccessToast(
+        response.message || "A new verification code has been sent to your email."
+      );
     } catch (error) {
       showApiErrorToast(error);
     } finally {
@@ -100,49 +107,57 @@ export default function VerifyOtp() {
   return (
     <AuthLayout
       headline="Verify your email to continue."
-      subheadline="Enter the 6-digit code sent to your inbox."
+      subheadline="Enter the 6-digit code we sent to your inbox."
     >
-      <h2 className="font-display text-2xl font-bold">Verify OTP</h2>
+      <h2 className="font-display text-2xl font-bold">Verify your email</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        {resolvedEmail ? `Code sent to ${resolvedEmail}` : "Enter the code from your email."}
+        {resolvedEmail
+          ? `Enter the 6-digit code sent to ${resolvedEmail}`
+          : "Enter the 6-digit code from your email."}
       </p>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="otp">6-digit OTP</Label>
-          <Input
+      <form onSubmit={onSubmit} className="mt-8 space-y-6">
+        <div className="space-y-3">
+          <Label htmlFor="otp">Verification code</Label>
+          <InputOTP
             id="otp"
-            inputMode="numeric"
             maxLength={6}
-            placeholder="Enter your OTP"
             value={otp}
-            onChange={(e) => {
-              setOtp(e.target.value.replace(/\D/g, ""));
+            onChange={(value) => {
+              setOtp(value);
               if (errors.otp) setErrors((prev) => ({ ...prev, otp: undefined }));
             }}
-            required
-          />
+          >
+            <InputOTPGroup className="w-full justify-between">
+              <InputOTPSlot index={0} className="h-12 w-11 text-lg" />
+              <InputOTPSlot index={1} className="h-12 w-11 text-lg" />
+              <InputOTPSlot index={2} className="h-12 w-11 text-lg" />
+              <InputOTPSlot index={3} className="h-12 w-11 text-lg" />
+              <InputOTPSlot index={4} className="h-12 w-11 text-lg" />
+              <InputOTPSlot index={5} className="h-12 w-11 text-lg" />
+            </InputOTPGroup>
+          </InputOTP>
           {errors.otp ? <p className="text-xs text-destructive">{errors.otp}</p> : null}
         </div>
 
-        <Button type="submit" className="w-full" disabled={loading || !resolvedUserId}>
+        <Button type="submit" className="w-full" disabled={loading || !resolvedEmail || otp.length !== 6}>
           {loading ? "Verifying..." : "Verify & Continue"}
         </Button>
       </form>
 
-      {!resolvedUserId ? (
+      {!resolvedEmail ? (
         <p className="mt-6 text-sm text-destructive">
-          {errors.userId || "Missing signup context. Please create your account again."}
+          {errors.email || "Missing signup context. Please create your account again."}
         </p>
       ) : null}
 
       <p className="mt-8 text-center text-sm text-muted-foreground">
-        Didn't get code?{" "}
+        Didn&apos;t get a code?{" "}
         <button
           type="button"
           onClick={onResendCode}
           className="font-semibold text-brand-text hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-          disabled={resending || !resolvedUserId}
+          disabled={resending || !resolvedEmail}
         >
           {resending ? "Resending..." : "Resend code"}
         </button>

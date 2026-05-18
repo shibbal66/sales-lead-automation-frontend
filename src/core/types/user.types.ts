@@ -9,6 +9,9 @@ export interface User {
   avatarUrl?: string;
   authProvider?: string;
   isVerified?: boolean;
+  role?: string;
+  address?: string | null;
+  contact?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -10,11 +10,15 @@ import {
   type CampaignDetailViewModel,
   type CampaignTone
 } from "@/lib/campaignPresentation";
-import type { CampaignLeadSource } from "@/types";
+import type { CampaignLeadSource, MailTemplateSample } from "@/types";
 import type { UpdateCampaignRequest } from "@/types";
 
 const DEFAULT_MAIL_TEMPLATE =
   "Write in a warm, conversational tone. Mention the company's recent product launches if available from their website. Always reference the specific pain point of scaling sales teams. Keep emails under 120 words. End with a soft CTA asking for a 15-minute call.";
+
+function resolveTone(value: string): CampaignTone {
+  return (CAMPAIGN_TONES as readonly string[]).includes(value) ? (value as CampaignTone) : CAMPAIGN_TONES[0];
+}
 
 function createFormState(campaign: CampaignDetailViewModel): CampaignDetailFormState {
   return {
@@ -24,9 +28,10 @@ function createFormState(campaign: CampaignDetailViewModel): CampaignDetailFormS
     callToAction: campaign.callToAction,
     leadSource: campaign.leadSource,
     runMode: campaign.runMode,
-    mailTemplate: campaign.mailTemplate || DEFAULT_MAIL_TEMPLATE,
-    exampleTraining: campaign.exampleTraining,
-    tone: "Professional",
+    mailTemplate: campaign.mailTrainingInstruction || DEFAULT_MAIL_TEMPLATE,
+    exampleTraining: "",
+    mailTemplateSamples: campaign.mailTemplateSamples.map((sample) => ({ ...sample })),
+    tone: resolveTone(campaign.targetTone),
     targetLeads: campaign.targetLeads,
     status: campaign.status
   };
@@ -57,6 +62,8 @@ export function useCampaignDetailForm(campaign: CampaignDetailViewModel) {
     setRunMode: (runMode: CampaignDetailRunMode) => setForm((current) => ({ ...current, runMode })),
     setMailTemplate: (mailTemplate: string) => setForm((current) => ({ ...current, mailTemplate })),
     setExampleTraining: (exampleTraining: string) => setForm((current) => ({ ...current, exampleTraining })),
+    setMailTemplateSamples: (mailTemplateSamples: MailTemplateSample[]) =>
+      setForm((current) => ({ ...current, mailTemplateSamples })),
     setTone: (tone: CampaignTone) => setForm((current) => ({ ...current, tone })),
     setTargetLeads: (targetLeads: number) => setForm((current) => ({ ...current, targetLeads })),
     setStatus: (status: CampaignDetailStatus) => setForm((current) => ({ ...current, status })),

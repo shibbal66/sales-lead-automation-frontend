@@ -3,16 +3,23 @@ import { END_POINT } from "../../lib/apiURL";
 import type {
   AddCampaignLeadRequest,
   AddCampaignLeadResponse,
-  AssignRandomCampaignLeadsResponse,
+  BulkAddCampaignLeadsRequest,
+  BulkAddCampaignLeadsResponse,
   CampaignStatus,
+  CreateCampaignFollowUpRequest,
+  CreateCampaignFollowUpResponse,
   CreateCampaignRequest,
   CreateCampaignResponse,
+  DeleteCampaignFollowUpResponse,
   DeleteCampaignLeadResponse,
   DeleteCampaignResponse,
   GetCampaignByIdResponse,
+  GetCampaignFollowUpsResponse,
   GetCampaignLeadsQuery,
   GetCampaignLeadsResponse,
   GetCampaignsResponse,
+  UpdateCampaignFollowUpRequest,
+  UpdateCampaignFollowUpResponse,
   UpdateCampaignLeadRequest,
   UpdateCampaignLeadResponse,
   UpdateCampaignRequest,
@@ -52,6 +59,14 @@ export function addCampaignLead(campaignId: string, payload: AddCampaignLeadRequ
   );
 }
 
+export function bulkAddCampaignLeads(campaignId: string, payload: BulkAddCampaignLeadsRequest) {
+  return apiInvoker<BulkAddCampaignLeadsResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/leads/bulk`,
+    "POST",
+    payload
+  );
+}
+
 export function updateCampaignLead(
   campaignId: string,
   campaignLeadId: string,
@@ -71,17 +86,44 @@ export function deleteCampaignLead(campaignId: string, campaignLeadId: string) {
   );
 }
 
-export function assignRandomCampaignLeads(campaignId: string) {
-  return apiInvoker<AssignRandomCampaignLeadsResponse>(
-    `${END_POINT.campaign.create}/${campaignId}/leads/assign-random`,
-    "POST"
-  );
-}
-
 export function updateCampaign(campaignId: string, payload: UpdateCampaignRequest) {
   return apiInvoker<UpdateCampaignResponse>(`${END_POINT.campaign.create}/${campaignId}`, "PATCH", payload);
 }
 
 export function deleteCampaign(campaignId: string) {
   return apiInvoker<DeleteCampaignResponse>(`${END_POINT.campaign.create}/${campaignId}`, "DELETE");
+}
+
+export function getCampaignFollowUps(campaignId: string) {
+  return apiInvoker<GetCampaignFollowUpsResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/follow-ups`,
+    "GET"
+  );
+}
+
+export function createCampaignFollowUp(campaignId: string, payload: CreateCampaignFollowUpRequest) {
+  return apiInvoker<CreateCampaignFollowUpResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/follow-ups`,
+    "POST",
+    payload
+  );
+}
+
+export function updateCampaignFollowUp(
+  campaignId: string,
+  followUpId: string,
+  payload: UpdateCampaignFollowUpRequest
+) {
+  return apiInvoker<UpdateCampaignFollowUpResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/follow-ups/${followUpId}`,
+    "PATCH",
+    payload
+  );
+}
+
+export function deleteCampaignFollowUp(campaignId: string, followUpId: string) {
+  return apiInvoker<DeleteCampaignFollowUpResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/follow-ups/${followUpId}`,
+    "DELETE"
+  );
 }

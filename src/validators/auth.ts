@@ -43,12 +43,25 @@ export const loginSchema = z.object({
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
-// --- Sign up (role is passed from URL/state; API requires PATIENT | DOCTOR) ---
+// --- Sign up ---
 export const signupSchema = z
   .object({
+    name: z
+      .string()
+      .trim()
+      .min(1, "Name is required")
+      .max(100, "Name must be less than 100 characters"),
     email: emailSchema,
     password: strongPasswordSchema,
-    confirmPassword: z.string().min(1, "Please confirm your password")
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+    address: z.string().trim(),
+    contact: z.string().trim(),
+    profile_pic: z
+      .string()
+      .trim()
+      .refine((v) => v === "" || z.string().url().safeParse(v).success, {
+        message: "Please enter a valid profile picture URL"
+      })
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -57,15 +70,13 @@ export const signupSchema = z
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
-/** Validate signup payload when sending to API (email + role + provider). */
 export const signupPayloadSchema = z.object({
   email: emailSchema,
-  role: z.enum(["PATIENT", "DOCTOR"], {
-    errorMap: () => ({ message: "Role must be PATIENT or DOCTOR" })
-  }),
-  provider: z.enum(["EMAIL", "GOOGLE"], {
-    errorMap: () => ({ message: "Provider must be EMAIL or GOOGLE" })
-  })
+  password: strongPasswordSchema,
+  name: z.string().trim().min(1, "Name is required"),
+  profile_pic: z.string(),
+  address: z.string(),
+  contact: z.string()
 });
 
 // --- Forgot password / Request OTP ---
@@ -85,11 +96,18 @@ export type RequestOtpFormValues = z.infer<typeof requestOtpSchema>;
 
 // --- Verify OTP ---
 export const verifyOtpSchema = z.object({
-  userId: z.string().min(1, "User ID is required"),
+  email: emailSchema,
   otp: otpSchema
 });
 
 export type VerifyOtpFormValues = z.infer<typeof verifyOtpSchema>;
+
+// --- Resend OTP (email verification) ---
+export const resendOtpSchema = z.object({
+  email: emailSchema
+});
+
+export type ResendOtpFormValues = z.infer<typeof resendOtpSchema>;
 
 /** Add-password flow schema (token-based create password page). */
 export const addPasswordSchema = z
@@ -104,13 +122,15 @@ export const addPasswordSchema = z
 
 export type AddPasswordFormValues = z.infer<typeof addPasswordSchema>;
 
-// --- Reset password (set new password after OTP) ---
+// --- Reset password (email + OTP + new password) ---
 export const resetPasswordSchema = z
   .object({
-    newPassword: strongPasswordSchema,
+    email: emailSchema,
+    otp: otpSchema,
+    password: strongPasswordSchema,
     confirmPassword: z.string().min(1, "Please confirm your password")
   })
-  .refine((data) => data.newPassword === data.confirmPassword, {
+  .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"]
   });

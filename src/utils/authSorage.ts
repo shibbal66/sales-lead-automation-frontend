@@ -4,6 +4,7 @@ const AUTH_TOKEN_KEY = "auth_token";
 const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "user";
 const PENDING_VERIFY_KEY = "pending_verify";
+const PENDING_PASSWORD_RESET_KEY = "pending_password_reset";
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -59,17 +60,19 @@ export function setStoredUser(user: AuthUser): void {
   localStorage.setItem(USER_KEY, JSON.stringify(user));
 }
 
-export function setPendingVerification(data: { userId: string; email: string }): void {
+export function setPendingVerification(data: { email: string }): void {
   if (!isBrowser()) return;
   sessionStorage.setItem(PENDING_VERIFY_KEY, JSON.stringify(data));
 }
 
-export function getPendingVerification(): { userId: string; email: string } | null {
+export function getPendingVerification(): { email: string } | null {
   if (!isBrowser()) return null;
   const raw = sessionStorage.getItem(PENDING_VERIFY_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as { userId: string; email: string };
+    const parsed = JSON.parse(raw) as { email?: string; userId?: string };
+    if (parsed.email) return { email: parsed.email };
+    return null;
   } catch {
     return null;
   }
@@ -80,11 +83,35 @@ export function clearPendingVerification(): void {
   sessionStorage.removeItem(PENDING_VERIFY_KEY);
 }
 
+export function setPendingPasswordReset(data: { email: string }): void {
+  if (!isBrowser()) return;
+  sessionStorage.setItem(PENDING_PASSWORD_RESET_KEY, JSON.stringify(data));
+}
+
+export function getPendingPasswordReset(): { email: string } | null {
+  if (!isBrowser()) return null;
+  const raw = sessionStorage.getItem(PENDING_PASSWORD_RESET_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as { email?: string };
+    if (parsed.email) return { email: parsed.email };
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingPasswordReset(): void {
+  if (!isBrowser()) return;
+  sessionStorage.removeItem(PENDING_PASSWORD_RESET_KEY);
+}
+
 export function clearAuthStorage(): void {
   if (!isBrowser()) return;
   localStorage.removeItem(AUTH_TOKEN_KEY);
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
   clearPendingVerification();
+  clearPendingPasswordReset();
   authClearSyncHandler?.();
 }

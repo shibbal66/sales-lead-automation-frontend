@@ -11,12 +11,12 @@ export function useCampaignLeads(campaignId: string) {
   const campaignLeadsLimit = useCampaignStore((state) => state.campaignLeadsLimit);
   const isFetchingCampaignLeads = useCampaignStore((state) => state.isFetchingCampaignLeads);
   const isAddingCampaignLead = useCampaignStore((state) => state.isAddingCampaignLead);
+  const isBulkAddingCampaignLeads = useCampaignStore((state) => state.isBulkAddingCampaignLeads);
+  const bulkAddCampaignLeads = useCampaignStore((state) => state.bulkAddCampaignLeads);
   const isUpdatingCampaignLead = useCampaignStore((state) => state.isUpdatingCampaignLead);
   const isDeletingCampaignLead = useCampaignStore((state) => state.isDeletingCampaignLead);
-  const isAssigningRandomLeads = useCampaignStore((state) => state.isAssigningRandomLeads);
   const fetchCampaignLeads = useCampaignStore((state) => state.fetchCampaignLeads);
   const addCampaignLead = useCampaignStore((state) => state.addCampaignLead);
-  const assignRandomCampaignLeads = useCampaignStore((state) => state.assignRandomCampaignLeads);
   const updateCampaignLead = useCampaignStore((state) => state.updateCampaignLead);
   const deleteCampaignLead = useCampaignStore((state) => state.deleteCampaignLead);
   const clearCampaignLeads = useCampaignStore((state) => state.clearCampaignLeads);
@@ -104,6 +104,35 @@ export function useCampaignLeads(campaignId: string) {
     [campaignId, updateCampaignLead]
   );
 
+  const bulkAssignLeads = useCallback(
+    async (leadDataIds: string[]) => {
+      if (leadDataIds.length === 0) {
+        showApiErrorToast("Select at least one lead.");
+        return false;
+      }
+
+      try {
+        const message = await bulkAddCampaignLeads(campaignId, {
+          leads: leadDataIds.map((lead_data_id) => ({ lead_data_id }))
+        });
+        showApiSuccessToast(message);
+        setCampaignLeadsPage(1);
+        await fetchCampaignLeads(campaignId, { page: 1, limit: campaignLeadsLimit });
+        return true;
+      } catch (error) {
+        showApiErrorToast(error);
+        return false;
+      }
+    },
+    [
+      bulkAddCampaignLeads,
+      campaignId,
+      campaignLeadsLimit,
+      fetchCampaignLeads,
+      setCampaignLeadsPage
+    ]
+  );
+
   const removeCampaignLead = useCallback(
     async (campaignLeadId: string) => {
       try {
@@ -118,19 +147,6 @@ export function useCampaignLeads(campaignId: string) {
     [campaignId, deleteCampaignLead]
   );
 
-  const assignRandomLeads = useCallback(async () => {
-    try {
-      const response = await assignRandomCampaignLeads(campaignId);
-      showApiSuccessToast(response.message || "Random leads assigned.");
-      setCampaignLeadsPage(1);
-      await fetchCampaignLeads(campaignId, { page: 1, limit: campaignLeadsLimit });
-      return true;
-    } catch (error) {
-      showApiErrorToast(error);
-      return false;
-    }
-  }, [assignRandomCampaignLeads, campaignId, campaignLeadsLimit, fetchCampaignLeads, setCampaignLeadsPage]);
-
   return {
     campaignLeads,
     campaignLeadsTotal,
@@ -138,12 +154,12 @@ export function useCampaignLeads(campaignId: string) {
     totalPages,
     isFetchingCampaignLeads,
     isAddingCampaignLead,
+    isBulkAddingCampaignLeads,
     isUpdatingCampaignLead,
     isDeletingCampaignLead,
-    isAssigningRandomLeads,
     handlePageChange,
     assignLead,
-    assignRandomLeads,
+    bulkAssignLeads,
     saveCampaignLead,
     removeCampaignLead
   };

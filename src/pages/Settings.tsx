@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/auth/authStore";
+import { GoogleLinkCard } from "@/components/auth/google-link-card";
 
 const sections = [
   { id: "profile", label: "Profile", icon: User },
@@ -90,6 +91,7 @@ export default function Settings() {
 
         {section === "email" && (
           <>
+            <GoogleLinkCard />
             <Card className="p-6 shadow-card">
               <h3 className="font-display text-lg font-bold">Connected Inboxes</h3>
               <p className="mt-1 text-sm text-muted-foreground">Connect Gmail to send personalized outreach from your address.</p>

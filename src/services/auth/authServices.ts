@@ -5,9 +5,16 @@ import type {
   SignupResponse,
   LoginRequest,
   LoginResponse,
-  GoogleAuthResponse,
+  GoogleCallbackResponse,
+  GoogleLinkStatusResponse,
+  GoogleTokenExchangeRequest,
+  GoogleTokenExchangeResponse,
   VerifyOtpRequest,
   VerifyOtpResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
+  ResetPasswordRequest,
+  ResetPasswordResponse,
   ResendOtpRequest,
   ResendOtpResponse,
   RefreshTokenRequest,
@@ -21,18 +28,41 @@ export function login(body: LoginRequest) {
   return apiInvoker<LoginResponse>(END_POINT.auth.login, "POST", body);
 }
 
-export function googleSignIn() {
-  return apiInvoker<GoogleAuthResponse>(END_POINT.auth.googleLogin, "GET");
+/** Browser redirect — start Google OAuth (GET /auth/google). */
+export function getGoogleOAuthStartUrl(): string {
+  const base = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+  return `${base}${END_POINT.auth.google}`;
 }
 
+/** Complete OAuth after Google redirect (GET /auth/google/callback?code=). */
+export function googleOAuthCallback(params: { code?: string; error?: string }) {
+  return apiInvoker<GoogleCallbackResponse>(END_POINT.auth.googleCallback, "GET", undefined, params);
+}
+
+/** Exchange Google `id_token` for app JWT pair (POST /auth/google/token). */
+export function exchangeGoogleIdToken(body: GoogleTokenExchangeRequest) {
+  return apiInvoker<GoogleTokenExchangeResponse>(END_POINT.auth.googleToken, "POST", body);
+}
+
+/** Google link status for the current user (GET /auth/google/status, bearer required). */
+export function getGoogleLinkStatus() {
+  return apiInvoker<GoogleLinkStatusResponse>(END_POINT.auth.googleStatus, "GET");
+}
 
 export function signup(payload: SignupRequest) {
   return apiInvoker<SignupResponse>(END_POINT.auth.signup, "POST", payload);
 }
 
-
 export function verifyOtp(payload: VerifyOtpRequest) {
   return apiInvoker<VerifyOtpResponse>(END_POINT.auth.verifyOtp, "POST", payload);
+}
+
+export function forgotPassword(payload: ForgotPasswordRequest) {
+  return apiInvoker<ForgotPasswordResponse>(END_POINT.auth.forgotPassword, "POST", payload);
+}
+
+export function resetPassword(payload: ResetPasswordRequest) {
+  return apiInvoker<ResetPasswordResponse>(END_POINT.auth.resetPassword, "POST", payload);
 }
 
 export function resendOtp(payload: ResendOtpRequest) {

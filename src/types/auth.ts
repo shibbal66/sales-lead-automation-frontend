@@ -1,4 +1,21 @@
-import type { AuthUser, User } from "@/core/types/user.types";
+import type { AuthUser } from "@/core/types/user.types";
+
+/** User object returned by login / verify-otp auth endpoints. */
+export interface ApiAuthUserPayload {
+  id: string;
+  email: string;
+  isVerified?: boolean;
+  createdAt?: string;
+  role?: string;
+  name?: string | null;
+  profilePic?: string | null;
+  address?: string | null;
+  contact?: string | null;
+  firstName?: string;
+  lastName?: string;
+  avatarUrl?: string;
+  authProvider?: string;
+}
 
 
 export interface LoginRequest {
@@ -6,43 +23,63 @@ export interface LoginRequest {
   password: string;
 }
 
+export const AUTH_ERROR_CODE = {
+  EMAIL_NOT_VERIFIED: "EMAIL_NOT_VERIFIED"
+} as const;
+
 export interface LoginResponse {
   success: boolean;
   message: string;
+  code?: string;
   data?: {
     accessToken: string;
     refreshToken: string;
-    user: AuthUser;
+    user: ApiAuthUserPayload;
   };
 }
 
 export interface SignupRequest {
   email: string;
   password: string;
+  name: string;
+  profile_pic: string;
+  address: string;
+  contact: string;
 }
 
 export interface SignupResponse {
   success: boolean;
   message: string;
   data?: {
-    userId: string;
+    email: string;
   };
 }
 
-export interface GoogleLoginRequest {
-  token: string;
+export interface GoogleTokenExchangeRequest {
+  id_token: string;
 }
 
-export interface GoogleAuthResponse {
+/** Shared envelope for Google OAuth routes (callback, token exchange, status). */
+export interface GoogleApiResponse {
   success: boolean;
-  message: string;
-  data?: {
-    accessToken?: string;
-    refreshToken?: string;
-    user?: AuthUser;
-    url?: string;
-  };
+  message?: string;
+  code?: string;
+  /** JWT pair object, redirect URL, or stringified JSON / id_token depending on route. */
+  data?: string | GoogleAuthTokenData;
 }
+
+export type GoogleAuthTokenData = {
+  accessToken?: string;
+  refreshToken?: string;
+  access_token?: string;
+  refresh_token?: string;
+  user?: AuthUser;
+  url?: string;
+};
+
+export type GoogleCallbackResponse = GoogleApiResponse;
+export type GoogleTokenExchangeResponse = GoogleApiResponse;
+export type GoogleLinkStatusResponse = GoogleApiResponse;
 
 
 
@@ -50,7 +87,7 @@ export interface GoogleAuthResponse {
 
 
 export interface VerifyOtpRequest {
-  userId: string;
+  email: string;
   otp: string;
 }
 
@@ -60,6 +97,7 @@ export interface VerifyOtpResponse {
   data?: {
     accessToken: string;
     refreshToken: string;
+    user: ApiAuthUserPayload;
   };
 }
 
@@ -87,8 +125,25 @@ export interface LogoutResponse {
   message: string;
 }
 
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface ResetPasswordRequest {
+  email: string;
+  otp: string;
+  password: string;
+}
+
+export type ResetPasswordResponse = LoginResponse;
+
 export interface ResendOtpRequest {
-  userId: string;
+  email: string;
 }
 
 export interface ResendOtpResponse {

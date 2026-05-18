@@ -6,17 +6,28 @@ import { AuthLayout } from "@/components/auth/auth-layout";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { AxiosError } from "axios";
 import { login } from "@/services/auth/authServices";
 import { useAuthStore } from "@/store/auth/authStore";
-import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
-import { signInWithGoogle } from "@/lib/googleAuth";
+import { getApiErrorMessage, showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import { startGoogleOAuthRedirect } from "@/lib/googleAuth";
 import { loginSchema } from "@/validators";
-import type { AuthUser } from "@/core/types/user.types";
+import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
+import { setPendingVerification } from "@/utils/authSorage";
+import { AUTH_ERROR_CODE } from "@/types/auth";
 
 type LoginErrors = {
   email?: string;
   password?: string;
 };
+
+function isEmailNotVerifiedPayload(payload: unknown): boolean {
+  return (
+    payload !== null &&
+    typeof payload === "object" &&
+    (payload as { code?: string }).code === AUTH_ERROR_CODE.EMAIL_NOT_VERIFIED
+  );
+}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -43,22 +54,29 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const response = await login({ email, password });
+      const response = await login({
+        email: parsed.data.email,
+        password: parsed.data.password
+      });
+
       if (!response.success || !response.data) {
+        if (response.code === AUTH_ERROR_CODE.EMAIL_NOT_VERIFIED) {
+          setPendingVerification({ email: parsed.data.email });
+          showApiSuccessToast(
+            response.message || "Email not verified. A new verification code has been sent to your email."
+          );
+          navigate("/verify-otp", {
+            replace: true,
+            state: { email: parsed.data.email }
+          });
+          return;
+        }
         showApiErrorToast(response);
         return;
       }
 
-      const apiUser = response.data.user;
-      const user: AuthUser = {
-        id: apiUser.id,
-        email: apiUser.email,
-        isVerified: apiUser.isVerified,
-        createdAt: apiUser.createdAt
-      };
-
       setCredentials({
-        user,
+        user: mapApiUserToAuthUser(response.data.user),
         token: response.data.accessToken,
         refreshToken: response.data.refreshToken
       });
@@ -66,25 +84,28 @@ export default function Login() {
       showApiSuccessToast(response.message || "Login successful.");
       navigate("/dashboard", { replace: true });
     } catch (error) {
+      const errorBody = error instanceof AxiosError ? error.response?.data : error;
+      if (isEmailNotVerifiedPayload(errorBody)) {
+        setPendingVerification({ email: parsed.data.email });
+        showApiSuccessToast(
+          getApiErrorMessage(errorBody) ||
+            "Email not verified. A new verification code has been sent to your email."
+        );
+        navigate("/verify-otp", {
+          replace: true,
+          state: { email: parsed.data.email }
+        });
+        return;
+      }
       showApiErrorToast(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const onGoogleSignIn = async () => {
+  const onGoogleSignIn = () => {
     setGoogleLoading(true);
-    try {
-      await signInWithGoogle({
-        setCredentials,
-        navigate,
-        onSuccessToast: showApiSuccessToast
-      });
-    } catch (error) {
-      showApiErrorToast(error);
-    } finally {
-      setGoogleLoading(false);
-    }
+    startGoogleOAuthRedirect();
   };
 
   return (

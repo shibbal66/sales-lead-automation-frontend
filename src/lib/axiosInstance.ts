@@ -48,7 +48,11 @@ const shouldSkipRefreshForRequest = (url?: string): boolean => {
     url.includes(END_POINT.auth.signup) ||
     url.includes(END_POINT.auth.verifyOtp) ||
     url.includes(END_POINT.auth.resendOtp) ||
-    url.includes(END_POINT.auth.googleLogin)
+    url.includes(END_POINT.auth.forgotPassword) ||
+    url.includes(END_POINT.auth.resetPassword) ||
+    url.includes(END_POINT.auth.google) ||
+    url.includes(END_POINT.auth.googleCallback) ||
+    url.includes(END_POINT.auth.googleToken)
   );
 };
 
