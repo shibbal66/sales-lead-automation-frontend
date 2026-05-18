@@ -43,6 +43,7 @@ const EMPTY_FILTERS: LeadsBrowseFilters = {
   emailStatus: "",
   country: "",
   state: "",
+  city: "",
   industry: ""
 };
 
