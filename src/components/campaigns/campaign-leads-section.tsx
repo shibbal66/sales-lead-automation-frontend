@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CampaignLeadsTable } from "@/components/campaigns/campaign-leads-table";
-import { AssignLeadDialog } from "@/components/campaigns/assign-lead-dialog";
+import { BulkAssignLeadsSheet } from "@/components/campaigns/bulk-assign-leads-sheet";
 import { EditCampaignLeadDialog } from "@/components/campaigns/edit-campaign-lead-dialog";
 import {
   AlertDialog,
@@ -21,50 +21,29 @@ type CampaignLeadsSectionProps = {
   mailTemplate: string;
 };
 
-export function CampaignLeadsSection({ campaignId, mailTemplate }: CampaignLeadsSectionProps) {
+export function CampaignLeadsSection({ campaignId }: CampaignLeadsSectionProps) {
   const {
     campaignLeads,
     campaignLeadsTotal,
     currentPage,
     totalPages,
     isFetchingCampaignLeads,
-    isAddingCampaignLead,
+    isBulkAddingCampaignLeads,
     isUpdatingCampaignLead,
     isDeletingCampaignLead,
-    isAssigningRandomLeads,
     handlePageChange,
-    assignLead,
-    assignRandomLeads,
+    bulkAssignLeads,
     saveCampaignLead,
     removeCampaignLead
   } = useCampaignLeads(campaignId);
-  const [assignLeadOpen, setAssignLeadOpen] = useState(false);
-  const [leadDataId, setLeadDataId] = useState("");
-  const [assignmentMailTemplate, setAssignmentMailTemplate] = useState(mailTemplate);
+  const [assignLeadsOpen, setAssignLeadsOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<CampaignLeadApiModel | null>(null);
   const [deletingLead, setDeletingLead] = useState<CampaignLeadApiModel | null>(null);
-  const [assignRandomConfirmOpen, setAssignRandomConfirmOpen] = useState(false);
 
-  useEffect(() => {
-    if (assignLeadOpen) {
-      setAssignmentMailTemplate(mailTemplate);
-    }
-  }, [assignLeadOpen, mailTemplate]);
-
-  const handleAssignLeadOpenChange = (open: boolean) => {
-    setAssignLeadOpen(open);
-    if (!open) {
-      setLeadDataId("");
-      setAssignmentMailTemplate(mailTemplate);
-    }
-  };
-
-  const handleAssignLead = async () => {
-    const assigned = await assignLead(leadDataId, assignmentMailTemplate);
-    if (assigned) {
-      handleAssignLeadOpenChange(false);
-    }
-  };
+  const assignedLeadDataIds = useMemo(
+    () => new Set(campaignLeads.map((lead) => lead.lead_data_id)),
+    [campaignLeads]
+  );
 
   const handleSaveEdit = async (payload: UpdateCampaignLeadRequest) => {
     if (!editingLead) return;
@@ -82,14 +61,6 @@ export function CampaignLeadsSection({ campaignId, mailTemplate }: CampaignLeads
     }
   };
 
-  const handleConfirmAssignRandom = async () => {
-    try {
-      await assignRandomLeads();
-    } finally {
-      setAssignRandomConfirmOpen(false);
-    }
-  };
-
   return (
     <>
       <Card className="overflow-hidden shadow-card">
@@ -100,22 +71,17 @@ export function CampaignLeadsSection({ campaignId, mailTemplate }: CampaignLeads
           totalPages={totalPages}
           isLoading={isFetchingCampaignLeads}
           onPageChange={handlePageChange}
-          onAssignClick={() => setAssignLeadOpen(true)}
-          onAssignRandomClick={() => setAssignRandomConfirmOpen(true)}
-          isAssigningRandomLeads={isAssigningRandomLeads}
+          onAssignClick={() => setAssignLeadsOpen(true)}
           onEditLead={setEditingLead}
           onDeleteLead={setDeletingLead}
         />
       </Card>
-      <AssignLeadDialog
-        open={assignLeadOpen}
-        leadDataId={leadDataId}
-        mailTemplate={assignmentMailTemplate}
-        isSubmitting={isAddingCampaignLead}
-        onOpenChange={handleAssignLeadOpenChange}
-        onLeadDataIdChange={setLeadDataId}
-        onMailTemplateChange={setAssignmentMailTemplate}
-        onSubmit={handleAssignLead}
+      <BulkAssignLeadsSheet
+        open={assignLeadsOpen}
+        assignedLeadDataIds={assignedLeadDataIds}
+        isSubmitting={isBulkAddingCampaignLeads}
+        onOpenChange={setAssignLeadsOpen}
+        onAssign={bulkAssignLeads}
       />
       <EditCampaignLeadDialog
         key={editingLead?.id ?? "closed"}
@@ -147,29 +113,6 @@ export function CampaignLeadsSection({ campaignId, mailTemplate }: CampaignLeads
               onClick={() => void handleConfirmDelete()}
             >
               {isDeletingCampaignLead ? "Removing..." : "Remove"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog
-        open={assignRandomConfirmOpen}
-        onOpenChange={(open) => {
-          if (isAssigningRandomLeads) return;
-          setAssignRandomConfirmOpen(open);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Assign random leads?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will call the server to add available leads from your configured sources to this campaign at
-              random. Existing campaign leads are unchanged; duplicates are skipped per the API response.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isAssigningRandomLeads}>Cancel</AlertDialogCancel>
-            <Button disabled={isAssigningRandomLeads} onClick={() => void handleConfirmAssignRandom()}>
-              {isAssigningRandomLeads ? "Assigning…" : "Assign random"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

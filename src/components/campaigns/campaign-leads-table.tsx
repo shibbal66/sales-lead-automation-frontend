@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EllipsisVertical, Pencil, Plus, Shuffle, Trash2, FileSpreadsheet } from "lucide-react";
+import { EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import type { CampaignLeadApiModel } from "@/types";
 import { formatDateTime } from "@/lib/dateFormatting";
 import { MailTemplatePreview } from "@/components/campaigns/mail-template-preview";
@@ -28,8 +28,6 @@ type CampaignLeadsTableProps = {
   isLoading: boolean;
   onPageChange: (page: number) => void;
   onAssignClick: () => void;
-  onAssignRandomClick: () => void;
-  isAssigningRandomLeads?: boolean;
   onEditLead: (lead: CampaignLeadApiModel) => void;
   onDeleteLead: (lead: CampaignLeadApiModel) => void;
 };
@@ -42,8 +40,6 @@ export function CampaignLeadsTable({
   isLoading,
   onPageChange,
   onAssignClick,
-  onAssignRandomClick,
-  isAssigningRandomLeads = false,
   onEditLead,
   onDeleteLead,
 }: CampaignLeadsTableProps) {
@@ -57,19 +53,6 @@ export function CampaignLeadsTable({
         <div className="flex items-end justify-end gap-2">
           <Button onClick={onAssignClick} size="sm">
             <Plus className="h-4 w-4" /> Add
-          </Button>
-          <Button size="sm">
-            <FileSpreadsheet className="h-4 w-4" /> Add Bulk
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={isAssigningRandomLeads}
-            onClick={() => void onAssignRandomClick()}
-          >
-            <Shuffle className="h-4 w-4" />
-           Assign Random
           </Button>
         </div>
       </div>

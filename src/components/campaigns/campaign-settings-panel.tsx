@@ -212,13 +212,6 @@ export function CampaignSettingsPanel({
           </div>
         </div>
 
-        <div className="rounded-lg border border-border bg-muted/30 p-3">
-          <p className="text-xs font-semibold text-muted-foreground">Timeline</p>
-          <div className="mt-2 space-y-1.5 text-xs">
-            <p><span className="text-muted-foreground">Created:</span> {formatDateTime(campaign.createdAt)}</p>
-            <p><span className="text-muted-foreground">Updated:</span> {formatDateTime(campaign.updatedAt)}</p>
-          </div>
-        </div>
       </div>
     </Card>
   );

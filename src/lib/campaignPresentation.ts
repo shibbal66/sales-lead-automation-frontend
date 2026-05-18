@@ -1,4 +1,10 @@
-import type { CampaignApiModel, CampaignLeadSource, CampaignStatus, UpdateCampaignRequest } from "@/types";
+import type {
+  CampaignApiModel,
+  CampaignLeadSource,
+  CampaignStatus,
+  MailTemplateSample,
+  UpdateCampaignRequest
+} from "@/types";
 
 export const CAMPAIGN_DETAIL_STATUSES = ["draft", "active", "paused", "completed"] as const;
 export const CAMPAIGN_TONES = ["Friendly", "Professional", "Direct", "Consultative"] as const;
@@ -17,8 +23,12 @@ export type CampaignDetailViewModel = {
   targetZone: string;
   callToAction: string;
   leadSource: CampaignLeadSource;
-  mailTemplate: string;
-  exampleTraining: string;
+  targetTone: string;
+  mailTrainingInstruction: string;
+  mailTemplateSamples: MailTemplateSample[];
+  senderDisplayName: string;
+  senderAddress: string;
+  senderPhone: string;
   targetLeads: number;
   createdAt: string;
   updatedAt: string;
@@ -50,6 +60,8 @@ export function mapApiStatusToListStatus(status: CampaignStatus): CampaignStatus
 }
 
 export function mapCampaignApiToDetail(campaign: CampaignApiModel): CampaignDetailViewModel {
+  const mailTrainingInstruction = campaign.mail_training_instruction ?? "";
+
   return {
     id: campaign.id,
     name: campaign.name,
@@ -59,8 +71,12 @@ export function mapCampaignApiToDetail(campaign: CampaignApiModel): CampaignDeta
     targetZone: campaign.target_zone,
     callToAction: campaign.call_to_action,
     leadSource: campaign.lead_source,
-    mailTemplate: campaign.mail_template,
-    exampleTraining: campaign.example_training,
+    targetTone: campaign.target_tone ?? CAMPAIGN_TONES[0],
+    mailTrainingInstruction: mailTrainingInstruction,
+    mailTemplateSamples: campaign.mail_template_samples ?? [],
+    senderDisplayName: campaign.sender_display_name ?? "",
+    senderAddress: campaign.sender_address ?? "",
+    senderPhone: campaign.sender_phone ?? "",
     targetLeads: campaign.target_leads,
     createdAt: campaign.created_at,
     updatedAt: campaign.updated_at
@@ -89,6 +105,7 @@ export type CampaignDetailFormState = {
   runMode: CampaignDetailRunMode;
   mailTemplate: string;
   exampleTraining: string;
+  mailTemplateSamples: MailTemplateSample[];
   tone: CampaignTone;
   targetLeads: number;
   status: CampaignDetailStatus;
@@ -107,9 +124,13 @@ export function buildCampaignUpdatePayload(
   if (current.runMode !== initial.runMode) {
     payload.run_mode = current.runMode === "automatic" ? "auto" : "manual";
   }
-  if (current.mailTemplate !== initial.mailTemplate) payload.mail_template = current.mailTemplate;
-  if (current.exampleTraining !== initial.exampleTraining) payload.example_training = current.exampleTraining;
-  if (current.tone !== initial.tone && !payload.example_training) payload.example_training = current.tone;
+  if (current.mailTemplate !== initial.mailTemplate) {
+    payload.mail_training_instruction = current.mailTemplate;
+  }
+  if (JSON.stringify(current.mailTemplateSamples) !== JSON.stringify(initial.mailTemplateSamples)) {
+    payload.mail_template_samples = current.mailTemplateSamples;
+  }
+  if (current.tone !== initial.tone) payload.target_tone = current.tone;
   if (current.targetLeads !== initial.targetLeads) payload.target_leads = current.targetLeads;
   if (current.status !== initial.status) payload.status = current.status;
   return payload;

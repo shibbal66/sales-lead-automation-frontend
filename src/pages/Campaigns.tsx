@@ -68,14 +68,19 @@ export default function CampaignsPage() {
         target_zone: campaign.target_zone,
         call_to_action: campaign.call_to_action,
         run_mode: campaign.run_mode,
+        target_tone: campaign.target_tone ?? "Friendly",
+        mail_training_instruction:
+          campaign.mail_training_instruction ?? "",
+        mail_template_samples: campaign.mail_template_samples ?? [],
         lead_source: campaign.lead_source,
-        mail_template: campaign.mail_template,
-        example_training: campaign.example_training,
+        sender_display_name: campaign.sender_display_name ?? "",
+        sender_address: campaign.sender_address ?? "",
+        sender_phone: campaign.sender_phone ?? "",
         target_leads: campaign.target_leads,
         status: "draft"
       };
-      await createCampaign(payload);
-      showApiSuccessToast("Campaign duplicated successfully.");
+      const { message } = await createCampaign(payload);
+      showApiSuccessToast(message || "Campaign duplicated successfully.");
     } catch {
       // Error toast is already handled in store.
     }

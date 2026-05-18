@@ -1,52 +1,96 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { forgotPassword } from "@/services/auth/authServices";
+import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import { forgotPasswordSchema } from "@/validators";
+import { setPendingPasswordReset } from "@/utils/authSorage";
+
+type ForgotPasswordErrors = {
+  email?: string;
+};
 
 export default function ForgotPassword() {
-  const [sent, setSent] = useState(false);
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<ForgotPasswordErrors>({});
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = forgotPasswordSchema.safeParse({ email });
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors;
+      setErrors({ email: fieldErrors.email?.[0] });
+      return;
+    }
+    setErrors({});
+
+    setLoading(true);
+    try {
+      const response = await forgotPassword({ email: parsed.data.email });
+      if (!response.success) {
+        showApiErrorToast(response);
+        return;
+      }
+
+      showApiSuccessToast(
+        response.message ||
+          "If an account with this email exists and has a password, a reset code has been sent."
+      );
+      setPendingPasswordReset({ email: parsed.data.email });
+      navigate("/reset-password", {
+        replace: true,
+        state: { email: parsed.data.email }
+      });
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <AuthLayout
-      headline="Reset your password in one click."
-      subheadline="We'll email you a secure link to set a new password."
+      headline="Reset your password securely."
+      subheadline="We'll email you a 6-digit code to choose a new password."
     >
-      {sent ? (
-        <div className="rounded-xl border border-success/30 bg-success/10 p-6 text-center">
-          <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
-          <h2 className="mt-4 font-display text-xl font-bold">Check your inbox</h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            We've sent a password reset link to your email.
-          </p>
-          <Link to="/login" className="mt-6 inline-block text-sm font-semibold text-brand-text hover:underline">
-            ← Back to sign in
-          </Link>
+      <h2 className="font-display text-2xl font-bold">Forgot password</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Enter your email and we&apos;ll send you a reset code.
+      </p>
+
+      <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            placeholder="you@company.com"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (errors.email) setErrors({});
+            }}
+            required
+          />
+          {errors.email ? <p className="text-xs text-destructive">{errors.email}</p> : null}
         </div>
-      ) : (
-        <>
-          <h2 className="font-display text-2xl font-bold">Forgot password</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Enter your email and we'll send you a reset link.</p>
 
-          <form
-            onSubmit={(e) => { e.preventDefault(); setSent(true); }}
-            className="mt-8 space-y-4"
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@company.com" required />
-            </div>
-            <Button type="submit" className="w-full">Send Reset Link</Button>
-          </form>
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Sending..." : "Send reset code"}
+        </Button>
+      </form>
 
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            Remember your password?{" "}
-            <Link to="/login" className="font-semibold text-brand-text hover:underline">Sign in</Link>
-          </p>
-        </>
-      )}
+      <p className="mt-8 text-center text-sm text-muted-foreground">
+        Remember your password?{" "}
+        <Link to="/login" className="font-semibold text-brand-text hover:underline">
+          Sign in
+        </Link>
+      </p>
     </AuthLayout>
   );
 }

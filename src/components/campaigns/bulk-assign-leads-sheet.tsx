@@ -1,0 +1,379 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle
+} from "@/components/ui/sheet";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { TablePagination } from "@/components/layout/table-pagination";
+import { UserAvatar } from "@/components/user-avatar";
+import { getLeads } from "@/services/lead/leadServices";
+import { parseLeadsListResponse } from "@/lib/parseLeadsListResponse";
+import { mapLeadApiToListRow } from "@/lib/leadPresentation";
+import { showApiErrorToast } from "@/lib/apiToast";
+import { clampPage, getTotalPages } from "@/lib/listPagination";
+import type { GetLeadsQuery, LeadApiModel } from "@/types";
+import { Plus, RotateCcw, Search } from "lucide-react";
+
+type LeadsBrowseFilters = {
+  search: string;
+  emailStatus: string;
+  country: string;
+  state: string;
+  city: string;
+  industry: string;
+};
+
+const EMPTY_FILTERS: LeadsBrowseFilters = {
+  search: "",
+  emailStatus: "",
+  country: "",
+  state: "",
+  industry: ""
+};
+
+const PAGE_LIMIT = 20;
+
+function filtersToQuery(filters: LeadsBrowseFilters, page: number): GetLeadsQuery {
+  return {
+    page,
+    limit: PAGE_LIMIT,
+    search: filters.search.trim() || undefined,
+    emailStatus: filters.emailStatus.trim() || undefined,
+    country: filters.country.trim() || undefined,
+    state: filters.state.trim() || undefined,
+    city: filters.city.trim() || undefined,
+    industry: filters.industry.trim() || undefined
+  };
+}
+
+type BulkAssignLeadsSheetProps = {
+  open: boolean;
+  assignedLeadDataIds: Set<string>;
+  isSubmitting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAssign: (leadDataIds: string[]) => Promise<boolean>;
+};
+
+export function BulkAssignLeadsSheet({
+  open,
+  assignedLeadDataIds,
+  isSubmitting,
+  onOpenChange,
+  onAssign
+}: BulkAssignLeadsSheetProps) {
+  const [draftFilters, setDraftFilters] = useState<LeadsBrowseFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<LeadsBrowseFilters>(EMPTY_FILTERS);
+  const [leads, setLeads] = useState<LeadApiModel[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [isFetching, setIsFetching] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const totalPages = getTotalPages(total, PAGE_LIMIT);
+
+  const rows = useMemo(() => leads.map(mapLeadApiToListRow), [leads]);
+
+  const selectableRows = useMemo(
+    () => rows.filter((row) => !assignedLeadDataIds.has(row.id)),
+    [assignedLeadDataIds, rows]
+  );
+
+  const loadLeads = useCallback(async (filters: LeadsBrowseFilters, nextPage: number) => {
+    setIsFetching(true);
+    try {
+      const response = await getLeads(filtersToQuery(filters, nextPage));
+      const parsed = parseLeadsListResponse(response, nextPage, PAGE_LIMIT);
+      if (!parsed) {
+        showApiErrorToast(response);
+        return;
+      }
+      setLeads(parsed.leads);
+      setPage(parsed.page);
+      setTotal(parsed.total);
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setIsFetching(false);
+    }
+  }, []);
+
+  const resetSheetState = useCallback(() => {
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    setSelected(new Set());
+    setPage(1);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    resetSheetState();
+    void loadLeads(EMPTY_FILTERS, 1);
+  }, [loadLeads, open, resetSheetState]);
+
+  useEffect(() => {
+    if (!open || isFetching || total === 0) return;
+    const nextPage = clampPage(page, totalPages);
+    if (nextPage !== page) {
+      void loadLeads(appliedFilters, nextPage);
+    }
+  }, [appliedFilters, isFetching, loadLeads, open, page, total, totalPages]);
+
+  const updateDraftFilter = (key: keyof LeadsBrowseFilters, value: string) => {
+    setDraftFilters((previous) => ({ ...previous, [key]: value }));
+  };
+
+  const handleApplyFilters = () => {
+    setAppliedFilters(draftFilters);
+    setSelected(new Set());
+    void loadLeads(draftFilters, 1);
+  };
+
+  const handleResetFilters = () => {
+    setDraftFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+    setSelected(new Set());
+    void loadLeads(EMPTY_FILTERS, 1);
+  };
+
+  const handlePageChange = (nextPage: number) => {
+    void loadLeads(appliedFilters, clampPage(nextPage, totalPages));
+  };
+
+  const allSelectableChecked =
+    selectableRows.length > 0 && selectableRows.every((row) => selected.has(row.id));
+
+  const toggleAll = () => {
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (allSelectableChecked) {
+        selectableRows.forEach((row) => next.delete(row.id));
+      } else {
+        selectableRows.forEach((row) => next.add(row.id));
+      }
+      return next;
+    });
+  };
+
+  const toggleOne = (id: string) => {
+    if (assignedLeadDataIds.has(id)) return;
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleAssign = async () => {
+    const ok = await onAssign([...selected]);
+    if (ok) {
+      setSelected(new Set());
+      onOpenChange(false);
+    }
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-3xl">
+        <SheetHeader className="border-b border-border px-6 py-5 text-left">
+          <SheetTitle>Add leads to campaign</SheetTitle>
+          <SheetDescription>
+            Filter leads, select rows, then add them to this campaign.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
+            <p className="text-sm font-semibold">Filters</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="lead-filter-search">Search</Label>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="lead-filter-search"
+                    value={draftFilters.search}
+                    onChange={(event) => updateDraftFilter("search", event.target.value)}
+                    placeholder="Name, company, email..."
+                    className="pl-9"
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") handleApplyFilters();
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lead-filter-email-status">Email status</Label>
+                <Input
+                  id="lead-filter-email-status"
+                  value={draftFilters.emailStatus}
+                  onChange={(event) => updateDraftFilter("emailStatus", event.target.value)}
+                  placeholder="e.g. sent"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lead-filter-country">Country</Label>
+                <Input
+                  id="lead-filter-country"
+                  value={draftFilters.country}
+                  onChange={(event) => updateDraftFilter("country", event.target.value)}
+                  placeholder="Country"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lead-filter-state">State</Label>
+                <Input
+                  id="lead-filter-state"
+                  value={draftFilters.state}
+                  onChange={(event) => updateDraftFilter("state", event.target.value)}
+                  placeholder="State"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="lead-filter-city">City</Label>
+                <Input
+                  id="lead-filter-city"
+                  value={draftFilters.city}
+                  onChange={(event) => updateDraftFilter("city", event.target.value)}
+                  placeholder="City"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="lead-filter-industry">Industry</Label>
+                <Input
+                  id="lead-filter-industry"
+                  value={draftFilters.industry}
+                  onChange={(event) => updateDraftFilter("industry", event.target.value)}
+                  placeholder="Industry"
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={handleResetFilters}>
+                <RotateCcw className="h-4 w-4" /> Reset
+              </Button>
+              <Button type="button" size="sm" onClick={handleApplyFilters} disabled={isFetching}>
+                Apply filters
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              {isFetching ? "Loading..." : `${total} lead${total === 1 ? "" : "s"} found`}
+            </p>
+            {selected.size > 0 ? (
+              <p className="text-sm font-medium">{selected.size} selected</p>
+            ) : null}
+          </div>
+
+          <div className="mt-3 overflow-hidden rounded-xl border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allSelectableChecked}
+                      disabled={selectableRows.length === 0 || isFetching}
+                      onCheckedChange={toggleAll}
+                      aria-label="Select all leads on this page"
+                    />
+                  </TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Email status</TableHead>
+                  <TableHead>Location</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {!isFetching && rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                      No leads match your filters.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                {rows.map((row) => {
+                  const lead = leads.find((item) => String(item.id) === row.id);
+                  const isAssigned = assignedLeadDataIds.has(row.id);
+                  const location = [lead?.city, lead?.state, lead?.country].filter(Boolean).join(", ");
+
+                  return (
+                    <TableRow key={row.id} className={isAssigned ? "opacity-60" : undefined}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selected.has(row.id)}
+                          disabled={isAssigned || isFetching}
+                          onCheckedChange={() => toggleOne(row.id)}
+                          aria-label={`Select ${row.name}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex min-w-[140px] items-center gap-2">
+                          <UserAvatar name={row.name} size={28} />
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium">{row.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">{row.title}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[120px] truncate text-sm">{row.company}</TableCell>
+                      <TableCell className="max-w-[160px] truncate text-sm text-muted-foreground">
+                        {row.email}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {lead?.emailStatus?.trim() || "—"}
+                      </TableCell>
+                      <TableCell className="max-w-[140px] truncate text-sm text-muted-foreground">
+                        {isAssigned ? (
+                          <span className="text-xs font-medium text-primary">Already assigned</span>
+                        ) : (
+                          location || "—"
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <TablePagination currentPage={page} totalPages={totalPages} onPageChange={handlePageChange} />
+          </div>
+        </div>
+
+        <SheetFooter className="border-t border-border px-6 py-4 sm:justify-between">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void handleAssign()}
+            disabled={isSubmitting || selected.size === 0}
+          >
+            <Plus className="h-4 w-4" />
+            {isSubmitting
+              ? "Adding..."
+              : selected.size > 0
+                ? `Add ${selected.size} lead${selected.size === 1 ? "" : "s"}`
+                : "Add to campaign"}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
+}

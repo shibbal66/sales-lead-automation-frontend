@@ -54,7 +54,10 @@ export interface GetLeadsQuery {
   page?: number;
   limit?: number;
   search?: string;
+  emailStatus?: string;
   country?: string;
+  state?: string;
+  city?: string;
   industry?: string;
 }
 

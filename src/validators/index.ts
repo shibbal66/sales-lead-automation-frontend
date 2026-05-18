@@ -8,6 +8,7 @@ export {
   updatePasswordSchema,
   requestOtpSchema,
   verifyOtpSchema,
+  resendOtpSchema,
   type LoginFormValues,
   type SignupFormValues,
   type ForgotPasswordFormValues,
@@ -15,7 +16,13 @@ export {
   type ResetPasswordFormValues,
   type UpdatePasswordFormValues,
   type RequestOtpFormValues,
-  type VerifyOtpFormValues
+  type VerifyOtpFormValues,
+  type ResendOtpFormValues
 } from "./auth";
 
-export { createCampaignSchema, type CreateCampaignFormValues } from "./campaign";
+export {
+  createCampaignSchema,
+  mailTemplateSampleSchema,
+  type CreateCampaignFormValues,
+  type MailTemplateSampleFormValues
+} from "./campaign";
