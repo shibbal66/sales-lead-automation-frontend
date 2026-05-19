@@ -79,7 +79,22 @@ export type GoogleAuthTokenData = {
 
 export type GoogleCallbackResponse = GoogleApiResponse;
 export type GoogleTokenExchangeResponse = GoogleApiResponse;
-export type GoogleLinkStatusResponse = GoogleApiResponse;
+
+/** GET /auth/google/status — Gmail link state for the authenticated user. */
+export interface GoogleLinkStatusData {
+  linked: boolean;
+  email?: string;
+  name?: string;
+  avatarUrl?: string;
+  scopes?: string[];
+  tokenExpiresAt?: string;
+}
+
+export interface GoogleLinkStatusResponse {
+  success: boolean;
+  message?: string;
+  data?: GoogleLinkStatusData;
+}
 
 
 

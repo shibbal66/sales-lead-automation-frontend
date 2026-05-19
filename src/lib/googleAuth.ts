@@ -7,6 +7,11 @@ import {
 import type { AuthUser } from "@/core/types/user.types";
 import type { GoogleApiResponse, GoogleAuthTokenData } from "@/types";
 import { showApiErrorToast } from "@/lib/apiToast";
+import { getAuthToken } from "@/utils/authSorage";
+import {
+  clearPendingGoogleLinkReturn,
+  getPendingGoogleLinkReturn
+} from "@/utils/googleLinkReturn";
 
 type SetCredentials = (payload: { user: AuthUser; token: string; refreshToken?: string }) => void;
 
@@ -111,6 +116,14 @@ export async function applyGoogleAuthResponse(
   });
 
   params.onSuccessToast(response.message || "Google authentication successful.");
+
+  const pendingReturn = getPendingGoogleLinkReturn();
+  if (pendingReturn) {
+    clearPendingGoogleLinkReturn();
+    params.navigate(pendingReturn.returnTo, { replace: true });
+    return true;
+  }
+
   params.navigate("/dashboard", { replace: true });
   return true;
 }
@@ -144,6 +157,12 @@ export async function completeGoogleOAuthFromCallback(
         ? "Google sign-in was cancelled."
         : `Google sign-in failed (${oauthError}).`;
     showApiErrorToast(message);
+    const pendingReturn = getPendingGoogleLinkReturn();
+    if (pendingReturn && getAuthToken()) {
+      clearPendingGoogleLinkReturn();
+      params.navigate(pendingReturn.returnTo, { replace: true });
+      return;
+    }
     params.navigate("/login", { replace: true });
     return;
   }
@@ -154,14 +173,47 @@ export async function completeGoogleOAuthFromCallback(
     return;
   }
 
+  const pendingReturn = getPendingGoogleLinkReturn();
+
   try {
     const response = await googleOAuthCallback({ code });
+
+    if (pendingReturn && getAuthToken()) {
+      clearPendingGoogleLinkReturn();
+      if (response.success) {
+        const tokens = await resolveGoogleTokens(response);
+        if (tokens) {
+          const user = tokens.user
+            ? authUserFromApiUser(tokens.user)
+            : fallbackGoogleUser(tokens.accessToken);
+          params.setCredentials({
+            user,
+            token: tokens.accessToken,
+            refreshToken: tokens.refreshToken
+          });
+        }
+        params.onSuccessToast(
+          response.message || "Google account connected. Set status to Active and save your changes."
+        );
+        params.navigate(pendingReturn.returnTo, { replace: true });
+        return;
+      }
+      showApiErrorToast(response);
+      params.navigate(pendingReturn.returnTo, { replace: true });
+      return;
+    }
+
     const ok = await applyGoogleAuthResponse(response, params);
     if (!ok) {
       params.navigate("/login", { replace: true });
     }
   } catch (error) {
     showApiErrorToast(error);
+    if (pendingReturn && getAuthToken()) {
+      clearPendingGoogleLinkReturn();
+      params.navigate(pendingReturn.returnTo, { replace: true });
+      return;
+    }
     params.navigate("/login", { replace: true });
   }
 }

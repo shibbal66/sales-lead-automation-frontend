@@ -23,7 +23,8 @@ import type {
   UpdateCampaignLeadRequest,
   UpdateCampaignLeadResponse,
   UpdateCampaignRequest,
-  UpdateCampaignResponse
+  UpdateCampaignResponse,
+  RunCampaignLeadsResponse
 } from "@/types";
 
 export function createCampaign(payload: CreateCampaignRequest) {
@@ -125,5 +126,12 @@ export function deleteCampaignFollowUp(campaignId: string, followUpId: string) {
   return apiInvoker<DeleteCampaignFollowUpResponse>(
     `${END_POINT.campaign.create}/${campaignId}/follow-ups/${followUpId}`,
     "DELETE"
+  );
+}
+
+export function runCampaignLeads(campaignId: string) {
+  return apiInvoker<RunCampaignLeadsResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/leads/run`,
+    "POST"
   );
 }

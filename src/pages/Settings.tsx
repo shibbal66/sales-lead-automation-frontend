@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,17 @@ const sections = [
   { id: "notif", label: "Notifications", icon: Bell },
   { id: "danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
+
+type SettingsSectionId = (typeof sections)[number]["id"];
+
+const SETTINGS_SECTION_IDS = new Set<SettingsSectionId>(sections.map((s) => s.id));
+
+function settingsSectionFromTab(tab: string | null): SettingsSectionId {
+  if (tab && SETTINGS_SECTION_IDS.has(tab as SettingsSectionId)) {
+    return tab as SettingsSectionId;
+  }
+  return "profile";
+}
 
 type ProfileFormState = {
   name: string;
@@ -80,10 +91,15 @@ function UserAvatarCircle({ user, className }: { user: AuthUser | null; classNam
 
 export default function Settings() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
   const logoutAllDevices = useAuthStore((state) => state.logoutAllDevices);
-  const [section, setSection] = useState<(typeof sections)[number]["id"]>("profile");
+  const section = settingsSectionFromTab(searchParams.get("tab"));
+
+  const selectSection = (id: SettingsSectionId) => {
+    setSearchParams({ tab: id }, { replace: true });
+  };
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
@@ -130,7 +146,7 @@ export default function Settings() {
           return (
             <button
               key={s.id}
-              onClick={() => setSection(s.id)}
+              onClick={() => selectSection(s.id)}
               className={cn(
                 "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 active ? "bg-primary/15 text-brand-text" : "text-muted-foreground hover:bg-muted hover:text-foreground",

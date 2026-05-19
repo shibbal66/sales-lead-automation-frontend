@@ -30,7 +30,7 @@ export interface Campaign {
   tone: "Friendly" | "Professional" | "Direct" | "Consultative";
   cta: string;
   targetZone?: string;
-  leadSource?: "new" | "existing" | "both";
+  leadSource?: "new" | "old" | "both";
   mailTemplate?: string;
   exampleTraining?: string;
   createdAt?: string;

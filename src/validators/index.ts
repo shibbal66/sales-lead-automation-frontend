@@ -22,7 +22,10 @@ export {
 
 export {
   createCampaignSchema,
+  createCampaignFollowUpSchema,
+  parseCreateCampaignFollowUpPayload,
   mailTemplateSampleSchema,
   type CreateCampaignFormValues,
+  type CreateCampaignFollowUpFormValues,
   type MailTemplateSampleFormValues
 } from "./campaign";

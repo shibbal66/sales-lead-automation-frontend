@@ -10,8 +10,8 @@ import { Bot, Hand, Check, ArrowLeft, ArrowRight, Plus, Trash2, Users } from "lu
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { createCampaignSchema, mailTemplateSampleSchema } from "@/validators";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
-import { CAMPAIGN_TONES } from "@/lib/campaignPresentation";
-import type { CampaignLeadSource, CreateCampaignRequest, MailTemplateSample } from "@/types";
+import { CAMPAIGN_LEAD_SOURCES, CAMPAIGN_TONES } from "@/lib/campaignPresentation";
+import type { CreateCampaignRequest, MailTemplateSample } from "@/types";
 import type { CreateCampaignFormValues } from "@/validators";
 import type { ZodError } from "zod";
 
@@ -43,7 +43,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
   const [targetZone, setTargetZone] = useState("");
   const [targetTone, setTargetTone] = useState<string>(CAMPAIGN_TONES[0]);
   const [cta, setCta] = useState("");
-  const [leadSource, setLeadSource] = useState<CampaignLeadSource>("both");
+  const [leadSource, setLeadSource] = useState<CreateCampaignFormValues["lead_source"]>("both");
   const [mode, setMode] = useState<"auto" | "manual">("manual");
   const [senderDisplayName, setSenderDisplayName] = useState("");
   const [senderAddress, setSenderAddress] = useState("");
@@ -58,7 +58,9 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
   const [leadCount, setLeadCount] = useState<number | "">(100);
   const [errors, setErrors] = useState<CampaignFormErrors>({});
 
-  const getDraftPayload = (): CreateCampaignFormValues => ({
+  const buildDraftPayload = (
+    overrides: Partial<CreateCampaignFormValues> = {}
+  ): CreateCampaignFormValues => ({
     name,
     goal,
     target_zone: targetZone,
@@ -72,7 +74,8 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     sender_address: senderAddress,
     sender_phone: senderPhone,
     target_leads: typeof leadCount === "number" ? leadCount : 0,
-    status: "draft"
+    status: "draft",
+    ...overrides
   });
 
   const getStepFields = (currentStep: number): Array<keyof CreateCampaignFormValues> => {
@@ -106,37 +109,86 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     };
   };
 
-  const validateCurrentStep = (currentStep: number) => {
-    const parsed = createCampaignSchema.safeParse(getDraftPayload());
-    const stepFields = getStepFields(currentStep);
-    const nextErrors: CampaignFormErrors = {};
+  const validateFields = (
+    fields: Array<keyof CreateCampaignFormValues>,
+    overrides: Partial<CreateCampaignFormValues> = {}
+  ) => {
+    const parsed = createCampaignSchema.safeParse(buildDraftPayload(overrides));
     const allErrors = !parsed.success ? mapZodErrors(parsed.error) : {};
+    const nextErrors: Partial<CampaignFormErrors> = {};
 
-    stepFields.forEach((field) => {
+    fields.forEach((field) => {
       nextErrors[field] = allErrors[field] || "";
     });
 
-    setErrors((prev) => ({ ...prev, ...nextErrors, sampleDraft: undefined }));
-    return stepFields.every((field) => !nextErrors[field]);
+    setErrors((prev) => ({ ...prev, ...nextErrors }));
+    return fields.every((field) => !nextErrors[field]);
+  };
+
+  const validateCurrentStep = (currentStep: number) => {
+    const stepFields = getStepFields(currentStep);
+    const ok = validateFields(stepFields);
+    if (currentStep !== 5) {
+      setErrors((prev) => ({ ...prev, sampleDraft: undefined }));
+    }
+    return ok;
+  };
+
+  const patchField = <K extends keyof CreateCampaignFormValues>(
+    field: K,
+    value: CreateCampaignFormValues[K],
+    apply: () => void
+  ) => {
+    apply();
+    validateFields([field], { [field]: value });
+  };
+
+  const validateSampleDraft = (draft?: {
+    subject?: string;
+    body?: string;
+    html?: string;
+    text?: string;
+  }) => {
+    const subject = draft?.subject ?? sampleSubject;
+    const body = draft?.body ?? sampleBody;
+    const html = draft?.html ?? sampleHtml;
+    const text = draft?.text ?? sampleText;
+    const hasDraftContent = [subject, body, html, text].some((part) => part.trim().length > 0);
+
+    if (!hasDraftContent) {
+      setErrors((prev) => ({ ...prev, sampleDraft: undefined }));
+      return;
+    }
+
+    const parsed = mailTemplateSampleSchema.safeParse({ subject, body, html, text });
+    if (!parsed.success) {
+      const message = parsed.error.errors[0]?.message ?? "Please complete subject and email content.";
+      setErrors((prev) => ({ ...prev, sampleDraft: message }));
+      return;
+    }
+
+    setErrors((prev) => ({ ...prev, sampleDraft: undefined }));
   };
 
   const setSampleContentValue = (value: string) => {
-    if (errors.sampleDraft) setErrors((prev) => ({ ...prev, sampleDraft: undefined }));
     if (sampleContentFormat === "body") {
       setSampleBody(value);
       setSampleHtml("");
       setSampleText("");
+      validateSampleDraft({ body: value, html: "", text: "" });
       return;
     }
     if (sampleContentFormat === "html") {
       setSampleHtml(value);
       setSampleBody("");
       setSampleText("");
+      validateSampleDraft({ html: value, body: "", text: "" });
       return;
     }
     setSampleText(value);
     setSampleBody("");
     setSampleHtml("");
+    validateSampleDraft({ text: value, body: "", html: "" });
   };
 
   const handleSampleContentFormatChange = (format: SampleContentFormat) => {
@@ -144,7 +196,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     setSampleBody("");
     setSampleHtml("");
     setSampleText("");
-    if (errors.sampleDraft) setErrors((prev) => ({ ...prev, sampleDraft: undefined }));
+    validateSampleDraft({ body: "", html: "", text: "" });
   };
 
   const handleAddTemplateSample = () => {
@@ -159,13 +211,15 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
       setErrors((prev) => ({ ...prev, sampleDraft: first }));
       return;
     }
-    setTemplateSamples((prev) => [...prev, parsed.data]);
+    const nextSamples = [...templateSamples, parsed.data];
+    setTemplateSamples(nextSamples);
     setSampleSubject("");
     setSampleContentFormat("body");
     setSampleBody("");
     setSampleHtml("");
     setSampleText("");
-    setErrors((prev) => ({ ...prev, sampleDraft: undefined, mail_template_samples: undefined }));
+    setErrors((prev) => ({ ...prev, sampleDraft: undefined }));
+    validateFields(["mail_template_samples"], { mail_template_samples: nextSamples });
   };
 
   const handleNext = () => {
@@ -196,16 +250,21 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     setErrors({});
   };
 
-  const close = () => {
+  const dismiss = () => {
+    onOpenChange(false);
+  };
+
+  const closeAndReset = () => {
     onOpenChange(false);
     setTimeout(reset, 200);
   };
 
   const create = async () => {
-    const parsed = createCampaignSchema.safeParse(getDraftPayload());
+    const allFields = Object.keys(createCampaignSchema.shape) as Array<keyof CreateCampaignFormValues>;
+    const parsed = createCampaignSchema.safeParse(buildDraftPayload());
 
     if (!parsed.success) {
-      setErrors(mapZodErrors(parsed.error));
+      validateFields(allFields);
       showApiErrorToast(new Error("Please fix campaign form errors."));
       return;
     }
@@ -213,13 +272,13 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     const payload = parsed.data as CreateCampaignRequest;
     const { campaign, message } = await createCampaign(payload);
     showApiSuccessToast(message || `Campaign "${campaign.name}" created successfully.`);
-    close();
+    closeAndReset();
   };
 
   const presets = [50, 100, 250, 500];
 
   return (
-    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : close())}>
+    <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : dismiss())}>
       <DialogContent className="max-w-3xl gap-0 overflow-hidden p-0">
         <div className="flex items-center justify-between border-b border-border p-5">
           <div>
@@ -269,10 +328,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="name"
                   value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    if (errors.name) setErrors((prev) => ({ ...prev, name: "" }));
-                  }}
+                  onChange={(e) => patchField("name", e.target.value, () => setName(e.target.value))}
                   placeholder="e.g. Q2 Outbound — SaaS"
                 />
                 {errors.name ? <p className="text-xs text-destructive">{errors.name}</p> : null}
@@ -283,10 +339,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   id="goal"
                   rows={3}
                   value={goal}
-                  onChange={(e) => {
-                    setGoal(e.target.value);
-                    if (errors.goal) setErrors((prev) => ({ ...prev, goal: "" }));
-                  }}
+                  onChange={(e) => patchField("goal", e.target.value, () => setGoal(e.target.value))}
                   placeholder="What is the objective of this campaign?"
                 />
                 {errors.goal ? <p className="text-xs text-destructive">{errors.goal}</p> : null}
@@ -296,10 +349,9 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="targetZone"
                   value={targetZone}
-                  onChange={(e) => {
-                    setTargetZone(e.target.value);
-                    if (errors.target_zone) setErrors((prev) => ({ ...prev, target_zone: "" }));
-                  }}
+                  onChange={(e) =>
+                    patchField("target_zone", e.target.value, () => setTargetZone(e.target.value))
+                  }
                   placeholder="e.g. North America - SaaS Companies"
                 />
                 {errors.target_zone ? <p className="text-xs text-destructive">{errors.target_zone}</p> : null}
@@ -311,10 +363,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                     <button
                       key={t}
                       type="button"
-                      onClick={() => {
-                        setTargetTone(t);
-                        if (errors.target_tone) setErrors((prev) => ({ ...prev, target_tone: "" }));
-                      }}
+                      onClick={() => patchField("target_tone", t, () => setTargetTone(t))}
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
                         targetTone === t
@@ -333,10 +382,9 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="cta"
                   value={cta}
-                  onChange={(e) => {
-                    setCta(e.target.value);
-                    if (errors.call_to_action) setErrors((prev) => ({ ...prev, call_to_action: "" }));
-                  }}
+                  onChange={(e) =>
+                    patchField("call_to_action", e.target.value, () => setCta(e.target.value))
+                  }
                   placeholder="What action do you want leads to take?"
                 />
                 {errors.call_to_action ? (
@@ -346,16 +394,13 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
               <div className="space-y-2">
                 <Label>Lead source</Label>
                 <div className="flex flex-wrap gap-2">
-                  {(["new", "existing", "both"] as const).map((source) => (
+                  {CAMPAIGN_LEAD_SOURCES.map((source) => (
                     <button
                       key={source}
                       type="button"
-                      onClick={() => {
-                        setLeadSource(source);
-                        if (errors.lead_source) setErrors((prev) => ({ ...prev, lead_source: "" }));
-                      }}
+                      onClick={() => patchField("lead_source", source, () => setLeadSource(source))}
                       className={cn(
-                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors capitalize",
                         leadSource === source
                           ? "border-primary bg-primary/15 text-brand-text"
                           : "border-border text-muted-foreground hover:bg-muted"
@@ -397,10 +442,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                     <button
                       key={c.id}
                       type="button"
-                      onClick={() => {
-                        setMode(c.id);
-                        if (errors.run_mode) setErrors((prev) => ({ ...prev, run_mode: "" }));
-                      }}
+                      onClick={() => patchField("run_mode", c.id, () => setMode(c.id))}
                       className={cn(
                         "relative flex flex-col items-start gap-3 rounded-xl border-2 p-5 text-left transition-all",
                         selected
@@ -450,10 +492,9 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="senderDisplayName"
                   value={senderDisplayName}
-                  onChange={(e) => {
-                    setSenderDisplayName(e.target.value);
-                    if (errors.sender_display_name) setErrors((prev) => ({ ...prev, sender_display_name: "" }));
-                  }}
+                  onChange={(e) =>
+                    patchField("sender_display_name", e.target.value, () => setSenderDisplayName(e.target.value))
+                  }
                   placeholder="e.g. Alex from Rapid AI"
                 />
                 {errors.sender_display_name ? (
@@ -461,16 +502,15 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="senderAddress">Sender email address</Label>
+                <Label htmlFor="senderAddress">Sender address</Label>
                 <Input
                   id="senderAddress"
-                  type="email"
+                  type="text"
                   value={senderAddress}
-                  onChange={(e) => {
-                    setSenderAddress(e.target.value);
-                    if (errors.sender_address) setErrors((prev) => ({ ...prev, sender_address: "" }));
-                  }}
-                  placeholder="you@company.com"
+                  onChange={(e) =>
+                    patchField("sender_address", e.target.value, () => setSenderAddress(e.target.value))
+                  }
+                  placeholder="e.g. 123 Main St, Anytown, USA"
                 />
                 {errors.sender_address ? (
                   <p className="text-xs text-destructive">{errors.sender_address}</p>
@@ -481,11 +521,11 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="senderPhone"
                   type="tel"
+                  maxLength={15}
                   value={senderPhone}
-                  onChange={(e) => {
-                    setSenderPhone(e.target.value);
-                    if (errors.sender_phone) setErrors((prev) => ({ ...prev, sender_phone: "" }));
-                  }}
+                  onChange={(e) =>
+                    patchField("sender_phone", e.target.value, () => setSenderPhone(e.target.value))
+                  }
                   placeholder="+1 555 000 0000"
                 />
                 {errors.sender_phone ? <p className="text-xs text-destructive">{errors.sender_phone}</p> : null}
@@ -501,12 +541,11 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   id="mailTraining"
                   rows={10}
                   value={mailTrainingInstruction}
-                  onChange={(e) => {
-                    setMailTrainingInstruction(e.target.value);
-                    if (errors.mail_training_instruction) {
-                      setErrors((prev) => ({ ...prev, mail_training_instruction: "" }));
-                    }
-                  }}
+                  onChange={(e) =>
+                    patchField("mail_training_instruction", e.target.value, () =>
+                      setMailTrainingInstruction(e.target.value)
+                    )
+                  }
                   placeholder="Tell the AI how to write emails: tone, length, personalization rules, CTA style..."
                 />
                 <p className="text-right text-[11px] text-muted-foreground">
@@ -535,7 +574,11 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   <Input
                     id="sampleSubject"
                     value={sampleSubject}
-                    onChange={(e) => setSampleSubject(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSampleSubject(value);
+                      validateSampleDraft({ subject: value });
+                    }}
                     placeholder="Subject line"
                   />
                 </div>
@@ -608,7 +651,13 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 shrink-0"
-                      onClick={() => setTemplateSamples((prev) => prev.filter((_, idx) => idx !== i))}
+                      onClick={() =>
+                        patchField(
+                          "mail_template_samples",
+                          templateSamples.filter((_, idx) => idx !== i),
+                          () => setTemplateSamples((prev) => prev.filter((_, idx) => idx !== i))
+                        )
+                      }
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -650,11 +699,12 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                       value={leadCount}
                       onChange={(e) => {
                         const v = e.target.value;
-                        setLeadCount(v === "" ? "" : Math.max(0, parseInt(v, 10) || 0));
-                        if (errors.target_leads) setErrors((prev) => ({ ...prev, target_leads: "" }));
+                        const next = v === "" ? "" : Math.max(0, parseInt(v, 10) || 0);
+                        const targetLeads = typeof next === "number" ? next : 0;
+                        patchField("target_leads", targetLeads, () => setLeadCount(next));
                       }}
                       placeholder="e.g. 250"
-                      className="h-12 pl-9 font-display text-lg font-bold"
+                      className="h-12 pl-9 font-display text-lg font-bold [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     />
                   </div>
                   <span className="text-sm text-muted-foreground">leads</span>
@@ -665,7 +715,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                     <button
                       key={p}
                       type="button"
-                      onClick={() => setLeadCount(p)}
+                      onClick={() => patchField("target_leads", p, () => setLeadCount(p))}
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
                         leadCount === p
@@ -690,7 +740,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
         </div>
 
         <div className="flex items-center justify-between border-t border-border p-5">
-          <Button variant="ghost" onClick={close}>
+          <Button variant="ghost" onClick={closeAndReset}>
             Cancel
           </Button>
           <div className="flex items-center gap-2">

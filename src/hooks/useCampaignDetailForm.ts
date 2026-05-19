@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildCampaignUpdatePayload,
   CAMPAIGN_DETAIL_STATUSES,
   CAMPAIGN_LEAD_SOURCES,
   CAMPAIGN_TONES,
+  type CampaignDetailFormErrors,
   type CampaignDetailFormState,
   type CampaignDetailRunMode,
   type CampaignDetailStatus,
   type CampaignDetailViewModel,
-  type CampaignTone
+  type CampaignTone,
+  validateCampaignDetailForm,
+  VALIDATED_CAMPAIGN_DETAIL_FIELDS
 } from "@/lib/campaignPresentation";
 import type { CampaignLeadSource, MailTemplateSample } from "@/types";
 import type { UpdateCampaignRequest } from "@/types";
@@ -33,41 +36,86 @@ function createFormState(campaign: CampaignDetailViewModel): CampaignDetailFormS
     mailTemplateSamples: campaign.mailTemplateSamples.map((sample) => ({ ...sample })),
     tone: resolveTone(campaign.targetTone),
     targetLeads: campaign.targetLeads,
-    status: campaign.status
+    status: campaign.status,
+    senderDisplayName: campaign.senderDisplayName,
+    senderAddress: campaign.senderAddress,
+    senderPhone: campaign.senderPhone
   };
 }
 
 export function useCampaignDetailForm(campaign: CampaignDetailViewModel) {
   const [form, setForm] = useState<CampaignDetailFormState>(() => createFormState(campaign));
+  const [errors, setErrors] = useState<CampaignDetailFormErrors>({});
   const initialState = useMemo(() => createFormState(campaign), [campaign]);
 
   useEffect(() => {
     setForm(createFormState(campaign));
+    setErrors({});
   }, [campaign]);
+
+  const applyFieldErrors = useCallback(
+    (fields: Array<keyof CampaignDetailFormState>, fieldErrors: CampaignDetailFormErrors) => {
+      setErrors((prev) => {
+        const next = { ...prev };
+        fields.forEach((field) => {
+          next[field] = fieldErrors[field] || "";
+        });
+        return next;
+      });
+    },
+    []
+  );
+
+  const validateFields = useCallback(
+    (formState: CampaignDetailFormState, fields: Array<keyof CampaignDetailFormState>) => {
+      const result = validateCampaignDetailForm(formState, fields);
+      applyFieldErrors(fields, result.fieldErrors);
+      return result.ok;
+    },
+    [applyFieldErrors]
+  );
+
+  const patchField = useCallback(
+    <K extends keyof CampaignDetailFormState>(field: K, value: CampaignDetailFormState[K]) => {
+      if (field === "exampleTraining") {
+        setForm((current) => ({ ...current, exampleTraining: value as string }));
+        return;
+      }
+
+      setForm((current) => {
+        const next = { ...current, [field]: value };
+        if (VALIDATED_CAMPAIGN_DETAIL_FIELDS.includes(field)) {
+          validateFields(next, [field]);
+        }
+        return next;
+      });
+    },
+    [validateFields]
+  );
+
+  const validateForm = useCallback(() => {
+    return validateFields(form, VALIDATED_CAMPAIGN_DETAIL_FIELDS);
+  }, [form, validateFields]);
 
   const hasChanges = useMemo(
     () => JSON.stringify(form) !== JSON.stringify(initialState),
     [form, initialState]
   );
 
+  const hasValidationErrors = useMemo(
+    () => Object.values(errors).some((message) => Boolean(message)),
+    [errors]
+  );
+
   const buildUpdatePayload = (): UpdateCampaignRequest => buildCampaignUpdatePayload(form, initialState);
 
   return {
     form,
-    setName: (name: string) => setForm((current) => ({ ...current, name })),
-    setGoal: (goal: string) => setForm((current) => ({ ...current, goal })),
-    setTargetZone: (targetZone: string) => setForm((current) => ({ ...current, targetZone })),
-    setCallToAction: (callToAction: string) => setForm((current) => ({ ...current, callToAction })),
-    setLeadSource: (leadSource: CampaignLeadSource) => setForm((current) => ({ ...current, leadSource })),
-    setRunMode: (runMode: CampaignDetailRunMode) => setForm((current) => ({ ...current, runMode })),
-    setMailTemplate: (mailTemplate: string) => setForm((current) => ({ ...current, mailTemplate })),
-    setExampleTraining: (exampleTraining: string) => setForm((current) => ({ ...current, exampleTraining })),
-    setMailTemplateSamples: (mailTemplateSamples: MailTemplateSample[]) =>
-      setForm((current) => ({ ...current, mailTemplateSamples })),
-    setTone: (tone: CampaignTone) => setForm((current) => ({ ...current, tone })),
-    setTargetLeads: (targetLeads: number) => setForm((current) => ({ ...current, targetLeads })),
-    setStatus: (status: CampaignDetailStatus) => setForm((current) => ({ ...current, status })),
+    errors,
+    patchField,
+    validateForm,
     hasChanges,
+    hasValidationErrors,
     buildUpdatePayload,
     statusOptions: CAMPAIGN_DETAIL_STATUSES,
     leadSourceOptions: CAMPAIGN_LEAD_SOURCES,

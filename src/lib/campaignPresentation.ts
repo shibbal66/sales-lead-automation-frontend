@@ -1,3 +1,4 @@
+import { createCampaignSchema, type CreateCampaignFormValues } from "@/validators/campaign";
 import type {
   CampaignApiModel,
   CampaignLeadSource,
@@ -5,10 +6,12 @@ import type {
   MailTemplateSample,
   UpdateCampaignRequest
 } from "@/types";
+import { CAMPAIGN_LEAD_SOURCE_VALUES } from "@/types/campaign";
+import type { ZodError } from "zod";
 
 export const CAMPAIGN_DETAIL_STATUSES = ["draft", "active", "paused", "completed"] as const;
 export const CAMPAIGN_TONES = ["Friendly", "Professional", "Direct", "Consultative"] as const;
-export const CAMPAIGN_LEAD_SOURCES: CampaignLeadSource[] = ["new", "existing", "both"];
+export const CAMPAIGN_LEAD_SOURCES: CampaignLeadSource[] = [...CAMPAIGN_LEAD_SOURCE_VALUES];
 
 export type CampaignDetailStatus = (typeof CAMPAIGN_DETAIL_STATUSES)[number];
 export type CampaignDetailRunMode = "automatic" | "manual";
@@ -109,7 +112,87 @@ export type CampaignDetailFormState = {
   tone: CampaignTone;
   targetLeads: number;
   status: CampaignDetailStatus;
+  senderDisplayName: string;
+  senderAddress: string;
+  senderPhone: string;
 };
+
+export type CampaignDetailFormErrors = Partial<Record<keyof CampaignDetailFormState, string>>;
+
+export const VALIDATED_CAMPAIGN_DETAIL_FIELDS: Array<keyof CampaignDetailFormState> = [
+  "name",
+  "goal",
+  "targetZone",
+  "callToAction",
+  "leadSource",
+  "runMode",
+  "mailTemplate",
+  "mailTemplateSamples",
+  "tone",
+  "targetLeads",
+  "status",
+  "senderDisplayName",
+  "senderAddress",
+  "senderPhone"
+];
+
+export function campaignDetailFormToCreateValues(
+  form: CampaignDetailFormState
+): CreateCampaignFormValues {
+  return {
+    name: form.name,
+    goal: form.goal,
+    target_zone: form.targetZone,
+    call_to_action: form.callToAction,
+    run_mode: form.runMode === "automatic" ? "auto" : "manual",
+    target_tone: form.tone,
+    mail_training_instruction: form.mailTemplate,
+    mail_template_samples: form.mailTemplateSamples,
+    lead_source: form.leadSource,
+    sender_display_name: form.senderDisplayName,
+    sender_address: form.senderAddress,
+    sender_phone: form.senderPhone,
+    target_leads: form.targetLeads,
+    status: form.status === "active" ? "running" : form.status
+  };
+}
+
+export function mapCreateCampaignZodErrors(
+  error: ZodError<CreateCampaignFormValues>
+): CampaignDetailFormErrors {
+  const fieldErrors = error.flatten().fieldErrors;
+  return {
+    name: fieldErrors.name?.[0],
+    goal: fieldErrors.goal?.[0],
+    targetZone: fieldErrors.target_zone?.[0],
+    callToAction: fieldErrors.call_to_action?.[0],
+    runMode: fieldErrors.run_mode?.[0],
+    tone: fieldErrors.target_tone?.[0],
+    mailTemplate: fieldErrors.mail_training_instruction?.[0],
+    mailTemplateSamples: fieldErrors.mail_template_samples?.[0],
+    leadSource: fieldErrors.lead_source?.[0],
+    senderDisplayName: fieldErrors.sender_display_name?.[0],
+    senderAddress: fieldErrors.sender_address?.[0],
+    senderPhone: fieldErrors.sender_phone?.[0],
+    targetLeads: fieldErrors.target_leads?.[0],
+    status: fieldErrors.status?.[0]
+  };
+}
+
+export function validateCampaignDetailForm(
+  form: CampaignDetailFormState,
+  fields: Array<keyof CampaignDetailFormState> = VALIDATED_CAMPAIGN_DETAIL_FIELDS
+): { ok: boolean; fieldErrors: CampaignDetailFormErrors } {
+  const parsed = createCampaignSchema.safeParse(campaignDetailFormToCreateValues(form));
+  const mapped = parsed.success ? {} : mapCreateCampaignZodErrors(parsed.error);
+  const fieldErrors: CampaignDetailFormErrors = {};
+
+  fields.forEach((field) => {
+    fieldErrors[field] = parsed.success ? "" : mapped[field] || "";
+  });
+
+  return { ok: parsed.success, fieldErrors };
+}
 
 export function buildCampaignUpdatePayload(
   current: CampaignDetailFormState,
@@ -133,5 +216,14 @@ export function buildCampaignUpdatePayload(
   if (current.tone !== initial.tone) payload.target_tone = current.tone;
   if (current.targetLeads !== initial.targetLeads) payload.target_leads = current.targetLeads;
   if (current.status !== initial.status) payload.status = current.status;
+  if (current.senderDisplayName !== initial.senderDisplayName) {
+    payload.sender_display_name = current.senderDisplayName;
+  }
+  if (current.senderAddress !== initial.senderAddress) {
+    payload.sender_address = current.senderAddress;
+  }
+  if (current.senderPhone !== initial.senderPhone) {
+    payload.sender_phone = current.senderPhone;
+  }
   return payload;
 }
