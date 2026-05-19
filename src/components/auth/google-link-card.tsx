@@ -3,13 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getGoogleLinkStatus } from "@/services/auth/authServices";
 import { startGoogleOAuthRedirect } from "@/lib/googleAuth";
+import { formatGoogleLinkDetail, parseGoogleLinkStatus } from "@/lib/googleLinkStatus";
 import { showApiErrorToast } from "@/lib/apiToast";
-
-function formatStatusDetail(data: unknown, message?: string): string {
-  if (typeof data === "string" && data.trim()) return data.trim();
-  if (message?.trim()) return message.trim();
-  return "Connected";
-}
 
 export function GoogleLinkCard() {
   const [loading, setLoading] = useState(true);
@@ -21,13 +16,9 @@ export function GoogleLinkCard() {
     setLoading(true);
     try {
       const response = await getGoogleLinkStatus();
-      if (response.success) {
-        setLinked(true);
-        setDetail(formatStatusDetail(response.data, response.message));
-      } else {
-        setLinked(false);
-        setDetail(response.message || "Google account is not linked.");
-      }
+      const status = parseGoogleLinkStatus(response);
+      setLinked(status.linked);
+      setDetail(formatGoogleLinkDetail(status.linked, status.email, status.name, response.message));
     } catch (error) {
       setLinked(false);
       setDetail("Could not load Google link status.");

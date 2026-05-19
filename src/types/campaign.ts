@@ -1,5 +1,7 @@
 export type CampaignRunMode = "auto" | "manual";
-export type CampaignLeadSource = "new" | "existing" | "both";
+
+export const CAMPAIGN_LEAD_SOURCE_VALUES = ["new", "old", "both"] as const;
+export type CampaignLeadSource = (typeof CAMPAIGN_LEAD_SOURCE_VALUES)[number];
 export type CampaignStatus = "draft" | "running" | "active" | "paused" | "completed";
 
 /** Pagination returned with list endpoints (e.g. GET `/campaigns`). */
@@ -234,5 +236,13 @@ export interface DeleteCampaignFollowUpResponse {
   message?: string;
   code?: string;
   data?: string;
+}
+
+/** POST `/campaigns/:id/leads/run` — process pending leads (manual run mode). */
+export interface RunCampaignLeadsResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data?: unknown;
 }
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,16 +8,23 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CampaignLeadsSection } from "@/components/campaigns/campaign-leads-section";
 import { CampaignSettingsPanel } from "@/components/campaigns/campaign-settings-panel";
+import { CampaignSenderDetailsCard } from "@/components/campaigns/campaign-sender-details-card";
 import { FollowUpStepRow } from "@/components/campaigns/follow-up-step-row";
 import { useCampaignDetailForm } from "@/hooks/useCampaignDetailForm";
 import { useCampaignFollowUps } from "@/hooks/useCampaignFollowUps";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
-import { showApiSuccessToast } from "@/lib/apiToast";
-import { cn } from "@/lib/utils";
-import { mailTemplateSampleSchema } from "@/validators";
+import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import { runCampaignLeads } from "@/services/campaign/campaignServices";
+import { getGoogleLinkStatus } from "@/services/auth/authServices";
+import { parseGoogleLinkStatus } from "@/lib/googleLinkStatus";
+import { GoogleLinkDialog } from "@/components/auth/google-link-dialog";
+import { setPendingGoogleLinkReturn } from "@/utils/googleLinkReturn";
+import { createCampaignFollowUpSchema, mailTemplateSampleSchema, parseCreateCampaignFollowUpPayload } from "@/validators";
+import type { CreateCampaignFollowUpFormValues } from "@/validators";
 import type { CampaignDetailViewModel } from "@/lib/campaignPresentation";
+import type { CreateCampaignFollowUpRequest } from "@/types";
 import {
-  ArrowLeft, ChevronDown, Plus, Trash2, Sparkles, X,
+  ArrowLeft, Mail, Plus, Trash2, Sparkles, X,
 } from "lucide-react";
 
 const WAIT_DAY_OPTIONS = [1, 2, 3, 5, 7] as const;
@@ -47,19 +54,11 @@ export function CampaignDetail({
   const isDeleting = useCampaignStore((state) => state.isDeleting);
   const {
     form,
-    setName,
-    setGoal,
-    setTargetZone,
-    setCallToAction,
-    setLeadSource,
-    setRunMode,
-    setMailTemplate,
-    setExampleTraining,
-    setMailTemplateSamples,
-    setTone,
-    setTargetLeads,
-    setStatus,
+    errors,
+    patchField,
+    validateForm,
     hasChanges,
+    hasValidationErrors,
     buildUpdatePayload,
     statusOptions,
     leadSourceOptions,
@@ -98,21 +97,94 @@ export function CampaignDetail({
   const [newFollowUpName, setNewFollowUpName] = useState("");
   const [newFollowUpDays, setNewFollowUpDays] = useState<number>(3);
   const [newFollowUpBodyTemplate, setNewFollowUpBodyTemplate] = useState("");
-  const [addFollowUpBodyExpanded, setAddFollowUpBodyExpanded] = useState(false);
+  const [addFollowUpErrors, setAddFollowUpErrors] = useState<
+    Partial<Record<keyof CreateCampaignFollowUpFormValues, string>>
+  >({});
+  const [googleLinkDialogOpen, setGoogleLinkDialogOpen] = useState(false);
+  const [checkingGoogleLink, setCheckingGoogleLink] = useState(false);
+  const [isRunningLeads, setIsRunningLeads] = useState(false);
+
+  const isManualRunMode = campaign.runMode === "manual";
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("googleLinked") !== "1") return;
+    showApiSuccessToast("Google account connected. Set status to Active and click Save Changes.");
+    params.delete("googleLinked");
+    const next = params.toString();
+    const path = `${window.location.pathname}${next ? `?${next}` : ""}`;
+    window.history.replaceState(null, "", path);
+  }, []);
+
+  const buildAddFollowUpDraft = (
+    overrides: Partial<CreateCampaignFollowUpRequest> = {}
+  ): CreateCampaignFollowUpRequest => ({
+    name: overrides.name ?? (newFollowUpName.trim() || `Follow-up ${campaignFollowUps.length + 1}`),
+    waiting_days: overrides.waiting_days ?? newFollowUpDays,
+    body_template: overrides.body_template ?? newFollowUpBodyTemplate
+  });
+
+  const validateAddFollowUpFields = (
+    fields: Array<keyof CreateCampaignFollowUpFormValues>,
+    overrides: Partial<CreateCampaignFollowUpFormValues> = {}
+  ) => {
+    const parsed = createCampaignFollowUpSchema.safeParse(buildAddFollowUpDraft(overrides));
+    const fieldErrors = parsed.success
+      ? {}
+      : parsed.error.flatten().fieldErrors;
+    const nextErrors: Partial<Record<keyof CreateCampaignFollowUpFormValues, string>> = {};
+
+    fields.forEach((field) => {
+      nextErrors[field] = fieldErrors[field]?.[0] || "";
+    });
+
+    setAddFollowUpErrors((prev) => ({ ...prev, ...nextErrors }));
+    return fields.every((field) => !nextErrors[field]);
+  };
 
   const handleSaveChanges = async () => {
+    if (!validateForm()) {
+      showApiErrorToast(new Error("Please fix campaign form errors."));
+      return;
+    }
+
     const payload = buildUpdatePayload();
     if (Object.keys(payload).length === 0) {
       showApiSuccessToast("No changes to save.");
       return;
     }
 
+    const isActivatingCampaign = payload.status === "active";
+
+    if (!isActivatingCampaign) {
+      try {
+        await updateCampaign(campaign.id, payload);
+        showApiSuccessToast("Campaign updated successfully.");
+      } catch {
+        // Error toast is handled in store for update failures.
+      }
+      return;
+    }
+
+    setCheckingGoogleLink(true);
     try {
+      const response = await getGoogleLinkStatus();
+      const { linked } = parseGoogleLinkStatus(response);
+      if (!linked) {
+        setGoogleLinkDialogOpen(true);
+        return;
+      }
       await updateCampaign(campaign.id, payload);
       showApiSuccessToast("Campaign updated successfully.");
-    } catch {
-      // Error toast is handled in store for update failures.
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setCheckingGoogleLink(false);
     }
+  };
+
+  const handleBeforeGoogleConnect = () => {
+    setPendingGoogleLinkReturn({ returnTo: `/campaigns/${campaign.id}?googleLinked=1` });
   };
 
   const resetAddExampleDialog = () => {
@@ -144,7 +216,7 @@ export function CampaignDetail({
       setAddExampleError(parsed.error.errors[0]?.message ?? "Please complete subject and email content.");
       return;
     }
-    setMailTemplateSamples([...form.mailTemplateSamples, parsed.data]);
+    patchField("mailTemplateSamples", [...form.mailTemplateSamples, parsed.data]);
     resetAddExampleDialog();
     setAddingExample(false);
   };
@@ -153,7 +225,7 @@ export function CampaignDetail({
     setNewFollowUpName("");
     setNewFollowUpDays(3);
     setNewFollowUpBodyTemplate("");
-    setAddFollowUpBodyExpanded(false);
+    setAddFollowUpErrors({});
   };
 
   const handleAddFollowUpOpenChange = (open: boolean) => {
@@ -161,22 +233,41 @@ export function CampaignDetail({
     if (open) {
       setNewFollowUpName(`Follow-up ${campaignFollowUps.length + 1}`);
       setNewFollowUpBodyTemplate("");
-      setAddFollowUpBodyExpanded(false);
+      setAddFollowUpErrors({});
       return;
     }
     resetAddFollowUpDialog();
   };
 
   const handleCreateFollowUp = async () => {
-    const name = newFollowUpName.trim() || `Follow-up ${campaignFollowUps.length + 1}`;
-    const ok = await addFollowUp({
-      name,
-      waiting_days: newFollowUpDays,
-      body_template: newFollowUpBodyTemplate
-    });
+    const fields: Array<keyof CreateCampaignFollowUpFormValues> = ["name", "waiting_days", "body_template"];
+    const parsed = parseCreateCampaignFollowUpPayload(buildAddFollowUpDraft());
+    if (!parsed.success) {
+      validateAddFollowUpFields(fields);
+      showApiErrorToast(new Error("Please fix follow-up form errors."));
+      return;
+    }
+
+    const ok = await addFollowUp(parsed.data);
     if (!ok) return;
     resetAddFollowUpDialog();
     setAddFollowUpOpen(false);
+  };
+
+  const handleRunManualLeads = async () => {
+    setIsRunningLeads(true);
+    try {
+      const response = await runCampaignLeads(campaign.id);
+      if (response.success) {
+        showApiSuccessToast(response.message || "Emails processed successfully.");
+        return;
+      }
+      showApiErrorToast(response);
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setIsRunningLeads(false);
+    }
   };
 
   const handleDeleteCampaign = async () => {
@@ -195,11 +286,24 @@ export function CampaignDetail({
       <div className="flex items-center justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Back to campaigns</Button>
         <div className="flex items-center gap-2">
+          {isManualRunMode ? (
+            <Button
+              variant="outline"
+              onClick={() => void handleRunManualLeads()}
+              disabled={isRunningLeads}
+            >
+              <Mail className="h-4 w-4" />
+              {isRunningLeads ? "Sending…" : "Send emails"}
+            </Button>
+          ) : null}
           <Button variant="destructive" onClick={() => setDeleteOpen(true)} disabled={isDeleting}>
             {isDeleting ? "Deleting..." : "Delete Campaign"}
           </Button>
-          <Button onClick={handleSaveChanges} disabled={!hasChanges || isUpdating}>
-            {isUpdating ? "Saving..." : "Save Changes"}
+          <Button
+            onClick={() => void handleSaveChanges()}
+            disabled={!hasChanges || isUpdating || checkingGoogleLink || hasValidationErrors}
+          >
+            {checkingGoogleLink ? "Checking Google…" : isUpdating ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>
@@ -216,21 +320,32 @@ export function CampaignDetail({
           tone={form.tone}
           targetLeads={form.targetLeads}
           status={form.status}
+          errors={errors}
           statusOptions={statusOptions}
           leadSourceOptions={leadSourceOptions}
           toneOptions={toneOptions}
-          onNameChange={setName}
-          onGoalChange={setGoal}
-          onTargetZoneChange={setTargetZone}
-          onCallToActionChange={setCallToAction}
-          onLeadSourceChange={setLeadSource}
-          onRunModeChange={setRunMode}
-          onToneChange={setTone}
-          onTargetLeadsChange={setTargetLeads}
-          onStatusChange={setStatus}
+          onNameChange={(value) => patchField("name", value)}
+          onGoalChange={(value) => patchField("goal", value)}
+          onTargetZoneChange={(value) => patchField("targetZone", value)}
+          onCallToActionChange={(value) => patchField("callToAction", value)}
+          onLeadSourceChange={(value) => patchField("leadSource", value)}
+          onRunModeChange={(value) => patchField("runMode", value)}
+          onToneChange={(value) => patchField("tone", value)}
+          onTargetLeadsChange={(value) => patchField("targetLeads", value)}
+          onStatusChange={(value) => patchField("status", value)}
         />
 
         <div className="space-y-4">
+          <CampaignSenderDetailsCard
+            senderDisplayName={form.senderDisplayName}
+            senderAddress={form.senderAddress}
+            senderPhone={form.senderPhone}
+            errors={errors}
+            onSenderDisplayNameChange={(value) => patchField("senderDisplayName", value)}
+            onSenderAddressChange={(value) => patchField("senderAddress", value)}
+            onSenderPhoneChange={(value) => patchField("senderPhone", value)}
+          />
+
           <Card className="p-5 shadow-card">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-base font-bold">AI Instructions</h3>
@@ -242,10 +357,15 @@ export function CampaignDetail({
               rows={6}
               className="mt-3 font-mono text-sm"
               value={form.mailTemplate}
-              onChange={(event) => setMailTemplate(event.target.value)}
+              onChange={(event) => patchField("mailTemplate", event.target.value)}
               placeholder="Example: Write in a warm, conversational tone..."
             />
-            <p className="mt-1 text-right text-[11px] text-muted-foreground">{form.mailTemplate.length} chars</p>
+            <p className="mt-1 text-right text-[11px] text-muted-foreground">
+              {form.mailTemplate.length} / 2000
+            </p>
+            {errors.mailTemplate ? (
+              <p className="text-xs text-destructive">{errors.mailTemplate}</p>
+            ) : null}
           </Card>
 
           <Card className="p-5 shadow-card">
@@ -280,7 +400,10 @@ export function CampaignDetail({
                     size="icon"
                     className="h-7 w-7 shrink-0"
                     onClick={() =>
-                      setMailTemplateSamples(form.mailTemplateSamples.filter((_, itemIndex) => itemIndex !== index))
+                      patchField(
+                        "mailTemplateSamples",
+                        form.mailTemplateSamples.filter((_, itemIndex) => itemIndex !== index)
+                      )
                     }
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -290,6 +413,9 @@ export function CampaignDetail({
               {form.mailTemplateSamples.length === 0 && (
                 <p className="text-center text-xs text-muted-foreground">No template samples yet.</p>
               )}
+              {errors.mailTemplateSamples ? (
+                <p className="text-xs text-destructive">{errors.mailTemplateSamples}</p>
+              ) : null}
             </div>
             <Button className="mt-4" variant="secondary" onClick={() => setPreviewOpen(true)}>
               <Sparkles className="h-4 w-4" /> Generate Preview Email
@@ -453,9 +579,18 @@ export function CampaignDetail({
               <Input
                 id="newFollowUpName"
                 value={newFollowUpName}
-                onChange={(event) => setNewFollowUpName(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setNewFollowUpName(value);
+                  validateAddFollowUpFields(["name"], {
+                    name: value.trim() || `Follow-up ${campaignFollowUps.length + 1}`
+                  });
+                }}
                 placeholder="Follow-up 1"
               />
+              {addFollowUpErrors.name ? (
+                <p className="text-xs text-destructive">{addFollowUpErrors.name}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="newFollowUpDays">Wait days</Label>
@@ -463,41 +598,35 @@ export function CampaignDetail({
                 id="newFollowUpDays"
                 value={newFollowUpDays}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                onChange={(event) => setNewFollowUpDays(Number(event.target.value))}
+                onChange={(event) => {
+                  const value = Number(event.target.value);
+                  setNewFollowUpDays(value);
+                  validateAddFollowUpFields(["waiting_days"], { waiting_days: value });
+                }}
               >
                 {WAIT_DAY_OPTIONS.map((day) => (
                   <option key={day} value={day}>Wait {day} days</option>
                 ))}
               </select>
+              {addFollowUpErrors.waiting_days ? (
+                <p className="text-xs text-destructive">{addFollowUpErrors.waiting_days}</p>
+              ) : null}
             </div>
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="newFollowUpBodyTemplate">Mail template</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  title={addFollowUpBodyExpanded ? "Hide mail template" : "Show mail template"}
-                  aria-expanded={addFollowUpBodyExpanded}
-                  onClick={() => setAddFollowUpBodyExpanded((previous) => !previous)}
-                >
-                  <ChevronDown
-                    className={cn(
-                      "h-4 w-4 transition-transform",
-                      !addFollowUpBodyExpanded && "-rotate-90"
-                    )}
-                  />
-                </Button>
-              </div>
-              {addFollowUpBodyExpanded ? (
-                <Textarea
-                  id="newFollowUpBodyTemplate"
-                  rows={5}
-                  value={newFollowUpBodyTemplate}
-                  onChange={(event) => setNewFollowUpBodyTemplate(event.target.value)}
-                  placeholder="Hi {{firstName}}, ..."
-                />
+              <Label htmlFor="newFollowUpBodyTemplate">Mail template</Label>
+              <Textarea
+                id="newFollowUpBodyTemplate"
+                rows={5}
+                value={newFollowUpBodyTemplate}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setNewFollowUpBodyTemplate(value);
+                  validateAddFollowUpFields(["body_template"], { body_template: value });
+                }}
+                placeholder="Hi {{firstName}}, ..."
+              />
+              {addFollowUpErrors.body_template ? (
+                <p className="text-xs text-destructive">{addFollowUpErrors.body_template}</p>
               ) : null}
             </div>
           </div>
@@ -531,6 +660,14 @@ export function CampaignDetail({
         </DialogContent>
       </Dialog>
 
+      <GoogleLinkDialog
+        open={googleLinkDialogOpen}
+        onOpenChange={setGoogleLinkDialogOpen}
+        onBeforeConnect={handleBeforeGoogleConnect}
+        title="Connect Google to activate"
+        description="A linked Gmail account is required before a campaign can go active. Connect Google, then return here, set status to Active, and save."
+      />
+
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Delete campaign?</DialogTitle></DialogHeader>
@@ -548,3 +685,9 @@ export function CampaignDetail({
     </div>
   );
 }
+
+
+
+
+
+

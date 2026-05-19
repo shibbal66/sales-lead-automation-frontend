@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CAMPAIGN_LEAD_SOURCE_VALUES, type CreateCampaignFollowUpRequest } from "@/types/campaign";
 
 const mailTemplateSampleBaseSchema = z.object({
   subject: z.string().trim().min(1, "Subject is required").max(200, "Subject is too long"),
@@ -62,8 +63,8 @@ export const createCampaignSchema = z.object({
     .min(1, "Mail training instructions are required")
     .max(2000, "Instructions are too long"),
   mail_template_samples: z.array(mailTemplateSampleSchema),
-  lead_source: z.enum(["new", "existing", "both"], {
-    errorMap: () => ({ message: "Lead source must be new, existing, or both" })
+  lead_source: z.enum(CAMPAIGN_LEAD_SOURCE_VALUES, {
+    errorMap: () => ({ message: "Lead source must be new, old, or both" })
   }),
   sender_display_name: z
     .string()
@@ -73,14 +74,15 @@ export const createCampaignSchema = z.object({
   sender_address: z
     .string()
     .trim()
-    .min(1, "Sender email is required")
-    .email("Please enter a valid sender email")
-    .max(254, "Sender email is too long"),
+    .min(1, "Sender address is required")
+    .max(180, "Sender address is too long"),
   sender_phone: z
     .string()
     .trim()
-    .min(1, "Sender phone is required")
-    .max(40, "Sender phone is too long"),
+    .regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number")
+    .transform((val) => val.replace(/[^\d+]/g, ""))
+    .refine((val) => val.length > 0, { message: "Sender phone is required" })
+    .refine((val) => val.length <= 15, { message: "Sender phone must be less than 15 digits" }),
   target_leads: z
     .number({ invalid_type_error: "Target leads must be a number" })
     .int("Target leads must be a whole number")
@@ -93,3 +95,31 @@ export const createCampaignSchema = z.object({
 
 export type CreateCampaignFormValues = z.infer<typeof createCampaignSchema>;
 export type MailTemplateSampleFormValues = z.infer<typeof mailTemplateSampleSchema>;
+
+export const createCampaignFollowUpSchema: z.ZodType<CreateCampaignFollowUpRequest> = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120, "Name is too long"),
+  waiting_days: z
+    .number({ invalid_type_error: "Wait days must be a number" })
+    .int("Wait days must be a whole number")
+    .min(1, "Wait days must be at least 1")
+    .max(365, "Wait days is too high"),
+  body_template: z
+    .string()
+    .trim()
+    .min(1, "Mail template is required")
+    .max(1200, "Mail template is too long")
+});
+
+export type CreateCampaignFollowUpFormValues = CreateCampaignFollowUpRequest;
+
+export function parseCreateCampaignFollowUpPayload(
+  value: unknown
+):
+  | { success: true; data: CreateCampaignFollowUpRequest }
+  | { success: false; error: z.ZodError } {
+  const result = createCampaignFollowUpSchema.safeParse(value);
+  if (!result.success) {
+    return { success: false, error: result.error };
+  }
+  return { success: true, data: result.data };
+}
