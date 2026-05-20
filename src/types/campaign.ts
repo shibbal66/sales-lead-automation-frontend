@@ -53,6 +53,10 @@ export interface CampaignApiModel {
   sender_phone: string | null;
   target_leads: number;
   status: CampaignStatus;
+  /** Present on list responses (GET `/campaigns`). */
+  sent_count?: number;
+  reply_rate?: number;
+  reply_rate_percent?: number;
   created_at: string;
   updated_at: string;
 }
