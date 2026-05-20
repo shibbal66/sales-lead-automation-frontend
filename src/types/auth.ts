@@ -12,7 +12,6 @@ export interface ApiAuthUserPayload {
   address?: string | null;
   contact?: string | null;
   timezone?: string | null;
-  name?: string;
   avatarUrl?: string;
   authProvider?: string;
 }

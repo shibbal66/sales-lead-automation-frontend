@@ -87,6 +87,10 @@ export function mapCampaignApiToDetail(campaign: CampaignApiModel): CampaignDeta
 }
 
 export function mapCampaignApiToListCard(campaign: CampaignApiModel): CampaignListCardViewModel {
+  const replyRate =
+    campaign.reply_rate_percent ??
+    (campaign.reply_rate != null ? Math.round(campaign.reply_rate * 100) : 0);
+
   return {
     id: campaign.id,
     name: campaign.name,
@@ -94,8 +98,8 @@ export function mapCampaignApiToListCard(campaign: CampaignApiModel): CampaignLi
     status: mapApiStatusToListStatus(campaign.status),
     runMode: mapApiRunMode(campaign.run_mode),
     targetLeads: campaign.target_leads,
-    emailsSent: 0,
-    replyRate: 0
+    emailsSent: campaign.sent_count ?? 0,
+    replyRate
   };
 }
 
