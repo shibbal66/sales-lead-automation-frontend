@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth/authStore";
-import { getUserDisplayEmail, getUserDisplayName, getUserInitials } from "@/lib/userDisplay";
+import { getUserDisplayEmail, getUserDisplayName, getUserInitials } from "@/lib/userProfile";
 import {
   LayoutGrid, Users, Megaphone, Calendar, BarChart3, Settings, Bell,
   ChevronLeft, ChevronRight, Sparkles,
@@ -16,8 +16,8 @@ const items = [
   { to: "/leads", label: "Leads", icon: Users },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/meetings", label: "Meetings", icon: Calendar },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/notifications", label: "Notifications", icon: Bell, badge: 5 },
+  // { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  // { to: "/notifications", label: "Notifications", icon: Bell, badge: 5 },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -70,11 +70,11 @@ function SidebarPanel({
               <span className="active-bar pointer-events-none absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary opacity-0 transition-opacity" />
               <Icon className="h-[18px] w-[18px] shrink-0" />
               {!collapsed && <span className="flex-1">{item.label}</span>}
-              {!collapsed && item.badge ? (
+              {/* {!collapsed && item.badge ? (
                 <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-brand-text">
                   {item.badge}
                 </span>
-              ) : null}
+              ) : null} */}
             </NavLink>
           );
         })}

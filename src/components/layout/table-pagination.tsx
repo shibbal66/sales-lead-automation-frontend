@@ -48,7 +48,7 @@ export function TablePagination({
   return (
     <div
       className={cn(
-        "flex max-w-full flex-wrap items-center justify-center gap-1 overflow-x-auto px-2 py-4",
+        "flex max-w-full flex-wrap items-center justify-center gap-1 overflow-x-auto scrollbar-thin px-2 py-4",
         className,
       )}
     >

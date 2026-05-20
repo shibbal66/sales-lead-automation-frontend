@@ -63,7 +63,7 @@ export function EditCampaignLeadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto scrollbar-thin sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit campaign lead</DialogTitle>
           {lead ? (

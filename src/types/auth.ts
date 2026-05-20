@@ -11,8 +11,8 @@ export interface ApiAuthUserPayload {
   profilePic?: string | null;
   address?: string | null;
   contact?: string | null;
-  firstName?: string;
-  lastName?: string;
+  timezone?: string | null;
+  name?: string;
   avatarUrl?: string;
   authProvider?: string;
 }
@@ -86,6 +86,7 @@ export interface GoogleLinkStatusData {
   email?: string;
   name?: string;
   avatarUrl?: string;
+  calendarLinked?: boolean;
   scopes?: string[];
   tokenExpiresAt?: string;
 }

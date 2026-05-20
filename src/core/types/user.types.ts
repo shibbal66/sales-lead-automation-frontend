@@ -12,6 +12,7 @@ export interface User {
   role?: string;
   address?: string | null;
   contact?: string | null;
+  timezone?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

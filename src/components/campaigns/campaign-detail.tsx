@@ -10,6 +10,7 @@ import { CampaignLeadsSection } from "@/components/campaigns/campaign-leads-sect
 import { CampaignSettingsPanel } from "@/components/campaigns/campaign-settings-panel";
 import { CampaignSenderDetailsCard } from "@/components/campaigns/campaign-sender-details-card";
 import { FollowUpStepRow } from "@/components/campaigns/follow-up-step-row";
+import { FollowUpsSkeleton } from "@/components/skeletons/campaigns/follow-ups-skeleton";
 import { useCampaignDetailForm } from "@/hooks/useCampaignDetailForm";
 import { useCampaignFollowUps } from "@/hooks/useCampaignFollowUps";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
@@ -286,7 +287,7 @@ export function CampaignDetail({
       <div className="flex items-center justify-between gap-3">
         <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Back to campaigns</Button>
         <div className="flex items-center gap-2">
-          {isManualRunMode ? (
+          {isManualRunMode && campaign.status === "active" ? (
             <Button
               variant="outline"
               onClick={() => void handleRunManualLeads()}
@@ -451,8 +452,8 @@ export function CampaignDetail({
                 </div>
               )}
             </div>
-            {isFetchingCampaignFollowUps ? (
-              <p className="mt-4 text-sm text-muted-foreground">Loading follow-ups...</p>
+            {isFetchingCampaignFollowUps && campaignFollowUps.length === 0 ? (
+              <FollowUpsSkeleton />
             ) : (
               <>
                 <ol className="mt-4 space-y-2">

@@ -96,7 +96,7 @@ export const createCampaignSchema = z.object({
 export type CreateCampaignFormValues = z.infer<typeof createCampaignSchema>;
 export type MailTemplateSampleFormValues = z.infer<typeof mailTemplateSampleSchema>;
 
-export const createCampaignFollowUpSchema: z.ZodType<CreateCampaignFollowUpRequest> = z.object({
+export const createCampaignFollowUpSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120, "Name is too long"),
   waiting_days: z
     .number({ invalid_type_error: "Wait days must be a number" })
@@ -121,5 +121,9 @@ export function parseCreateCampaignFollowUpPayload(
   if (!result.success) {
     return { success: false, error: result.error };
   }
-  return { success: true, data: result.data };
+  return { success: true, data: {
+    name: result.data.name,
+    waiting_days: result.data.waiting_days,
+    body_template: result.data.body_template
+  } };
 }

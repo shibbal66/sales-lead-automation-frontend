@@ -13,8 +13,7 @@ export function mapApiUserToAuthUser(apiUser: ApiAuthUserPayload): AuthUser {
     role: apiUser.role,
     address: apiUser.address ?? undefined,
     contact: apiUser.contact ?? undefined,
-    firstName: apiUser.firstName ?? nameParts[0],
-    lastName: apiUser.lastName ?? (nameParts.slice(1).join(" ") || undefined),
+    timezone: apiUser.timezone ?? undefined,  
     avatarUrl: apiUser.profilePic ?? apiUser.avatarUrl ?? undefined,
     authProvider: apiUser.authProvider
   };

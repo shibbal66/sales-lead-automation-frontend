@@ -5,6 +5,7 @@ const REFRESH_TOKEN_KEY = "refresh_token";
 const USER_KEY = "user";
 const PENDING_VERIFY_KEY = "pending_verify";
 const PENDING_PASSWORD_RESET_KEY = "pending_password_reset";
+const PENDING_AUTH_ERROR_KEY = "pending_auth_error";
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -104,6 +105,22 @@ export function getPendingPasswordReset(): { email: string } | null {
 export function clearPendingPasswordReset(): void {
   if (!isBrowser()) return;
   sessionStorage.removeItem(PENDING_PASSWORD_RESET_KEY);
+}
+
+/** Shown once on the login page after refresh-token failure forces sign-out. */
+export function setPendingAuthError(message: string): void {
+  if (!isBrowser()) return;
+  const trimmed = message.trim();
+  if (!trimmed) return;
+  sessionStorage.setItem(PENDING_AUTH_ERROR_KEY, trimmed);
+}
+
+export function consumePendingAuthError(): string | null {
+  if (!isBrowser()) return null;
+  const message = sessionStorage.getItem(PENDING_AUTH_ERROR_KEY);
+  if (!message) return null;
+  sessionStorage.removeItem(PENDING_AUTH_ERROR_KEY);
+  return message;
 }
 
 export function clearAuthStorage(): void {

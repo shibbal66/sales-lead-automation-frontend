@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/table";
 import { TablePagination } from "@/components/layout/table-pagination";
 import { UserAvatar } from "@/components/user-avatar";
+import { BulkAssignLeadsTableSkeleton } from "@/components/skeletons/leads/bulk-assign-leads-table-skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getLeads } from "@/services/lead/leadServices";
 import { parseLeadsListResponse } from "@/lib/parseLeadsListResponse";
 import { mapLeadApiToListRow } from "@/lib/leadPresentation";
@@ -190,7 +192,7 @@ export function BulkAssignLeadsSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-3xl">
+      <SheetContent side="right" className="flex h-full w-full min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
         <SheetHeader className="border-b border-border px-6 py-5 text-left">
           <SheetTitle>Add leads to campaign</SheetTitle>
           <SheetDescription>
@@ -198,7 +200,7 @@ export function BulkAssignLeadsSheet({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
           <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
             <p className="text-sm font-semibold">Filters</p>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -276,7 +278,11 @@ export function BulkAssignLeadsSheet({
 
           <div className="mt-4 flex items-center justify-between gap-2">
             <p className="text-sm text-muted-foreground">
-              {isFetching ? "Loading..." : `${total} lead${total === 1 ? "" : "s"} found`}
+              {isFetching ? (
+                <Skeleton className="inline-block h-4 w-32" />
+              ) : (
+                `${total} lead${total === 1 ? "" : "s"} found`
+              )}
             </p>
             {selected.size > 0 ? (
               <p className="text-sm font-medium">{selected.size} selected</p>
@@ -284,7 +290,8 @@ export function BulkAssignLeadsSheet({
           </div>
 
           <div className="mt-3 overflow-hidden rounded-xl border border-border">
-            <Table>
+            <div className="overflow-x-auto scrollbar-thin">
+            <Table className="w-full min-w-[36rem]">
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="w-10">
@@ -298,11 +305,12 @@ export function BulkAssignLeadsSheet({
                   <TableHead>Name</TableHead>
                   <TableHead>Company</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Email status</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Location</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {isFetching && rows.length === 0 ? <BulkAssignLeadsTableSkeleton /> : null}
                 {!isFetching && rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
@@ -353,6 +361,7 @@ export function BulkAssignLeadsSheet({
                 })}
               </TableBody>
             </Table>
+            </div>
             <TablePagination currentPage={page} totalPages={totalPages} onPageChange={handlePageChange} />
           </div>
         </div>

@@ -19,6 +19,7 @@ import { EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import type { CampaignLeadApiModel } from "@/types";
 import { formatDateTime } from "@/lib/dateFormatting";
 import { MailTemplatePreview } from "@/components/campaigns/mail-template-preview";
+import { CampaignLeadsTableSkeleton } from "@/components/skeletons/campaigns/campaign-leads-table-skeleton";
 
 type CampaignLeadsTableProps = {
   leads: CampaignLeadApiModel[];
@@ -43,6 +44,10 @@ export function CampaignLeadsTable({
   onEditLead,
   onDeleteLead,
 }: CampaignLeadsTableProps) {
+  if (isLoading && leads.length === 0) {
+    return <CampaignLeadsTableSkeleton />;
+  }
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3 p-5">
@@ -56,11 +61,6 @@ export function CampaignLeadsTable({
           </Button>
         </div>
       </div>
-      {isLoading ? (
-        <div className="px-5 pb-4 text-sm text-muted-foreground">
-          Loading campaign leads...
-        </div>
-      ) : null}
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">

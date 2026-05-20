@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -27,9 +27,14 @@ export function GoogleLinkDialog({
 }: GoogleLinkDialogProps) {
   const [connecting, setConnecting] = useState(false);
 
+  useEffect(() => {
+    if (!open) setConnecting(false);
+  }, [open]);
+
   const handleConnect = () => {
     setConnecting(true);
     onBeforeConnect?.();
+    onOpenChange(false);
     startGoogleOAuthRedirect();
   };
 
