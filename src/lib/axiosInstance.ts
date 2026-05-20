@@ -1,7 +1,8 @@
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { clearAuthStorage, getAuthToken } from "@/utils/authSorage";
+import { clearAuthStorage, getAuthToken, setPendingAuthError } from "@/utils/authSorage";
 import { refreshSession } from "@/lib/refreshSession";
-import { END_POINT } from "@/lib/apiURL";
+import { getApiErrorMessage, setSuppressApiErrorToasts } from "@/lib/apiToast";
+import { shouldRefreshAccessToken } from "@/lib/authTokenErrors";
 
 const LOGIN_PATH = "/login";
 
@@ -30,30 +31,12 @@ const setAuthorizationHeader = (request: InternalAxiosRequestConfig, token: stri
   request.headers.Authorization = `Bearer ${token}`;
 };
 
-const isOnLoginPage = () => window.location.pathname === LOGIN_PATH;
-
-/** Clears persisted auth via `authSorage` only, then redirects to login when appropriate. */
-const clearAuthAndRedirect = () => {
+const handleRefreshFailure = (refreshError: unknown) => {
+  setSuppressApiErrorToasts(true);
+  processQueue(refreshError, null);
   clearAuthStorage();
-  if (isOnLoginPage()) return;
+  setPendingAuthError(getApiErrorMessage(refreshError));
   window.location.href = LOGIN_PATH;
-};
-
-/** Do not run refresh for auth endpoints (avoids loops and masks real login errors). */
-const shouldSkipRefreshForRequest = (url?: string): boolean => {
-  if (!url) return true;
-  return (
-    url.includes(END_POINT.auth.login) ||
-    url.includes(END_POINT.auth.refresh) ||
-    url.includes(END_POINT.auth.signup) ||
-    url.includes(END_POINT.auth.verifyOtp) ||
-    url.includes(END_POINT.auth.resendOtp) ||
-    url.includes(END_POINT.auth.forgotPassword) ||
-    url.includes(END_POINT.auth.resetPassword) ||
-    url.includes(END_POINT.auth.google) ||
-    url.includes(END_POINT.auth.googleCallback) ||
-    url.includes(END_POINT.auth.googleToken)
-  );
 };
 
 const axiosInstance: AxiosInstance = axios.create({
@@ -78,12 +61,7 @@ axiosInstance.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableAxiosRequestConfig;
 
-    if (
-      error.response?.status === 401 &&
-      originalRequest &&
-      !originalRequest._retry &&
-      !shouldSkipRefreshForRequest(originalRequest.url)
-    ) {
+    if (originalRequest && !originalRequest._retry && shouldRefreshAccessToken(error, originalRequest)) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -103,10 +81,9 @@ axiosInstance.interceptors.response.use(
         setAuthorizationHeader(originalRequest, newAccessToken);
         processQueue(null, newAccessToken);
         return axiosInstance(originalRequest);
-      } catch {
-        processQueue(error, null);
-        clearAuthAndRedirect();
-        return Promise.reject(error);
+      } catch (refreshError) {
+        handleRefreshFailure(refreshError);
+        return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
       }

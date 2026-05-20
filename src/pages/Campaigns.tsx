@@ -11,6 +11,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { CampaignDetail } from "@/components/campaigns/campaign-detail";
+import { CampaignDetailSkeleton } from "@/components/skeletons/campaigns/campaign-detail-skeleton";
+import { CampaignsGridSkeleton } from "@/components/skeletons/campaigns/campaign-card-skeleton";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { mapCampaignApiToDetail, mapCampaignApiToListCard } from "@/lib/campaignPresentation";
 import type { CampaignApiModel, CampaignStatus, CreateCampaignRequest, UpdateCampaignRequest } from "@/types";
@@ -99,7 +101,7 @@ export default function CampaignsPage() {
   };
 
   if (id) {
-    if (isFetchingDetail && !selectedCampaignDetail) return <p className="p-6">Loading campaign...</p>;
+    if (isFetchingDetail && !selectedCampaignDetail) return <CampaignDetailSkeleton />;
     if (!selectedCampaignDetail) return <p className="p-6">Campaign not found.</p>;
     return <CampaignDetail campaign={selectedCampaignDetail} onBack={() => navigate("/campaigns")} />;
   }
@@ -129,11 +131,7 @@ export default function CampaignsPage() {
       </Tabs>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {isFetching && allCampaigns.length === 0 ? (
-          <Card className="p-5 shadow-card">
-            <p className="text-sm text-muted-foreground">Loading campaigns...</p>
-          </Card>
-        ) : null}
+        {isFetching && allCampaigns.length === 0 ? <CampaignsGridSkeleton count={6} /> : null}
         {allCampaigns.map((c, idx) => {
           const pct = Math.round((c.emailsSent / Math.max(c.targetLeads, 1)) * 100);
           return (

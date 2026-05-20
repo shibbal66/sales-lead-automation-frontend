@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusPill } from "@/components/status-pill";
 import { UserAvatar } from "@/components/user-avatar";
+import { LeadDetailSheetSkeleton } from "@/components/skeletons/leads/lead-detail-sheet-skeleton";
 import type { LeadApiModel } from "@/types";
 import type { LeadListRowViewModel } from "@/lib/leadPresentation";
 import { ExternalLink, RefreshCw } from "lucide-react";
@@ -161,11 +162,7 @@ export function LeadDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-lg p-0">
         <SheetTitle className="sr-only">{sheetTitleLabel}</SheetTitle>
-        {isFetchingDetail && !selectedLeadRow ? (
-          <div className="flex h-full items-center justify-center p-6">
-            <p className="text-sm text-muted-foreground">Loading lead details...</p>
-          </div>
-        ) : null}
+        {isFetchingDetail && !selectedLeadRow ? <LeadDetailSheetSkeleton /> : null}
         {selectedLeadRow && selectedLead ? (
           <div className="flex h-full flex-col bg-background">
             <div className="flex items-start gap-4 border-b border-border bg-muted/25 p-6">

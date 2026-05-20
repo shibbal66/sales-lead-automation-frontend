@@ -57,7 +57,7 @@ export function MailTemplatePreview({ template, className }: MailTemplatePreview
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
           </DialogHeader>
-          <pre className="max-h-[60vh] overflow-auto whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 font-mono text-sm leading-relaxed text-foreground">
+          <pre className="max-h-[60vh] overflow-auto scrollbar-thin whitespace-pre-wrap rounded-lg border border-border bg-muted/30 p-4 font-mono text-sm leading-relaxed text-foreground">
             {trimmedTemplate}
           </pre>
         </DialogContent>

@@ -17,6 +17,7 @@ import { useLeadsPage } from "@/hooks/useLeadsPage";
 import { mapLeadApiToListRow } from "@/lib/leadPresentation";
 import type { LeadPresentationStatus } from "@/types";
 import { LeadDetailSheet } from "@/components/leads/lead-detail-sheet";
+import { LeadsTableSkeleton } from "@/components/skeletons/leads/leads-table-skeleton";
 import { UserAvatar } from "@/components/user-avatar";
 import { TablePagination } from "@/components/layout/table-pagination";
 import {
@@ -145,9 +146,6 @@ export default function Leads() {
 
       {/* Table */}
       <Card className="overflow-hidden shadow-card">
-        {isFetching ? (
-          <div className="p-4 text-sm text-muted-foreground">Loading leads...</div>
-        ) : null}
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -163,6 +161,7 @@ export default function Leads() {
             </TableRow>
           </TableHeader>
           <TableBody>
+            {isFetching && leads.length === 0 ? <LeadsTableSkeleton /> : null}
             {filtered.map((l) => (
               <TableRow key={l.id} className="hover:bg-primary/5">
                 <TableCell><Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggleOne(l.id)} /></TableCell>

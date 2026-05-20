@@ -2,15 +2,17 @@ import type { GoogleLinkStatusResponse } from "@/types";
 
 export function parseGoogleLinkStatus(response: GoogleLinkStatusResponse): {
   linked: boolean;
+  calendarLinked: boolean;
   email?: string;
   name?: string;
 } {
   if (!response.success || !response.data) {
-    return { linked: false };
+    return { linked: false, calendarLinked: false };
   }
-  const { linked, email, name } = response.data;
+  const { linked, email, name, calendarLinked } = response.data;
   return {
     linked: Boolean(linked),
+    calendarLinked: Boolean(calendarLinked),
     email,
     name
   };

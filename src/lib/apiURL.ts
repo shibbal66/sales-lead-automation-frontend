@@ -24,6 +24,19 @@ export const END_POINT = {
   },
 
   user: {
-    me: "/me"
+    profile: "/user"
+  } as const,
+
+  dashboard: {
+    summary: "/dashboard/summary",
+    performance: "/dashboard/performance",
+    activeCampaigns: "/dashboard/active-campaigns",
+    recentActivity: "/dashboard/recent-activity"
+  } as const,
+
+  meeting: {
+    list: "/meetings",
+    create: "/meetings",
+    byId: (id: string) => `/meetings/${id}`
   } as const
 };

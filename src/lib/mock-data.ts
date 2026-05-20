@@ -51,15 +51,9 @@ export interface EmailThread {
   messages: { from: "user" | "lead"; body: string; at: string; subject?: string }[];
 }
 
-export interface Meeting {
-  id: string;
-  leadName: string;
-  company: string;
-  campaign: string;
-  date: string;
-  bookedAt: string;
-  status: "Upcoming" | "Completed" | "Cancelled";
-}
+import type { Meeting } from "@/types/meeting";
+
+export type { Meeting };
 
 export interface ActivityItem {
   id: string;
@@ -149,12 +143,78 @@ export const threads: EmailThread[] = [
 ];
 
 export const meetings: Meeting[] = [
-  { id: "m1", leadName: "Priya Raman", company: "Helix Bio", campaign: "Healthcare Q2", date: "Thu, Apr 24 · 10:00 AM PT", bookedAt: "Yesterday", status: "Upcoming" },
-  { id: "m2", leadName: "Rafael Mendes", company: "Cumulo", campaign: "Q2 Outbound — SaaS", date: "Fri, Apr 25 · 2:30 PM PT", bookedAt: "2 days ago", status: "Upcoming" },
-  { id: "m3", leadName: "Sarah Mitchell", company: "Vertex Labs", campaign: "Q2 Outbound — SaaS", date: "Tue, Apr 22 · 11:00 AM PT", bookedAt: "3 days ago", status: "Upcoming" },
-  { id: "m4", leadName: "Naomi Bryant", company: "Kestrel CRM", campaign: "Q2 Outbound — SaaS", date: "Mon, Apr 14 · 9:00 AM PT", bookedAt: "Last week", status: "Completed" },
-  { id: "m5", leadName: "Tobias Klein", company: "Berlin Mobility", campaign: "EMEA SDR Push", date: "Wed, Apr 9 · 4:00 PM CET", bookedAt: "Last week", status: "Completed" },
-  { id: "m6", leadName: "Mira Shah", company: "Rune AI", campaign: "Q2 Outbound — SaaS", date: "Mon, Apr 7 · 1:00 PM PT", bookedAt: "2 weeks ago", status: "Cancelled" },
+  {
+    id: "m1",
+    leadName: "Priya Raman",
+    company: "Helix Bio",
+    campaign: "Healthcare Q2",
+    date: "Thu, Apr 24 · 10:00 AM PT",
+    meetingAt: "2026-04-24T17:00:00.000Z",
+    endAt: "2026-04-24T18:00:00.000Z",
+    bookedAt: "Yesterday",
+    status: "Upcoming",
+    apiStatus: "scheduled"
+  },
+  {
+    id: "m2",
+    leadName: "Rafael Mendes",
+    company: "Cumulo",
+    campaign: "Q2 Outbound — SaaS",
+    date: "Fri, Apr 25 · 2:30 PM PT",
+    meetingAt: "2026-04-25T21:30:00.000Z",
+    endAt: "2026-04-25T22:30:00.000Z",
+    bookedAt: "2 days ago",
+    status: "Upcoming",
+    apiStatus: "scheduled"
+  },
+  {
+    id: "m3",
+    leadName: "Sarah Mitchell",
+    company: "Vertex Labs",
+    campaign: "Q2 Outbound — SaaS",
+    date: "Tue, Apr 22 · 11:00 AM PT",
+    meetingAt: "2026-04-22T18:00:00.000Z",
+    endAt: "2026-04-22T19:00:00.000Z",
+    bookedAt: "3 days ago",
+    status: "Upcoming",
+    apiStatus: "scheduled"
+  },
+  {
+    id: "m4",
+    leadName: "Naomi Bryant",
+    company: "Kestrel CRM",
+    campaign: "Q2 Outbound — SaaS",
+    date: "Mon, Apr 14 · 9:00 AM PT",
+    meetingAt: "2026-04-14T16:00:00.000Z",
+    endAt: "2026-04-14T17:00:00.000Z",
+    bookedAt: "Last week",
+    status: "Completed",
+    apiStatus: "completed"
+  },
+  {
+    id: "m5",
+    leadName: "Tobias Klein",
+    company: "Berlin Mobility",
+    campaign: "EMEA SDR Push",
+    date: "Wed, Apr 9 · 4:00 PM CET",
+    meetingAt: "2026-04-09T14:00:00.000Z",
+    endAt: "2026-04-09T15:00:00.000Z",
+    bookedAt: "Last week",
+    status: "Completed",
+    apiStatus: "completed"
+  },
+  {
+    id: "m6",
+    leadName: "Mira Shah",
+    company: "Rune AI",
+    campaign: "Q2 Outbound — SaaS",
+    date: "Mon, Apr 7 · 1:00 PM PT",
+    meetingAt: "2026-04-07T20:00:00.000Z",
+    endAt: "2026-04-07T21:00:00.000Z",
+    bookedAt: "2 weeks ago",
+    status: "Cancelled",
+    apiStatus: "cancelled"
+  }
 ];
 
 export const activity: ActivityItem[] = [

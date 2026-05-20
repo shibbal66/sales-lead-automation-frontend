@@ -4,6 +4,13 @@ import { toast } from "@/components/ui/sonner";
 const DEFAULT_ERROR_MESSAGE = "Something went wrong. Please try again.";
 const ERROR_TOAST_SHOWN = "__api_error_toast_shown__";
 
+let suppressApiErrorToasts = false;
+
+/** Suppresses error toasts while redirecting after session expiry (avoids duplicate toasts). */
+export function setSuppressApiErrorToasts(suppress: boolean): void {
+  suppressApiErrorToasts = suppress;
+}
+
 function messageFromApiBody(data: unknown): string | null {
   if (typeof data === "string") {
     const trimmed = data.trim();
@@ -57,6 +64,7 @@ export function getApiErrorMessage(error: unknown): string {
  * Show error toast with message from backend when available (AxiosError.response.data.message).
  */
 export function showApiErrorToast(error: unknown): void {
+  if (suppressApiErrorToasts) return;
   if (error && typeof error === "object" && (error as Record<string, unknown>)[ERROR_TOAST_SHOWN]) {
     return;
   }

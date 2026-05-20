@@ -21,6 +21,12 @@ export {
 } from "./auth";
 
 export {
+  createMeetingSchema,
+  buildCreateMeetingPayload,
+  type CreateMeetingFormValues
+} from "./meeting";
+
+export {
   createCampaignSchema,
   createCampaignFollowUpSchema,
   parseCreateCampaignFollowUpPayload,

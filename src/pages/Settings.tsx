@@ -7,11 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { billingHistory } from "@/lib/mock-data";
-import { getUserDisplayEmail, getUserDisplayName, getUserInitials } from "@/lib/userDisplay";
 import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/core/types/user.types";
 import {
-  User, Mail, CreditCard, Users, Bell, AlertTriangle, Check, Plus,
+  User, Mail, CreditCard, Bell, AlertTriangle, Check,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -20,13 +19,20 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/store/auth/authStore";
 import { GoogleLinkCard } from "@/components/auth/google-link-card";
+import { profileTimezoneSelectOptions, PROFILE_TIMEZONE_OPTIONS } from "@/lib/profileTimezones";
+import {
+  getUserDisplayEmail,
+  getUserDisplayName,
+  getUserInitials,
+  profileFormFromAuthUser,
+  type ProfileFormState
+} from "@/lib/userProfile";
 
 const sections = [
   { id: "profile", label: "Profile", icon: User },
   { id: "email", label: "Email Accounts", icon: Mail },
   { id: "billing", label: "Subscription & Billing", icon: CreditCard },
-  { id: "team", label: "Team & Roles", icon: Users },
-  { id: "notif", label: "Notifications", icon: Bell },
+  // { id: "team", label: "Team & Roles", icon: Users },
   { id: "danger", label: "Danger Zone", icon: AlertTriangle },
 ] as const;
 
@@ -41,26 +47,12 @@ function settingsSectionFromTab(tab: string | null): SettingsSectionId {
   return "profile";
 }
 
-type ProfileFormState = {
-  name: string;
-  email: string;
-  contact: string;
-  address: string;
-  timezone: string;
-};
-
 function formatUserRole(role?: string) {
   if (!role) return "User";
   const normalized = role.trim().toLowerCase();
   if (normalized === "admin") return "Admin";
   if (normalized === "manager") return "Manager";
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function formatAuthProvider(provider?: string) {
-  if (!provider) return "Email";
-  if (provider.toLowerCase() === "google") return "Gmail";
-  return provider.charAt(0).toUpperCase() + provider.slice(1);
 }
 
 function UserAvatarCircle({ user, className }: { user: AuthUser | null; className?: string }) {
@@ -93,7 +85,11 @@ export default function Settings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const user = useAuthStore((state) => state.user);
-  const updateUser = useAuthStore((state) => state.updateUser);
+  const googleLink = useAuthStore((state) => state.googleLink);
+  const profileLoading = useAuthStore((state) => state.profileLoading);
+  const profileSaving = useAuthStore((state) => state.profileSaving);
+  const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser);
+  const saveProfile = useAuthStore((state) => state.saveProfile);
   const logoutAllDevices = useAuthStore((state) => state.logoutAllDevices);
   const section = settingsSectionFromTab(searchParams.get("tab"));
 
@@ -104,24 +100,34 @@ export default function Settings() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [logoutAllLoading, setLogoutAllLoading] = useState(false);
-  const [profileForm, setProfileForm] = useState<ProfileFormState>({
-    name: "",
-    email: "",
-    contact: "",
-    address: "",
-    timezone: "pt"
-  });
+  const [profileForm, setProfileForm] = useState<ProfileFormState>(() =>
+    user
+      ? profileFormFromAuthUser(user)
+      : {
+          name: "",
+          email: "",
+          contact: "",
+          address: "",
+          timezone: PROFILE_TIMEZONE_OPTIONS[0].value,
+          profilePic: ""
+        }
+  );
 
   useEffect(() => {
-    if (!user) return;
-    setProfileForm({
-      name: getUserDisplayName(user),
-      email: user.email,
-      contact: user.contact ?? "",
-      address: user.address ?? "",
-      timezone: "pt"
-    });
-  }, [user]);
+    void fetchCurrentUser();
+  }, [fetchCurrentUser]);
+
+  useEffect(() => {
+    if (!user || profileLoading || profileSaving) return;
+    setProfileForm(profileFormFromAuthUser(user));
+  }, [user, profileLoading, profileSaving]);
+
+  const onSaveProfile = () => saveProfile(profileForm);
+
+  const timezoneOptions = useMemo(
+    () => profileTimezoneSelectOptions(profileForm.timezone),
+    [profileForm.timezone]
+  );
 
   const currentTeamMember = useMemo(() => {
     if (!user) return null;
@@ -133,8 +139,6 @@ export default function Settings() {
     };
   }, [user]);
 
-
-  const isGoogleAccount = user?.authProvider?.toLowerCase() === "google";
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[220px,1fr]">
@@ -166,7 +170,7 @@ export default function Settings() {
             <h3 className="font-display text-lg font-bold">Profile</h3>
             <div className="mt-4 flex items-center gap-4">
               <UserAvatarCircle user={user} className="h-16 w-16 text-lg" />
-              <Button variant="outline" disabled={!user}>Upload Avatar</Button>
+              <Button variant="outline" disabled={profileLoading || profileSaving}>Upload Avatar</Button>
             </div>
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
@@ -174,7 +178,7 @@ export default function Settings() {
                 <Input
                   id="profile-name"
                   value={profileForm.name}
-                  disabled={!user}
+                  disabled={profileLoading || profileSaving}
                   onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))}
                 />
               </div>
@@ -187,7 +191,7 @@ export default function Settings() {
                 <Input
                   id="profile-contact"
                   value={profileForm.contact}
-                  disabled={!user}
+                  disabled={profileLoading || profileSaving}
                   onChange={(event) => setProfileForm((current) => ({ ...current, contact: event.target.value }))}
                 />
               </div>
@@ -196,7 +200,7 @@ export default function Settings() {
                 <Input
                   id="profile-address"
                   value={profileForm.address}
-                  disabled={!user}
+                  disabled={profileLoading || profileSaving}
                   onChange={(event) => setProfileForm((current) => ({ ...current, address: event.target.value }))}
                 />
               </div>
@@ -204,59 +208,33 @@ export default function Settings() {
                 <Label>Timezone</Label>
                 <Select
                   value={profileForm.timezone}
-                  disabled={!user}
+                  disabled={profileLoading || profileSaving}
                   onValueChange={(value) => setProfileForm((current) => ({ ...current, timezone: value }))}
                 >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pt">(GMT-08:00) Pacific Time</SelectItem>
-                    <SelectItem value="et">(GMT-05:00) Eastern Time</SelectItem>
-                    <SelectItem value="utc">(GMT+00:00) UTC</SelectItem>
-                    <SelectItem value="cet">(GMT+01:00) Central European Time</SelectItem>
+                    {timezoneOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <div className="mt-6 flex justify-end">
-              <Button disabled={!user}>
-                Save Changes
+              <Button
+                disabled={profileLoading || profileSaving}
+                onClick={() => void onSaveProfile()}
+              >
+                {profileSaving ? "Saving..." : profileLoading ? "Loading..." : "Save Changes"}
               </Button>
             </div>
           </Card>
         )}
 
         {section === "email" && (
-          <>
-            <GoogleLinkCard />
-            <Card className="p-6 shadow-card">
-              <h3 className="font-display text-lg font-bold">Connected Inboxes</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Connect Gmail to send personalized outreach from your address.</p>
-              <div className="mt-4 flex items-center justify-between rounded-xl border border-border bg-surface/40 p-4">
-                <div className="flex items-center gap-3">
-                  <UserAvatarCircle user={user} className="h-10 w-10 text-sm" />
-                  <div>
-                    <p className="font-semibold">{getUserDisplayEmail(user)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatAuthProvider(user?.authProvider)}
-                      {user?.isVerified ? " · Verified" : ""}
-                    </p>
-                  </div>
-                </div>
-                <Button variant="outline" disabled={!isGoogleAccount}>
-                  {isGoogleAccount ? "Disconnect" : "Not connected"}
-                </Button>
-              </div>
-              
-            </Card>
-            <Card className="p-6 shadow-card">
-              <h3 className="font-display text-lg font-bold">SendGrid (optional)</h3>
-              <p className="mt-1 text-sm text-muted-foreground">For high-volume domains, connect a SendGrid API key.</p>
-              <div className="mt-4 flex gap-2">
-                <Input placeholder="SG.xxxxxxxxxxxxxxxxxxx" type="password" />
-                <Button>Save Key</Button>
-              </div>
-            </Card>
-          </>
+          <GoogleLinkCard linkStatus={googleLink} statusLoading={profileLoading} />
         )}
 
         {section === "billing" && (
@@ -384,7 +362,7 @@ export default function Settings() {
           </>
         )}
 
-        {section === "team" && (
+        {/* {section === "team" && (
           <>
             <Card className="p-6 shadow-card">
               <div className="flex items-center justify-between">
@@ -423,27 +401,8 @@ export default function Settings() {
               </ul>
             </Card>
           </>
-        )}
+        )} */}
 
-        {section === "notif" && (
-          <Card className="p-6 shadow-card">
-            <h3 className="font-display text-lg font-bold">Notifications</h3>
-            <div className="mt-4 space-y-3">
-              {[
-                "Email me when a lead replies",
-                "Email me when a meeting is booked",
-                "Daily digest email (campaign performance summary)",
-                "In-app notifications for replies",
-                "In-app notifications for meetings",
-              ].map((n, i) => (
-                <div key={n} className="flex items-center justify-between rounded-lg border border-border p-3">
-                  <span className="text-sm">{n}</span>
-                  <Switch defaultChecked={i !== 2} />
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
 
         {section === "danger" && (
           <Card className="border-destructive/40 p-6 shadow-card">

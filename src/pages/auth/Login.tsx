@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { AxiosError } from "axios";
 import { login } from "@/services/auth/authServices";
@@ -13,7 +13,7 @@ import { getApiErrorMessage, showApiErrorToast, showApiSuccessToast } from "@/li
 import { startGoogleOAuthRedirect } from "@/lib/googleAuth";
 import { loginSchema } from "@/validators";
 import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
-import { setPendingVerification } from "@/utils/authSorage";
+import { consumePendingAuthError, setPendingVerification } from "@/utils/authSorage";
 import { AUTH_ERROR_CODE } from "@/types/auth";
 
 type LoginErrors = {
@@ -38,6 +38,13 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
   const setCredentials = useAuthStore((state) => state.setCredentials);
+
+  useEffect(() => {
+    const pendingMessage = consumePendingAuthError();
+    if (pendingMessage) {
+      showApiErrorToast(pendingMessage);
+    }
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
