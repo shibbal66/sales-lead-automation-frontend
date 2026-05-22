@@ -1,4 +1,11 @@
 import { format, parseISO } from "date-fns";
+import {
+  buildPeriodQuery,
+  DEFAULT_DASHBOARD_PERIOD_QUERY,
+  DASHBOARD_PERIOD_QUERY_OPTIONS,
+  getPeriodQueryLabel,
+  isCustomPeriodRangeValid
+} from "@/lib/periodQuery";
 import type {
   DashboardPerformanceData,
   DashboardPerformanceQuery,
@@ -11,15 +18,9 @@ export type DashboardPeriodOption = {
   label: string;
 };
 
-export const DASHBOARD_PERIOD_OPTIONS: DashboardPeriodOption[] = [
-  { value: "last_7_days", label: "Last 7 days" },
-  { value: "last_30_days", label: "Last 30 days" },
-  { value: "this_month", label: "This month" },
-  { value: "last_90_days", label: "Last 90 days" },
-  { value: "custom", label: "Custom range" }
-];
+export const DASHBOARD_PERIOD_OPTIONS = DASHBOARD_PERIOD_QUERY_OPTIONS as DashboardPeriodOption[];
 
-export const DEFAULT_DASHBOARD_PERIOD: DashboardPeriod = "last_30_days";
+export const DEFAULT_DASHBOARD_PERIOD: DashboardPeriod = DEFAULT_DASHBOARD_PERIOD_QUERY;
 
 export const DASHBOARD_PERFORMANCE_CHART_TITLE = "Emails & meetings";
 
@@ -34,7 +35,7 @@ export const DASHBOARD_PERFORMANCE_EMPTY_MESSAGE =
   "No email or meeting activity for this period.";
 
 export function getDashboardPeriodLabel(period: DashboardPeriod): string {
-  return DASHBOARD_PERIOD_OPTIONS.find((o) => o.value === period)?.label ?? period;
+  return getPeriodQueryLabel(period);
 }
 
 export function buildDashboardPerformanceQuery(
@@ -42,21 +43,11 @@ export function buildDashboardPerformanceQuery(
   customFrom?: string,
   customTo?: string
 ): DashboardPerformanceQuery {
-  if (period === "custom") {
-    return {
-      period,
-      from: customFrom?.trim(),
-      to: customTo?.trim()
-    };
-  }
-  return { period };
+  return buildPeriodQuery(period, customFrom, customTo) as DashboardPerformanceQuery;
 }
 
 export function isCustomPerformanceRangeValid(from?: string, to?: string): boolean {
-  const f = from?.trim();
-  const t = to?.trim();
-  if (!f || !t) return false;
-  return f <= t;
+  return isCustomPeriodRangeValid(from, to);
 }
 
 export type DashboardChartPoint = DashboardPerformanceSeriesPoint & {
@@ -100,26 +91,13 @@ export function performanceSeriesToChartData(
   });
 }
 
-export function formatPerformanceDateRange(from: string, to: string): string {
-  try {
-    const fromLabel = format(parseISO(from), "MMM d, yyyy");
-    const toLabel = format(parseISO(to), "MMM d, yyyy");
-    return `${fromLabel} – ${toLabel}`;
-  } catch {
-    return `${from} – ${to}`;
-  }
-}
-
-const PERFORMANCE_SUBTITLE_SUFFIX = "emails sent, replies, and meetings booked";
+const PERFORMANCE_SUBTITLE = "Emails sent, replies, and meetings booked";
 
 export function getPerformanceSubtitle(
-  performance: DashboardPerformanceData | null,
-  period: DashboardPeriod,
+  _performance: DashboardPerformanceData | null,
+  _period: DashboardPeriod,
   isLoading: boolean
 ): string {
-  if (performance?.from && performance?.to) {
-    return `${formatPerformanceDateRange(performance.from, performance.to)} · ${PERFORMANCE_SUBTITLE_SUFFIX}`;
-  }
   if (isLoading) return "Loading…";
-  return `${getDashboardPeriodLabel(period)} · ${PERFORMANCE_SUBTITLE_SUFFIX}`;
+  return PERFORMANCE_SUBTITLE;
 }

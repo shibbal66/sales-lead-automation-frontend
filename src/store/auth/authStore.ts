@@ -1,14 +1,23 @@
 import { create } from "zustand";
 import { type AuthUser } from "../../core/types/user.types";
 import { logout as logoutApi, logoutAll as logoutAllApi } from "../../services/auth/authServices";
-import { getCurrentUser, updateCurrentUser } from "../../services/user/userServices";
+import {
+  deleteCurrentUser,
+  getCurrentUser,
+  updateCurrentUser,
+  uploadUserAvatar
+} from "../../services/user/userServices";
 import { showApiErrorToast, showApiSuccessToast } from "../../lib/apiToast";
 import {
-  authUserFromApiProfile,
+  buildUpdateNotificationPreferencesPayload,
+  buildUpdatePasswordPayload,
   buildUpdateProfilePayload,
+  type NotificationPreferencesFormState,
   type ProfileFormState
 } from "../../lib/userProfile";
-import type { UserGoogleLinkData } from "../../types/user";
+import { mapApiUserToAuthUser } from "../../lib/mapAuthUser";
+import type { ApiUserProfile, UpdateUserProfileRequest, UserGoogleLinkData } from "../../types/user";
+import type { UpdatePasswordFormValues } from "../../validators";
 import {
   clearAuthStorage,
   getAuthToken,
@@ -30,19 +39,51 @@ function getHydratedAuth(): { user: AuthUser | null; token: string | null; isAut
 }
 
 const hydrated = getHydratedAuth();
+const AVATAR_UPLOAD_GUARD_MS = 10_000;
 
 function applyProfileData(
   set: (partial: Partial<AuthState>) => void,
-  apiUser: Parameters<typeof authUserFromApiProfile>[0],
-  google?: UserGoogleLinkData
+  apiUser: ApiUserProfile,
+  google?: UserGoogleLinkData,
+  options?: { bustAvatar?: boolean; avatarUrl?: string }
 ) {
-  const user = authUserFromApiProfile(apiUser);
+  let user = mapApiUserToAuthUser(apiUser, options?.bustAvatar);
+  if (options?.avatarUrl) {
+    user = { ...user, avatarUrl: options.avatarUrl };
+  }
   setStoredUser(user);
   set({
     user,
     isAuthenticated: true,
     ...(google !== undefined ? { googleLink: google } : {})
   });
+}
+
+function commitUserAvatar(
+  set: (partial: Partial<AuthState>) => void,
+  get: () => AuthState,
+  avatarUrl: string
+) {
+  const current = get().user;
+  if (!current) return;
+  const user = { ...current, avatarUrl };
+  setStoredUser(user);
+  set({ user });
+}
+
+async function patchCurrentUser(
+  set: (partial: Partial<AuthState>) => void,
+  payload: UpdateUserProfileRequest,
+  successMessage: string
+): Promise<boolean> {
+  const response = await updateCurrentUser(payload);
+  if (!response.success || !response.data?.user) {
+    showApiErrorToast(response);
+    return false;
+  }
+  applyProfileData(set, response.data.user, response.data.google);
+  showApiSuccessToast(response.message || successMessage);
+  return true;
 }
 
 interface AuthState {
@@ -53,14 +94,23 @@ interface AuthState {
   googleLink: UserGoogleLinkData | null;
   profileLoading: boolean;
   profileSaving: boolean;
+  avatarUploading: boolean;
+  lastAvatarUploadedAt: number | null;
+  notificationPreferencesSaving: boolean;
+  passwordSaving: boolean;
+  accountDeleting: boolean;
   setCredentials: (payload: { user: AuthUser; token: string; refreshToken?: string }) => void;
   logout: () => Promise<void>;
   logoutAllDevices: () => Promise<void>;
+  deleteAccount: () => Promise<boolean>;
   setLoading: (loading: boolean) => void;
   setUser: (user: AuthUser) => void;
   updateUser: (payload: Partial<AuthUser>) => void;
   fetchCurrentUser: () => Promise<boolean>;
   saveProfile: (form: ProfileFormState) => Promise<boolean>;
+  uploadAvatar: (file: File) => Promise<boolean>;
+  saveNotificationPreferences: (form: NotificationPreferencesFormState) => Promise<boolean>;
+  savePassword: (form: UpdatePasswordFormValues) => Promise<boolean>;
   initializeAuth: () => void;
 }
 
@@ -82,7 +132,12 @@ export const useAuthStore = create<AuthState>((set, get) => {
       isLoading: false,
       googleLink: null,
       profileLoading: false,
-      profileSaving: false
+      profileSaving: false,
+      avatarUploading: false,
+      lastAvatarUploadedAt: null,
+      notificationPreferencesSaving: false,
+      passwordSaving: false,
+      accountDeleting: false
     });
   });
 
@@ -94,6 +149,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
     googleLink: null,
     profileLoading: false,
     profileSaving: false,
+    avatarUploading: false,
+    lastAvatarUploadedAt: null,
+    notificationPreferencesSaving: false,
+    passwordSaving: false,
+    accountDeleting: false,
 
     setCredentials: ({ user, token, refreshToken }) => {
       setStoredUser(user);
@@ -132,6 +192,25 @@ export const useAuthStore = create<AuthState>((set, get) => {
       clearAuthStorage();
     },
 
+    deleteAccount: async () => {
+      set({ accountDeleting: true });
+      try {
+        const response = await deleteCurrentUser();
+        if (!response.success) {
+          showApiErrorToast(response);
+          return false;
+        }
+        showApiSuccessToast(response.message || "Account deleted successfully.");
+        clearAuthStorage();
+        return true;
+      } catch (error) {
+        showApiErrorToast(error);
+        return false;
+      } finally {
+        set({ accountDeleting: false });
+      }
+    },
+
     setLoading: (isLoading) => set({ isLoading }),
 
     updateUser: (payload) =>
@@ -154,7 +233,16 @@ export const useAuthStore = create<AuthState>((set, get) => {
           showApiErrorToast(response);
           return false;
         }
-        applyProfileData(set, response.data.user, response.data.google ?? null);
+
+        const apiUser = response.data.user;
+        const uploadedRecently =
+          get().lastAvatarUploadedAt !== null &&
+          Date.now() - get().lastAvatarUploadedAt < AVATAR_UPLOAD_GUARD_MS;
+
+        applyProfileData(set, apiUser, response.data.google ?? null, {
+          avatarUrl: uploadedRecently ? get().user?.avatarUrl : undefined,
+          bustAvatar: !uploadedRecently && Boolean(apiUser.profilePic?.trim())
+        });
         return true;
       } catch (error) {
         showApiErrorToast(error);
@@ -167,20 +255,84 @@ export const useAuthStore = create<AuthState>((set, get) => {
     saveProfile: async (form) => {
       set({ profileSaving: true });
       try {
-        const response = await updateCurrentUser(buildUpdateProfilePayload(form));
-        if (!response.success || !response.data?.user) {
-          showApiErrorToast(response);
-          return false;
-        }
-        const { user: apiUser, google } = response.data;
-        applyProfileData(set, apiUser, google);
-        showApiSuccessToast(response.message || "Profile updated successfully.");
-        return true;
+        return await patchCurrentUser(
+          set,
+          buildUpdateProfilePayload(form),
+          "Profile updated successfully."
+        );
       } catch (error) {
         showApiErrorToast(error);
         return false;
       } finally {
         set({ profileSaving: false });
+      }
+    },
+
+    uploadAvatar: async (file) => {
+      const previousAvatarUrl = get().user?.avatarUrl;
+      const previewUrl = URL.createObjectURL(file);
+      commitUserAvatar(set, get, previewUrl);
+      set({ avatarUploading: true });
+
+      try {
+        const response = await uploadUserAvatar(file);
+        if (!response.success || !response.data?.user) {
+          showApiErrorToast(response);
+          return false;
+        }
+
+        applyProfileData(set, response.data.user, undefined, { bustAvatar: true });
+        if (!get().user?.avatarUrl) {
+          showApiErrorToast("Upload succeeded but no profile image URL was returned.");
+          return false;
+        }
+        set({ lastAvatarUploadedAt: Date.now() });
+        showApiSuccessToast(response.message || "Profile image uploaded.");
+        return true;
+      } catch (error) {
+        showApiErrorToast(error);
+        const current = get().user;
+        if (current) {
+          const user = { ...current, avatarUrl: previousAvatarUrl };
+          setStoredUser(user);
+          set({ user });
+        }
+        return false;
+      } finally {
+        URL.revokeObjectURL(previewUrl);
+        set({ avatarUploading: false });
+      }
+    },
+
+    saveNotificationPreferences: async (form) => {
+      set({ notificationPreferencesSaving: true });
+      try {
+        return await patchCurrentUser(
+          set,
+          buildUpdateNotificationPreferencesPayload(form),
+          "Notification preferences updated."
+        );
+      } catch (error) {
+        showApiErrorToast(error);
+        return false;
+      } finally {
+        set({ notificationPreferencesSaving: false });
+      }
+    },
+
+    savePassword: async (form) => {
+      set({ passwordSaving: true });
+      try {
+        return await patchCurrentUser(
+          set,
+          buildUpdatePasswordPayload(form),
+          "Password updated successfully."
+        );
+      } catch (error) {
+        showApiErrorToast(error);
+        return false;
+      } finally {
+        set({ passwordSaving: false });
       }
     },
 

@@ -5,18 +5,24 @@ import { TrendingUp, TrendingDown, type LucideIcon } from "lucide-react";
 interface KPICardProps {
   label: string;
   value: string;
+  hint?: string;
   delta?: { value: string; up?: boolean };
   icon?: LucideIcon;
   accent?: React.ReactNode;
   className?: string;
 }
 
-export function KPICard({ label, value, delta, icon: Icon, accent, className }: KPICardProps) {
+export function KPICard({ label, value, hint, delta, icon: Icon, accent, className }: KPICardProps) {
   return (
     <Card className={cn("relative overflow-hidden p-5 shadow-card", className)}>
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
+          {hint ? (
+            <p className="text-[10px] font-normal normal-case tracking-normal text-muted-foreground/90">
+              {hint}
+            </p>
+          ) : null}
           <p className="font-display text-3xl font-bold leading-none">{value}</p>
           {delta && (
             <p

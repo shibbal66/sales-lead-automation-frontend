@@ -492,6 +492,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="senderDisplayName"
                   value={senderDisplayName}
+                  aria-invalid={!!errors.sender_display_name}
                   onChange={(e) =>
                     patchField("sender_display_name", e.target.value, () => setSenderDisplayName(e.target.value))
                   }
@@ -507,6 +508,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   id="senderAddress"
                   type="text"
                   value={senderAddress}
+                  aria-invalid={!!errors.sender_address}
                   onChange={(e) =>
                     patchField("sender_address", e.target.value, () => setSenderAddress(e.target.value))
                   }
@@ -521,8 +523,9 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="senderPhone"
                   type="tel"
-                  maxLength={15}
+                  maxLength={16}
                   value={senderPhone}
+                  aria-invalid={!!errors.sender_phone}
                   onChange={(e) =>
                     patchField("sender_phone", e.target.value, () => setSenderPhone(e.target.value))
                   }

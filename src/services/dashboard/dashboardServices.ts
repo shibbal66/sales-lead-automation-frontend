@@ -9,6 +9,7 @@ import type {
   GetDashboardRecentActivityResponse,
   GetDashboardSummaryResponse
 } from "@/types/dashboard";
+import type { GetMeetingStatsResponse } from "@/types/meetingStats";
 import { DEFAULT_ACTIVE_CAMPAIGNS_LIMIT, DEFAULT_RECENT_ACTIVITY_LIMIT } from "@/lib/dashboard";
 
 export function getDashboardSummary() {
@@ -51,4 +52,8 @@ export function getDashboardRecentActivity({
     undefined,
     { page, limit }
   );
+}
+
+export function getMeetingStats() {
+  return apiInvoker<GetMeetingStatsResponse>(END_POINT.dashboard.meetingStats, "GET");
 }

@@ -1,6 +1,7 @@
 import type { AuthUser, User } from "@/core/types/user.types";
 import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
 import { resolveProfileTimezone } from "@/lib/profileTimezones";
+import type { ProfileSettingsFormValues, UpdatePasswordFormValues } from "@/validators";
 import type { ApiUserProfile, UpdateUserProfileRequest, UserGoogleLinkData } from "@/types/user";
 
 // --- Display (UI labels, avatars, sidebar) ---
@@ -11,12 +12,15 @@ export function getUserDisplayName(user: User | null): string {
   return fromFirstLast || user.name || user.email || "User";
 }
 
-export function getUserInitials(user: User | null): string {
-  const displayName = getUserDisplayName(user);
-  const parts = displayName.split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "U";
-  if (parts.length === 1) return parts[0][0]?.toUpperCase() || "U";
+export function getInitialsFromName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0][0]?.toUpperCase() || "?";
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
+
+export function getUserInitials(user: User | null): string {
+  return getInitialsFromName(getUserDisplayName(user));
 }
 
 export function getUserDisplayEmail(user: User | null): string {
@@ -25,13 +29,10 @@ export function getUserDisplayEmail(user: User | null): string {
 
 // --- Profile API (GET/PATCH /user, form state) ---
 
-export type ProfileFormState = {
-  name: string;
-  email: string;
-  contact: string;
-  address: string;
-  timezone: string;
-  profilePic: string;
+export type ProfileFormState = ProfileSettingsFormValues;
+
+export type NotificationPreferencesFormState = {
+  notificationsEnabled: boolean;
 };
 
 export function profileFormFromApiUser(user: ApiUserProfile): ProfileFormState {
@@ -44,8 +45,7 @@ export function profileFormFromAuthUser(user: AuthUser): ProfileFormState {
     email: user.email,
     contact: user.contact?.trim() ?? "",
     address: user.address?.trim() ?? "",
-    timezone: resolveProfileTimezone(user.timezone),
-    profilePic: user.avatarUrl?.trim() ?? ""
+    timezone: resolveProfileTimezone(user.timezone)
   };
 }
 
@@ -54,13 +54,37 @@ export function buildUpdateProfilePayload(form: ProfileFormState): UpdateUserPro
     name: form.name.trim(),
     address: form.address.trim(),
     contact: form.contact.trim(),
-    timezone: form.timezone,
-    ...(form.profilePic.trim() ? { profilePic: form.profilePic.trim() } : {})
+    timezone: form.timezone
   };
 }
 
-export function authUserFromApiProfile(user: ApiUserProfile): AuthUser {
-  return mapApiUserToAuthUser(user);
+export function notificationPreferencesFromAuthUser(
+  user: AuthUser
+): NotificationPreferencesFormState {
+  return {
+    notificationsEnabled: user.notificationsEnabled ?? true
+  };
+}
+
+export function buildUpdateNotificationPreferencesPayload(
+  form: NotificationPreferencesFormState
+): UpdateUserProfileRequest {
+  return { notificationsEnabled: form.notificationsEnabled };
+}
+
+export const emptyPasswordFormState: UpdatePasswordFormValues = {
+  oldPassword: "",
+  newPassword: "",
+  confirmNewPassword: ""
+};
+
+export function buildUpdatePasswordPayload(
+  form: UpdatePasswordFormValues
+): UpdateUserProfileRequest {
+  return {
+    oldPassword: form.oldPassword,
+    password: form.newPassword
+  };
 }
 
 export function formatGoogleLinkFromUserApi(

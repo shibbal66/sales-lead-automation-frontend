@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { addressSchema, nameSchema, phoneSchema } from "@/validators/auth";
 import { CAMPAIGN_LEAD_SOURCE_VALUES, type CreateCampaignFollowUpRequest } from "@/types/campaign";
 
 const mailTemplateSampleBaseSchema = z.object({
@@ -66,23 +67,9 @@ export const createCampaignSchema = z.object({
   lead_source: z.enum(CAMPAIGN_LEAD_SOURCE_VALUES, {
     errorMap: () => ({ message: "Lead source must be new, old, or both" })
   }),
-  sender_display_name: z
-    .string()
-    .trim()
-    .min(1, "Sender display name is required")
-    .max(120, "Sender display name is too long"),
-  sender_address: z
-    .string()
-    .trim()
-    .min(1, "Sender address is required")
-    .max(180, "Sender address is too long"),
-  sender_phone: z
-    .string()
-    .trim()
-    .regex(/^\+?[1-9]\d{1,14}$/, "Please enter a valid phone number")
-    .transform((val) => val.replace(/[^\d+]/g, ""))
-    .refine((val) => val.length > 0, { message: "Sender phone is required" })
-    .refine((val) => val.length <= 15, { message: "Sender phone must be less than 15 digits" }),
+  sender_display_name: nameSchema,
+  sender_address: addressSchema,
+  sender_phone: phoneSchema,
   target_leads: z
     .number({ invalid_type_error: "Target leads must be a number" })
     .int("Target leads must be a whole number")

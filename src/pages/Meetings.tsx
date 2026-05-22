@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { KPICard } from "@/components/kpi-card";
+import { DashboardKpiCardSkeleton } from "@/components/skeletons";
 import { CancelMeetingAlert } from "@/components/meetings/cancel-meeting-alert";
 import { CreateMeetingDialog } from "@/components/meetings/create-meeting-dialog";
 import { MeetingsCalendarView } from "@/components/meetings/meetings-calendar-view";
@@ -13,11 +15,11 @@ import {
 } from "@/components/meetings/meetings-filters-bar";
 import { MeetingsListView } from "@/components/meetings/meetings-list-view";
 import { TablePagination } from "@/components/layout/table-pagination";
-import type { MeetingsViewMode } from "@/lib/meetings";
+import { buildMeetingStatsKpis, MEETING_STATS_KPI_COUNT, type MeetingsViewMode } from "@/lib/meetings";
 import type { Meeting } from "@/types/meeting";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { useMeetingsStore } from "@/store/meetings/meetingsStore";
-import { CalendarCheck, CalendarDays, LayoutList, Percent } from "lucide-react";
+import { CalendarDays, Info, LayoutList } from "lucide-react";
 
 export default function Meetings() {
   const [view, setView] = useState<MeetingsViewMode>("calendar");
@@ -39,6 +41,9 @@ export default function Meetings() {
   const cancelMeeting = useMeetingsStore((state) => state.cancelMeeting);
   const isCancelling = useMeetingsStore((state) => state.isCancelling);
   const invalidateMeetingsCache = useMeetingsStore((state) => state.invalidateCache);
+  const meetingStats = useMeetingsStore((state) => state.meetingStats);
+  const isFetchingMeetingStats = useMeetingsStore((state) => state.isFetchingMeetingStats);
+  const fetchMeetingStats = useMeetingsStore((state) => state.fetchMeetingStats);
 
   const campaigns = useCampaignStore((state) => state.campaigns);
   const fetchCampaigns = useCampaignStore((state) => state.fetchCampaigns);
@@ -84,10 +89,21 @@ export default function Meetings() {
     setView(nextView);
   }, []);
 
+  const meetingStatsKpis = useMemo(
+    () => (meetingStats ? buildMeetingStatsKpis(meetingStats) : []),
+    [meetingStats]
+  );
+  const conversionDefinition = meetingStats?.meta.conversion_definition;
+  const showStatsSkeleton = isFetchingMeetingStats && !meetingStats;
+
   // Refetch when opening the page; cache stays warm while switching list ↔ calendar.
   useEffect(() => {
     return () => invalidateMeetingsCache();
   }, [invalidateMeetingsCache]);
+
+  useEffect(() => {
+    void fetchMeetingStats();
+  }, [fetchMeetingStats]);
 
   useEffect(() => {
     if (view === "calendar") {
@@ -140,24 +156,38 @@ export default function Meetings() {
     <div className="space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <KPICard
-          label="Meetings This Week"
-          value="9"
-          delta={{ value: "3 vs last week", up: true }}
-          icon={CalendarCheck}
-        />
-        <KPICard
-          label="Meetings This Month"
-          value="37"
-          delta={{ value: "12% vs last month", up: true }}
-          icon={CalendarDays}
-        />
-        <KPICard
-          label="Conversion Rate"
-          value="4.4%"
-          delta={{ value: "0.6% vs last month", up: true }}
-          icon={Percent}
-        />
+        {showStatsSkeleton
+          ? Array.from({ length: MEETING_STATS_KPI_COUNT }, (_, i) => (
+              <DashboardKpiCardSkeleton key={`meeting-stats-skeleton-${i}`} />
+            ))
+          : meetingStatsKpis.map((kpi) => (
+              <KPICard
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                hint={kpi.hint}
+                delta={kpi.delta}
+                icon={kpi.icon}
+                accent={
+                  kpi.label === "Conversion Rate" && conversionDefinition ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          aria-label="How conversion rate is calculated"
+                        >
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
+                        {conversionDefinition}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : undefined
+                }
+              />
+            ))}
       </div>
 
       {/* Booked meetings — list or calendar (one at a time) */}

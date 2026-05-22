@@ -18,7 +18,7 @@ import { mapLeadApiToListRow } from "@/lib/leadPresentation";
 import type { LeadPresentationStatus } from "@/types";
 import { LeadDetailSheet } from "@/components/leads/lead-detail-sheet";
 import { LeadsTableSkeleton } from "@/components/skeletons/leads/leads-table-skeleton";
-import { UserAvatar } from "@/components/user-avatar";
+import { UserProfileAvatar } from "@/components/user-profile-avatar";
 import { TablePagination } from "@/components/layout/table-pagination";
 import {
   Search, Plus, FileSpreadsheet, MoreVertical, Eye, Send, Trash2, Pencil, X,
@@ -167,7 +167,7 @@ export default function Leads() {
                 <TableCell><Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggleOne(l.id)} /></TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
-                    <UserAvatar name={l.name} size={28} />
+                    <UserProfileAvatar name={l.name} size={28} />
                     <div>
                       <p className="text-sm font-medium leading-tight">{l.name}</p>
                       <p className="text-xs text-muted-foreground">{l.title}</p>

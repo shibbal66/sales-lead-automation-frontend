@@ -12,15 +12,10 @@ export interface GetDashboardSummaryResponse {
   data?: DashboardSummaryData;
 }
 
-export const DASHBOARD_PERIOD_VALUES = [
-  "last_7_days",
-  "last_30_days",
-  "this_month",
-  "last_90_days",
-  "custom"
-] as const;
-
-export type DashboardPeriod = (typeof DASHBOARD_PERIOD_VALUES)[number];
+export {
+  DASHBOARD_PERIOD_QUERY_VALUES as DASHBOARD_PERIOD_VALUES,
+  type DashboardPeriodQuery as DashboardPeriod
+} from "@/lib/periodQuery";
 
 export interface DashboardPerformanceSeriesPoint {
   date: string;
@@ -65,17 +60,13 @@ export interface DashboardActiveCampaign {
   progress: number;
 }
 
-export interface DashboardPagination {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
+export type { Pagination as DashboardPagination } from "@/types/pagination";
+import type { Pagination } from "@/types/pagination";
 
 export interface DashboardActiveCampaignsData {
   total_running: number;
   campaigns: DashboardActiveCampaign[];
-  pagination: DashboardPagination;
+  pagination: Pagination;
 }
 
 export interface GetDashboardActiveCampaignsResponse {
@@ -104,7 +95,7 @@ export interface GetDashboardRecentActivityResponse {
   success: boolean;
   message?: string;
   data?: DashboardRecentActivityItem[];
-  pagination?: DashboardPagination;
+  pagination?: Pagination;
 }
 
 export type DashboardRecentActivityQuery = {
