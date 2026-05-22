@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusPill } from "@/components/status-pill";
-import { UserAvatar } from "@/components/user-avatar";
+import { UserProfileAvatar } from "@/components/user-profile-avatar";
 import { LeadDetailSheetSkeleton } from "@/components/skeletons/leads/lead-detail-sheet-skeleton";
 import type { LeadApiModel } from "@/types";
 import type { LeadListRowViewModel } from "@/lib/leadPresentation";
@@ -166,7 +166,7 @@ export function LeadDetailSheet({
         {selectedLeadRow && selectedLead ? (
           <div className="flex h-full flex-col bg-background">
             <div className="flex items-start gap-4 border-b border-border bg-muted/25 p-6">
-              <UserAvatar name={selectedLeadRow.name} size={56} />
+              <UserProfileAvatar name={selectedLeadRow.name} size={56} />
               <div className="min-w-0 flex-1">
                 <h3 className="font-display text-xl font-bold text-foreground">{selectedLeadRow.name}</h3>
                 {[selectedLead.title, selectedLead.company].some((p) => !isLeadValueEmpty(p)) ? (

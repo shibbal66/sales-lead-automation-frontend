@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getMeetingStats } from "@/services/dashboard/dashboardServices";
 import {
   cancelMeeting as cancelMeetingApi,
   createMeeting as createMeetingApi,
@@ -22,6 +23,7 @@ import type {
   MeetingsListQuery,
   UpdateMeetingRequest
 } from "@/types/meeting";
+import type { MeetingStatsData } from "@/types/meetingStats";
 
 type MeetingsFetchMode = "list" | "calendar";
 
@@ -60,20 +62,24 @@ function replaceMeetingInLists(meeting: Meeting) {
 interface MeetingsStoreState {
   meetings: Meeting[];
   calendarMeetings: Meeting[];
+  meetingStats: MeetingStatsData | null;
   page: number;
   total: number;
   totalPages: number;
   isFetching: boolean;
   isFetchingCalendar: boolean;
+  isFetchingMeetingStats: boolean;
   isCreating: boolean;
   isUpdating: boolean;
   isCancelling: boolean;
   fetchMode: MeetingsFetchMode;
   listHydrated: boolean;
   calendarHydrated: boolean;
+  meetingStatsHydrated: boolean;
   filters: MeetingsStoreFilters;
   fetchMeetings: (options?: { page?: number; force?: boolean }) => Promise<void>;
   fetchCalendarMeetings: (options?: { force?: boolean }) => Promise<void>;
+  fetchMeetingStats: (options?: { force?: boolean }) => Promise<void>;
   applyFilters: (draft: MeetingsFilterDraft) => Promise<void>;
   createMeeting: (
     payload: CreateMeetingRequest,
@@ -93,18 +99,41 @@ interface MeetingsStoreState {
 export const useMeetingsStore = create<MeetingsStoreState>((set, get) => ({
   meetings: [],
   calendarMeetings: [],
+  meetingStats: null,
   page: 1,
   total: 0,
   totalPages: 0,
   isFetching: false,
   isFetchingCalendar: false,
+  isFetchingMeetingStats: false,
   isCreating: false,
   isUpdating: false,
   isCancelling: false,
   fetchMode: "list",
   listHydrated: false,
   calendarHydrated: false,
+  meetingStatsHydrated: false,
   filters: {},
+
+  fetchMeetingStats: async (options = {}) => {
+    if (!options.force && get().meetingStatsHydrated) {
+      return;
+    }
+
+    set({ isFetchingMeetingStats: true });
+    try {
+      const response = await getMeetingStats();
+      if (!response.success || !response.data) {
+        showApiErrorToast(response);
+        return;
+      }
+      set({ meetingStats: response.data, meetingStatsHydrated: true });
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      set({ isFetchingMeetingStats: false });
+    }
+  },
 
   fetchMeetings: async (options = {}) => {
     const page = options.page ?? get().page ?? 1;
@@ -176,7 +205,7 @@ export const useMeetingsStore = create<MeetingsStoreState>((set, get) => ({
   },
 
   invalidateCache: () => {
-    set({ listHydrated: false, calendarHydrated: false });
+    set({ listHydrated: false, calendarHydrated: false, meetingStatsHydrated: false });
   },
 
   refetchCurrent: async () => {
@@ -202,7 +231,7 @@ export const useMeetingsStore = create<MeetingsStoreState>((set, get) => ({
       });
       showApiSuccessToast(response.message || "Meeting created successfully.");
       get().invalidateCache();
-      await get().refetchCurrent();
+      await Promise.all([get().refetchCurrent(), get().fetchMeetingStats({ force: true })]);
       return meeting;
     } catch (error) {
       showApiErrorToast(error);
@@ -247,6 +276,7 @@ export const useMeetingsStore = create<MeetingsStoreState>((set, get) => ({
       });
       showApiSuccessToast(response.message || "Meeting cancelled successfully.");
       set(replaceMeetingInLists(meeting));
+      void get().fetchMeetingStats({ force: true });
       return meeting;
     } catch (error) {
       showApiErrorToast(error);

@@ -101,7 +101,7 @@ export function CampaignLeadsSection({ campaignId }: CampaignLeadsSectionProps) 
             <AlertDialogTitle>Remove lead from campaign?</AlertDialogTitle>
             <AlertDialogDescription>
               {deletingLead
-                ? `This will remove lead ${deletingLead.lead_data_id} from the campaign. This action cannot be undone.`
+                ? `This will remove the lead from the campaign. This action cannot be undone.`
                 : null}
             </AlertDialogDescription>
           </AlertDialogHeader>

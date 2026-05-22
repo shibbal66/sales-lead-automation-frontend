@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { useNotificationsStore } from "@/store/notifications/notificationsStore";
 
 export function AppShell() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const fetchUnreadCount = useNotificationsStore((state) => state.fetchUnreadCount);
+  const invalidateUnreadCount = useNotificationsStore((state) => state.invalidateUnreadCount);
+
+  useEffect(() => {
+    void fetchUnreadCount();
+    return () => {
+      invalidateUnreadCount();
+    };
+  }, [fetchUnreadCount, invalidateUnreadCount]);
 
   return (
     <div className="flex h-svh min-h-0 w-full overflow-hidden bg-background text-foreground">

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,26 +12,39 @@ import { billingHistory } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 import type { AuthUser } from "@/core/types/user.types";
 import {
-  User, Mail, CreditCard, Bell, AlertTriangle, Check,
+  User, Mail, CreditCard, Bell, AlertTriangle, Check, KeyRound,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
+import { showApiErrorToast } from "@/lib/apiToast";
 import { useAuthStore } from "@/store/auth/authStore";
 import { GoogleLinkCard } from "@/components/auth/google-link-card";
+import { PasswordField } from "@/components/settings/password-field";
+import { ProfileAvatarUpload } from "@/components/settings/profile-avatar-upload";
 import { profileTimezoneSelectOptions, PROFILE_TIMEZONE_OPTIONS } from "@/lib/profileTimezones";
 import {
   getUserDisplayEmail,
   getUserDisplayName,
   getUserInitials,
+  emptyPasswordFormState,
+  notificationPreferencesFromAuthUser,
   profileFormFromAuthUser,
-  type ProfileFormState
+  type NotificationPreferencesFormState
 } from "@/lib/userProfile";
+import {
+  profileSettingsSchema,
+  updatePasswordSchema,
+  type ProfileSettingsFormValues,
+  type UpdatePasswordFormValues
+} from "@/validators";
 
 const sections = [
   { id: "profile", label: "Profile", icon: User },
+  { id: "password", label: "Password", icon: KeyRound },
+  { id: "notifications", label: "Notifications", icon: Bell },
   { id: "email", label: "Email Accounts", icon: Mail },
   { id: "billing", label: "Subscription & Billing", icon: CreditCard },
   // { id: "team", label: "Team & Roles", icon: Users },
@@ -45,6 +60,16 @@ function settingsSectionFromTab(tab: string | null): SettingsSectionId {
     return tab as SettingsSectionId;
   }
   return "profile";
+}
+
+function emptyProfileFormDefaults(): ProfileSettingsFormValues {
+  return {
+    name: "",
+    email: "",
+    contact: "",
+    address: "",
+    timezone: PROFILE_TIMEZONE_OPTIONS[0].value
+  };
 }
 
 function formatUserRole(role?: string) {
@@ -88,9 +113,17 @@ export default function Settings() {
   const googleLink = useAuthStore((state) => state.googleLink);
   const profileLoading = useAuthStore((state) => state.profileLoading);
   const profileSaving = useAuthStore((state) => state.profileSaving);
+  const avatarUploading = useAuthStore((state) => state.avatarUploading);
+  const uploadAvatar = useAuthStore((state) => state.uploadAvatar);
+  const notificationPreferencesSaving = useAuthStore((state) => state.notificationPreferencesSaving);
+  const passwordSaving = useAuthStore((state) => state.passwordSaving);
   const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser);
   const saveProfile = useAuthStore((state) => state.saveProfile);
+  const saveNotificationPreferences = useAuthStore((state) => state.saveNotificationPreferences);
+  const savePassword = useAuthStore((state) => state.savePassword);
   const logoutAllDevices = useAuthStore((state) => state.logoutAllDevices);
+  const deleteAccount = useAuthStore((state) => state.deleteAccount);
+  const accountDeleting = useAuthStore((state) => state.accountDeleting);
   const section = settingsSectionFromTab(searchParams.get("tab"));
 
   const selectSection = (id: SettingsSectionId) => {
@@ -100,18 +133,33 @@ export default function Settings() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [logoutAllLoading, setLogoutAllLoading] = useState(false);
-  const [profileForm, setProfileForm] = useState<ProfileFormState>(() =>
-    user
-      ? profileFormFromAuthUser(user)
-      : {
-          name: "",
-          email: "",
-          contact: "",
-          address: "",
-          timezone: PROFILE_TIMEZONE_OPTIONS[0].value,
-          profilePic: ""
-        }
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferencesFormState>(() =>
+    user ? notificationPreferencesFromAuthUser(user) : { notificationsEnabled: true }
   );
+
+  const {
+    control: profileControl,
+    handleSubmit: handleProfileSubmit,
+    reset: resetProfileForm,
+    watch: watchProfile,
+    formState: { errors: profileErrors }
+  } = useForm<ProfileSettingsFormValues>({
+    resolver: zodResolver(profileSettingsSchema),
+    mode: "onChange",
+    defaultValues: user ? profileFormFromAuthUser(user) : emptyProfileFormDefaults()
+  });
+
+  const {
+    control: passwordControl,
+    handleSubmit: handlePasswordSubmit,
+    reset: resetPasswordForm,
+    trigger: triggerPasswordField,
+    formState: { errors: passwordErrors }
+  } = useForm<UpdatePasswordFormValues>({
+    resolver: zodResolver(updatePasswordSchema),
+    mode: "onChange",
+    defaultValues: emptyPasswordFormState
+  });
 
   useEffect(() => {
     void fetchCurrentUser();
@@ -119,14 +167,47 @@ export default function Settings() {
 
   useEffect(() => {
     if (!user || profileLoading || profileSaving) return;
-    setProfileForm(profileFormFromAuthUser(user));
-  }, [user, profileLoading, profileSaving]);
+    resetProfileForm(profileFormFromAuthUser(user));
+  }, [user, profileLoading, profileSaving, resetProfileForm]);
 
-  const onSaveProfile = () => saveProfile(profileForm);
+  useEffect(() => {
+    if (!user || profileLoading || notificationPreferencesSaving) return;
+    setNotificationPrefs(notificationPreferencesFromAuthUser(user));
+  }, [user, profileLoading, notificationPreferencesSaving]);
+
+  const onSaveProfile = handleProfileSubmit(async (data: ProfileSettingsFormValues) => {
+    await saveProfile(data);
+  });
+
+  const onNotificationToggle = async (checked: boolean) => {
+    const previous = notificationPrefs.notificationsEnabled;
+    setNotificationPrefs({ notificationsEnabled: checked });
+    const ok = await saveNotificationPreferences({ notificationsEnabled: checked });
+    if (!ok) {
+      setNotificationPrefs({ notificationsEnabled: previous });
+    }
+  };
+
+  const onSavePassword = handlePasswordSubmit(async (data) => {
+    const ok = await savePassword(data);
+    if (ok) {
+      resetPasswordForm(emptyPasswordFormState);
+    }
+  });
+
+  const onDeleteAccount = async () => {
+    const ok = await deleteAccount();
+    if (!ok) return;
+    setDeleteOpen(false);
+    setConfirmText("");
+    navigate("/login", { replace: true });
+  };
+
+  const profileTimezone = watchProfile("timezone");
 
   const timezoneOptions = useMemo(
-    () => profileTimezoneSelectOptions(profileForm.timezone),
-    [profileForm.timezone]
+    () => profileTimezoneSelectOptions(profileTimezone),
+    [profileTimezone]
   );
 
   const currentTeamMember = useMemo(() => {
@@ -168,67 +249,221 @@ export default function Settings() {
         {section === "profile" && (
           <Card className="p-6 shadow-card">
             <h3 className="font-display text-lg font-bold">Profile</h3>
-            <div className="mt-4 flex items-center gap-4">
-              <UserAvatarCircle user={user} className="h-16 w-16 text-lg" />
-              <Button variant="outline" disabled={profileLoading || profileSaving}>Upload Avatar</Button>
+            <div className="mt-6">
+              <ProfileAvatarUpload
+                user={user}
+                disabled={profileLoading || profileSaving || avatarUploading}
+                uploading={avatarUploading}
+                onUpload={(file) => void uploadAvatar(file)}
+                onInvalidFile={(message) => showApiErrorToast(message)}
+              />
             </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="profile-name">Full name</Label>
-                <Input
-                  id="profile-name"
-                  value={profileForm.name}
-                  disabled={profileLoading || profileSaving}
-                  onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))}
+            <form
+              noValidate
+              onSubmit={onSaveProfile}
+              className="mt-6 space-y-4"
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <Controller
+                  name="name"
+                  control={profileControl}
+                  render={({ field }) => (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="profile-name">Full name</Label>
+                      <Input
+                        id="profile-name"
+                        disabled={profileLoading || profileSaving || avatarUploading}
+                        aria-invalid={!!profileErrors.name}
+                        {...field}
+                      />
+                      {profileErrors.name?.message ? (
+                        <p className="text-xs text-destructive">{profileErrors.name.message}</p>
+                      ) : null}
+                    </div>
+                  )}
+                />
+                <Controller
+                  name="email"
+                  control={profileControl}
+                  render={({ field }) => (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="profile-email">Email</Label>
+                      <Input id="profile-email" disabled readOnly {...field} />
+                    </div>
+                  )}
+                />
+                <Controller
+                  name="contact"
+                  control={profileControl}
+                  render={({ field }) => (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="profile-contact">Phone</Label>
+                      <Input
+                        id="profile-contact"
+                        type="tel"
+                        placeholder="+1 555 000 0000"
+                        disabled={profileLoading || profileSaving || avatarUploading}
+                        aria-invalid={!!profileErrors.contact}
+                        {...field}
+                      />
+                      {profileErrors.contact?.message ? (
+                        <p className="text-xs text-destructive">{profileErrors.contact.message}</p>
+                      ) : null}
+                    </div>
+                  )}
+                />
+                <Controller
+                  name="address"
+                  control={profileControl}
+                  render={({ field }) => (
+                    <div className="space-y-1.5 md:col-span-2">
+                      <Label htmlFor="profile-address">Address</Label>
+                      <Input
+                        id="profile-address"
+                        placeholder="City, country"
+                        disabled={profileLoading || profileSaving || avatarUploading}
+                        aria-invalid={!!profileErrors.address}
+                        {...field}
+                      />
+                      {profileErrors.address?.message ? (
+                        <p className="text-xs text-destructive">{profileErrors.address.message}</p>
+                      ) : null}
+                    </div>
+                  )}
+                />
+                <Controller
+                  name="timezone"
+                  control={profileControl}
+                  render={({ field }) => (
+                    <div className="space-y-1.5">
+                      <Label>Timezone</Label>
+                      <Select
+                        value={field.value}
+                        disabled={profileLoading || profileSaving || avatarUploading}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger aria-invalid={!!profileErrors.timezone}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {timezoneOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {profileErrors.timezone?.message ? (
+                        <p className="text-xs text-destructive">{profileErrors.timezone.message}</p>
+                      ) : null}
+                    </div>
+                  )}
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="profile-email">Email</Label>
-                <Input id="profile-email" value={profileForm.email} disabled readOnly />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="profile-contact">Phone</Label>
-                <Input
-                  id="profile-contact"
-                  value={profileForm.contact}
-                  disabled={profileLoading || profileSaving}
-                  onChange={(event) => setProfileForm((current) => ({ ...current, contact: event.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5 md:col-span-2">
-                <Label htmlFor="profile-address">Address</Label>
-                <Input
-                  id="profile-address"
-                  value={profileForm.address}
-                  disabled={profileLoading || profileSaving}
-                  onChange={(event) => setProfileForm((current) => ({ ...current, address: event.target.value }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Timezone</Label>
-                <Select
-                  value={profileForm.timezone}
-                  disabled={profileLoading || profileSaving}
-                  onValueChange={(value) => setProfileForm((current) => ({ ...current, timezone: value }))}
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={profileLoading || profileSaving || avatarUploading}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {timezoneOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {profileSaving
+                    ? "Saving..."
+                    : avatarUploading
+                      ? "Uploading photo..."
+                      : profileLoading
+                        ? "Loading..."
+                        : "Save Changes"}
+                </Button>
               </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <Button
-                disabled={profileLoading || profileSaving}
-                onClick={() => void onSaveProfile()}
-              >
-                {profileSaving ? "Saving..." : profileLoading ? "Loading..." : "Save Changes"}
-              </Button>
+            </form>
+          </Card>
+        )}
+
+        {section === "password" && (
+          <Card className="p-6 shadow-card">
+            <h3 className="font-display text-lg font-bold">Password</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Update your password. You will need your current password to save changes.
+            </p>
+            <form
+              noValidate
+              onSubmit={onSavePassword}
+              className="mt-6 max-w-md space-y-4"
+            >
+              <Controller
+                name="oldPassword"
+                control={passwordControl}
+                render={({ field }) => (
+                  <PasswordField
+                    id="settings-old-password"
+                    label="Current password"
+                    value={field.value}
+                    disabled={profileLoading || passwordSaving}
+                    error={passwordErrors.oldPassword?.message}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <Controller
+                name="newPassword"
+                control={passwordControl}
+                render={({ field }) => (
+                  <PasswordField
+                    id="settings-new-password"
+                    label="New password"
+                    value={field.value}
+                    disabled={profileLoading || passwordSaving}
+                    error={passwordErrors.newPassword?.message}
+                    onChange={(value) => {
+                      field.onChange(value);
+                      void triggerPasswordField("confirmNewPassword");
+                    }}
+                  />
+                )}
+              />
+              <Controller
+                name="confirmNewPassword"
+                control={passwordControl}
+                render={({ field }) => (
+                  <PasswordField
+                    id="settings-confirm-password"
+                    label="Confirm new password"
+                    value={field.value}
+                    disabled={profileLoading || passwordSaving}
+                    error={passwordErrors.confirmNewPassword?.message}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
+              <div className="flex justify-end">
+                <Button type="submit" disabled={profileLoading || passwordSaving}>
+                  {passwordSaving ? "Updating..." : profileLoading ? "Loading..." : "Update password"}
+                </Button>
+              </div>
+            </form>
+          </Card>
+        )}
+
+        {section === "notifications" && (
+          <Card className="p-6 shadow-card">
+            <h3 className="font-display text-lg font-bold">Notification preferences</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Control whether you receive in-app and email notifications for replies, meetings, campaigns, and system updates.
+            </p>
+            <div className="mt-6 flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="notifications-enabled" className="text-base font-semibold">
+                  Enable notifications
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  When off, you will not receive new notification alerts until you turn this back on.
+                </p>
+              </div>
+              <Switch
+                id="notifications-enabled"
+                checked={notificationPrefs.notificationsEnabled}
+                disabled={profileLoading || notificationPreferencesSaving}
+                onCheckedChange={(checked) => void onNotificationToggle(checked)}
+              />
             </div>
           </Card>
         )}
@@ -469,7 +704,14 @@ export default function Settings() {
       </Dialog>
 
       {/* Delete */}
-      <Dialog open={deleteOpen} onOpenChange={(o) => { setDeleteOpen(o); if (!o) setConfirmText(""); }}>
+      <Dialog
+        open={deleteOpen}
+        onOpenChange={(o) => {
+          if (accountDeleting) return;
+          setDeleteOpen(o);
+          if (!o) setConfirmText("");
+        }}
+      >
         <DialogContent>
           <DialogHeader><DialogTitle className="text-destructive">Delete account?</DialogTitle></DialogHeader>
           <p className="text-sm text-muted-foreground">
@@ -477,13 +719,15 @@ export default function Settings() {
           </p>
           <Input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Type RAPIDAI" />
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={accountDeleting}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
-              disabled={confirmText !== "RAPIDAI"}
-              onClick={() => { setDeleteOpen(false); toast({ title: "Account deleted" }); }}
+              disabled={confirmText !== "RAPIDAI" || accountDeleting}
+              onClick={() => void onDeleteAccount()}
             >
-              Delete forever
+              {accountDeleting ? "Deleting..." : "Delete forever"}
             </Button>
           </div>
         </DialogContent>

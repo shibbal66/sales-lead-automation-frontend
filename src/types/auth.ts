@@ -12,6 +12,7 @@ export interface ApiAuthUserPayload {
   address?: string | null;
   contact?: string | null;
   timezone?: string | null;
+  notificationsEnabled?: boolean;
   avatarUrl?: string;
   authProvider?: string;
 }
@@ -41,7 +42,6 @@ export interface SignupRequest {
   email: string;
   password: string;
   name: string;
-  profile_pic: string;
   address: string;
   contact: string;
 }

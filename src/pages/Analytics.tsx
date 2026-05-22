@@ -1,19 +1,43 @@
-import { useState } from "react";
+import { useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { KPICard } from "@/components/kpi-card";
-import { Send, MailOpen, MessageSquare, CalendarCheck, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { CampaignChartTooltip } from "@/components/analytics/campaign-chart-tooltip";
+import { PeriodQuerySelect } from "@/components/shared/period-query-select";
+import { ReplyBreakdownTooltip } from "@/components/analytics/reply-breakdown-tooltip";
+import { ReplySparkline } from "@/components/analytics/reply-sparkline";
+import { SentVsRepliesTooltip } from "@/components/analytics/sent-vs-replies-tooltip";
+import { TablePagination } from "@/components/layout/table-pagination";
+import {
+  AnalyticsCampaignChartSkeleton,
+  AnalyticsReplyBreakdownChartSkeleton,
+  AnalyticsSentVsRepliesChartSkeleton,
+  DashboardKpiCardSkeleton
+} from "@/components/skeletons";
+import { TableRowsSkeleton } from "@/components/skeletons/shared/table-rows-skeleton";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell, LineChart, Line,
 } from "recharts";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { campaigns, replyBreakdown, weeklyBars, performanceSeries } from "@/lib/mock-data";
+import {
+  ANALYTICS_CAMPAIGN_CHART_EMPTY_MESSAGE,
+  ANALYTICS_CAMPAIGN_COMPARISON_EMPTY_MESSAGE,
+  ANALYTICS_OVERVIEW_KPI_COUNT,
+  ANALYTICS_REPLY_BREAKDOWN_EMPTY_MESSAGE,
+  ANALYTICS_SENT_VS_REPLIES_EMPTY_MESSAGE,
+  buildAnalyticsOverviewKpis,
+  campaignChartToLineChartData,
+  formatAnalyticsRatePercent,
+  formatCampaignChartAxisDate,
+  getSentVsRepliesSubtitle,
+  hasCampaignChartActivity,
+  replyBreakdownSegmentsToChartData,
+  sentVsRepliesSeriesToChartData
+} from "@/lib/analytics";
 import { StatusPill } from "@/components/status-pill";
 import { cn } from "@/lib/utils";
-
-const ranges = ["7d", "30d", "90d", "Custom"] as const;
-const pieColors = ["hsl(var(--primary))", "hsl(var(--brand-deep))", "hsl(var(--muted-foreground))", "hsl(var(--info))", "hsl(var(--border))"];
+import { PERIOD_QUERY_OPTIONS } from "@/lib/periodQuery";
+import { useAnalyticsStore } from "@/store/analytics/analyticsStore";
 
 function HealthBar({ label, value, threshold }: { label: string; value: number; threshold: { warn: number; bad: number } }) {
   const color = value >= threshold.bad ? "bg-destructive" : value >= threshold.warn ? "bg-warning" : "bg-success";
@@ -31,8 +55,105 @@ function HealthBar({ label, value, threshold }: { label: string; value: number; 
 }
 
 export default function Analytics() {
-  const [range, setRange] = useState<(typeof ranges)[number]>("30d");
-  const bounce = 1.4, spam = 0.3, unsub = 0.8;
+
+  const analyticsPeriod = useAnalyticsStore((state) => state.analyticsPeriod);
+  const analyticsCustomFrom = useAnalyticsStore((state) => state.analyticsCustomFrom);
+  const analyticsCustomTo = useAnalyticsStore((state) => state.analyticsCustomTo);
+  const setAnalyticsPeriod = useAnalyticsStore((state) => state.setAnalyticsPeriod);
+  const setAnalyticsCustomRange = useAnalyticsStore((state) => state.setAnalyticsCustomRange);
+
+  const overview = useAnalyticsStore((state) => state.overview);
+  const isFetchingOverview = useAnalyticsStore((state) => state.isFetchingOverview);
+  const fetchOverview = useAnalyticsStore((state) => state.fetchOverview);
+  const invalidateOverview = useAnalyticsStore((state) => state.invalidateOverview);
+
+  const sentVsReplies = useAnalyticsStore((state) => state.sentVsReplies);
+  const isFetchingSentVsReplies = useAnalyticsStore((state) => state.isFetchingSentVsReplies);
+  const fetchSentVsReplies = useAnalyticsStore((state) => state.fetchSentVsReplies);
+  const invalidateSentVsReplies = useAnalyticsStore((state) => state.invalidateSentVsReplies);
+
+  const replyBreakdown = useAnalyticsStore((state) => state.replyBreakdown);
+  const isFetchingReplyBreakdown = useAnalyticsStore((state) => state.isFetchingReplyBreakdown);
+  const fetchReplyBreakdown = useAnalyticsStore((state) => state.fetchReplyBreakdown);
+  const invalidateReplyBreakdown = useAnalyticsStore((state) => state.invalidateReplyBreakdown);
+
+  const campaignComparison = useAnalyticsStore((state) => state.campaignComparison);
+  const campaignComparisonPage = useAnalyticsStore((state) => state.campaignComparisonPage);
+  const campaignComparisonTotalPages = useAnalyticsStore((state) => state.campaignComparisonTotalPages);
+  const isFetchingCampaignComparison = useAnalyticsStore((state) => state.isFetchingCampaignComparison);
+  const fetchCampaignComparison = useAnalyticsStore((state) => state.fetchCampaignComparison);
+  const invalidateCampaignComparison = useAnalyticsStore((state) => state.invalidateCampaignComparison);
+
+  const campaignChart = useAnalyticsStore((state) => state.campaignChart);
+  const isFetchingCampaignChart = useAnalyticsStore((state) => state.isFetchingCampaignChart);
+  const fetchCampaignChart = useAnalyticsStore((state) => state.fetchCampaignChart);
+  const invalidateCampaignChart = useAnalyticsStore((state) => state.invalidateCampaignChart);
+
+  const isFetchingPeriodScoped =
+    isFetchingOverview ||
+    isFetchingSentVsReplies ||
+    isFetchingReplyBreakdown ||
+    isFetchingCampaignChart;
+
+  useEffect(() => {
+    void fetchOverview();
+    void fetchSentVsReplies();
+    void fetchReplyBreakdown();
+    void fetchCampaignComparison();
+    void fetchCampaignChart();
+    return () => {
+      invalidateOverview();
+      invalidateSentVsReplies();
+      invalidateReplyBreakdown();
+      invalidateCampaignComparison();
+      invalidateCampaignChart();
+    };
+  }, [
+    fetchOverview,
+    fetchSentVsReplies,
+    fetchReplyBreakdown,
+    fetchCampaignComparison,
+    fetchCampaignChart,
+    invalidateOverview,
+    invalidateSentVsReplies,
+    invalidateReplyBreakdown,
+    invalidateCampaignComparison,
+    invalidateCampaignChart
+  ]);
+
+  const overviewKpis = useMemo(
+    () => (overview ? buildAnalyticsOverviewKpis(overview) : []),
+    [overview]
+  );
+  const showOverviewSkeleton = isFetchingOverview && !overview;
+
+  const sentVsRepliesChartData = useMemo(
+    () => sentVsRepliesSeriesToChartData(sentVsReplies?.series),
+    [sentVsReplies]
+  );
+  const sentVsRepliesSubtitle = getSentVsRepliesSubtitle(sentVsReplies, isFetchingSentVsReplies);
+  const showSentVsRepliesSkeleton = isFetchingSentVsReplies && !sentVsReplies;
+
+  const replyBreakdownChartData = useMemo(
+    () => replyBreakdownSegmentsToChartData(replyBreakdown?.segments),
+    [replyBreakdown]
+  );
+  const showReplyBreakdownSkeleton = isFetchingReplyBreakdown && !replyBreakdown;
+  const showReplyBreakdownEmpty =
+    replyBreakdownChartData.length === 0 || (replyBreakdown?.total ?? 0) === 0;
+
+  const showCampaignComparisonSkeleton =
+    isFetchingCampaignComparison && campaignComparison.length === 0;
+
+  const { points: campaignChartPoints, campaigns: campaignChartMeta } = useMemo(
+    () => campaignChartToLineChartData(campaignChart),
+    [campaignChart]
+  );
+  const showCampaignChartSkeleton = isFetchingCampaignChart && !campaignChart;
+  const showCampaignChartEmpty =
+    campaignChartPoints.length === 0 ||
+    campaignChartMeta.length === 0 ||
+    !hasCampaignChartActivity(campaignChart);
 
   return (
     <div className="space-y-6">
@@ -41,137 +162,236 @@ export default function Analytics() {
           <h2 className="font-display text-2xl font-bold">Analytics</h2>
           <p className="text-sm text-muted-foreground">Performance across all campaigns</p>
         </div>
-        <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1">
-          {ranges.map((r) => (
-            <button
-              key={r}
-              onClick={() => setRange(r)}
-              className={cn(
-                "rounded-md px-3 py-1 text-xs font-semibold transition-colors",
-                range === r ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {r === "Custom" ? "Custom" : `Last ${r}`}
-            </button>
-          ))}
-        </div>
+        <PeriodQuerySelect
+          period={analyticsPeriod}
+          customFrom={analyticsCustomFrom}
+          customTo={analyticsCustomTo}
+          options={PERIOD_QUERY_OPTIONS}
+          disabled={isFetchingPeriodScoped}
+          idPrefix="analytics"
+          onPeriodChange={setAnalyticsPeriod}
+          onCustomRangeApply={setAnalyticsCustomRange}
+        />
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <KPICard label="Emails Sent" value="8,420" delta={{ value: "8.3%", up: true }} icon={Send} />
-        <KPICard label="Open Rate" value="62.8%" delta={{ value: "1.4%", up: true }} icon={MailOpen} />
-        <KPICard label="Reply Rate" value="14.6%" delta={{ value: "1.2%", up: true }} icon={MessageSquare} />
-        <KPICard label="Meetings Booked" value="37" delta={{ value: "5", up: true }} icon={CalendarCheck} />
+        {showOverviewSkeleton
+          ? Array.from({ length: ANALYTICS_OVERVIEW_KPI_COUNT }, (_, i) => (
+              <DashboardKpiCardSkeleton key={`analytics-overview-skeleton-${i}`} />
+            ))
+          : overviewKpis.map((kpi) => (
+              <KPICard
+                key={kpi.label}
+                label={kpi.label}
+                value={kpi.value}
+                hint={kpi.hint}
+                delta={kpi.delta}
+                icon={kpi.icon}
+                className={cn(isFetchingOverview && overview && "opacity-60")}
+              />
+            ))}
       </div>
 
       {/* Campaign Analytics — per-campaign performance over time */}
       <Card className="p-5 shadow-card">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h3 className="font-display text-base font-bold">Campaign Analytics</h3>
-            <p className="text-xs text-muted-foreground">Reply volume by campaign across the selected range</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-            {campaigns.slice(0, 4).map((c, i) => (
-              <span key={c.id} className="inline-flex items-center gap-1.5">
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: pieColors[i % pieColors.length] }}
-                />
-                {c.name}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="mt-4 h-[300px]">
-          <ResponsiveContainer>
-            <LineChart
-              data={performanceSeries.map((p, idx) => ({
-                day: p.day,
-                ...campaigns.slice(0, 4).reduce((acc, c, i) => {
-                  const base = (c.replyRate / 5) + Math.sin(idx / 2 + i) * 2 + i * 1.5;
-                  acc[c.name] = Math.max(0, Math.round(base + idx * 0.4));
-                  return acc;
-                }, {} as Record<string, number>),
-              }))}
-              margin={{ top: 10, right: 10, bottom: 0, left: -10 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis dataKey="day" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-              <Tooltip
-                contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12 }}
-              />
-              {campaigns.slice(0, 4).map((c, i) => (
-                <Line
-                  key={c.id}
-                  type="monotone"
-                  dataKey={c.name}
-                  stroke={pieColors[i % pieColors.length]}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {campaigns.slice(0, 4).map((c, i) => (
-            <div key={c.id} className="rounded-lg border border-border p-3">
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ background: pieColors[i % pieColors.length] }}
-                />
-                <p className="truncate text-xs font-medium text-muted-foreground">{c.name}</p>
+        {showCampaignChartSkeleton ? (
+          <AnalyticsCampaignChartSkeleton />
+        ) : (
+          <>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-display text-base font-bold">Campaign Analytics</h3>
+                <p className="text-xs text-muted-foreground">Reply volume by campaign</p>
               </div>
-              <p className="mt-1 font-display text-lg font-bold">{c.replyRate}%</p>
-              <p className="text-[11px] text-muted-foreground">{c.emailsSent.toLocaleString()} sent · {c.leadsAssigned} leads</p>
+              {campaignChartMeta.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                  {campaignChartMeta.map((c) => (
+                    <span key={c.id} className="inline-flex items-center gap-1.5">
+                      <span
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ background: c.color }}
+                      />
+                      {c.name}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
-          ))}
-        </div>
+            <div
+              className={cn(
+                "mt-4 h-[300px]",
+                isFetchingCampaignChart && campaignChart && "opacity-60"
+              )}
+            >
+              {showCampaignChartEmpty ? (
+                <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                  {ANALYTICS_CAMPAIGN_CHART_EMPTY_MESSAGE}
+                </div>
+              ) : (
+                <ResponsiveContainer>
+                  <LineChart data={campaignChartPoints} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      minTickGap={48}
+                      tickFormatter={formatCampaignChartAxisDate}
+                    />
+                    <YAxis
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      allowDecimals={false}
+                    />
+                    <Tooltip content={<CampaignChartTooltip />} />
+                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                    {campaignChartMeta.map((c) => (
+                      <Line
+                        key={c.id}
+                        type="monotone"
+                        dataKey={c.name}
+                        stroke={c.color}
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+            {campaignChartMeta.length > 0 ? (
+              <div
+                className={cn(
+                  "mt-5 grid gap-3",
+                  campaignChartMeta.length === 1
+                    ? "grid-cols-1"
+                    : campaignChartMeta.length === 2
+                      ? "grid-cols-2"
+                      : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-4"
+                )}
+              >
+                {campaignChartMeta.map((c) => (
+                  <div key={c.id} className="rounded-lg border border-border p-3">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-block h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: c.color }}
+                      />
+                      <p className="truncate text-xs font-medium text-muted-foreground">{c.name}</p>
+                    </div>
+                    <p className="mt-1 font-display text-lg font-bold">
+                      {c.totalReplies.toLocaleString()}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">replies in period</p>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </>
+        )}
       </Card>
 
       {/* Charts */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="p-5 shadow-card">
-          <h3 className="font-display text-base font-bold">Emails Sent vs Replies</h3>
-          <p className="text-xs text-muted-foreground">By week, last 4 weeks</p>
-          <div className="mt-4 h-[280px]">
-            <ResponsiveContainer>
-              <BarChart data={weeklyBars}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="week" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
-                <Tooltip
-                  contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12 }}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="sent" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} name="Sent" />
-                <Bar dataKey="replies" fill="hsl(var(--brand-deep))" radius={[6, 6, 0, 0]} name="Replies" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {showSentVsRepliesSkeleton ? (
+            <AnalyticsSentVsRepliesChartSkeleton />
+          ) : (
+            <>
+              <h3 className="font-display text-base font-bold">Emails Sent vs Replies</h3>
+              <p className="text-xs text-muted-foreground">{sentVsRepliesSubtitle}</p>
+              <div
+                className={cn(
+                  "mt-4 h-[280px]",
+                  isFetchingSentVsReplies && sentVsReplies && "opacity-60"
+                )}
+              >
+                {sentVsRepliesChartData.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    {ANALYTICS_SENT_VS_REPLIES_EMPTY_MESSAGE}
+                  </div>
+                ) : (
+                  <ResponsiveContainer>
+                    <BarChart data={sentVsRepliesChartData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis
+                        dataKey="week"
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        stroke="hsl(var(--muted-foreground))"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <Tooltip content={<SentVsRepliesTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Bar dataKey="sent" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} name="Sent" />
+                      <Bar
+                        dataKey="replies"
+                        fill="hsl(var(--brand-deep))"
+                        radius={[6, 6, 0, 0]}
+                        name="Replies"
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </>
+          )}
         </Card>
 
         <Card className="p-5 shadow-card">
-          <h3 className="font-display text-base font-bold">Reply Breakdown</h3>
-          <p className="text-xs text-muted-foreground">Distribution of replies by classification</p>
-          <div className="mt-4 h-[280px]">
-            <ResponsiveContainer>
-              <PieChart>
-                <Pie data={replyBreakdown} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95} paddingAngle={2}>
-                  {replyBreakdown.map((_, i) => (
-                    <Cell key={i} fill={pieColors[i % pieColors.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {showReplyBreakdownSkeleton ? (
+            <AnalyticsReplyBreakdownChartSkeleton />
+          ) : (
+            <>
+              <div>
+                <h3 className="font-display text-base font-bold">Reply Breakdown</h3>
+                <p className="text-xs text-muted-foreground">Outreach status distribution</p>
+              </div>
+              <div
+                className={cn(
+                  "mt-4 h-[280px]",
+                  isFetchingReplyBreakdown && replyBreakdown && "opacity-60"
+                )}
+              >
+                {showReplyBreakdownEmpty ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    {ANALYTICS_REPLY_BREAKDOWN_EMPTY_MESSAGE}
+                  </div>
+                ) : (
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie
+                        data={replyBreakdownChartData}
+                        dataKey="value"
+                        nameKey="name"
+                        innerRadius={60}
+                        outerRadius={95}
+                        paddingAngle={2}
+                      >
+                        {replyBreakdownChartData.map((segment) => (
+                          <Cell key={segment.key} fill={segment.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip content={<ReplyBreakdownTooltip />} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </>
+          )}
         </Card>
       </div>
 
@@ -193,53 +413,60 @@ export default function Analytics() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {campaigns.map((c, i) => (
-              <TableRow key={c.id} className="hover:bg-primary/5">
-                <TableCell className="font-medium">{c.name}</TableCell>
-                <TableCell>{c.leadsAssigned}</TableCell>
-                <TableCell>{c.emailsSent}</TableCell>
-                <TableCell>{(58 + i * 1.4).toFixed(1)}%</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs">{c.replyRate}%</span>
-                    <div className="h-6 w-20">
-                      <ResponsiveContainer>
-                        <LineChart data={performanceSeries.slice(0, 8)}>
-                          <Line type="monotone" dataKey="replies" stroke="hsl(var(--primary))" strokeWidth={1.5} dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
+            {showCampaignComparisonSkeleton ? (
+              <TableRowsSkeleton
+                rows={8}
+                cells={[
+                  { width: "w-40" },
+                  { width: "w-10" },
+                  { width: "w-12" },
+                  { width: "w-12" },
+                  { width: "w-28" },
+                  { width: "w-10" },
+                  { width: "w-16" }
+                ]}
+              />
+            ) : null}
+            {!showCampaignComparisonSkeleton && campaignComparison.length === 0 ? (
+              <TableRow className="hover:bg-transparent">
+                <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                  {ANALYTICS_CAMPAIGN_COMPARISON_EMPTY_MESSAGE}
                 </TableCell>
-                <TableCell>{Math.round(c.replyRate / 4)}</TableCell>
-                <TableCell><StatusPill status={c.status} /></TableCell>
               </TableRow>
-            ))}
+            ) : null}
+            {!showCampaignComparisonSkeleton
+              ? campaignComparison.map((row) => (
+                  <TableRow key={row.campaign_id} className="hover:bg-primary/5">
+                    <TableCell className="font-medium">{row.campaign_name}</TableCell>
+                    <TableCell>{row.leads.toLocaleString()}</TableCell>
+                    <TableCell>{row.emails_sent.toLocaleString()}</TableCell>
+                    <TableCell>{formatAnalyticsRatePercent(row.open_rate_percent)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs">
+                          {formatAnalyticsRatePercent(row.reply_rate_percent)}
+                        </span>
+                        <ReplySparkline values={row.reply_sparkline} />
+                      </div>
+                    </TableCell>
+                    <TableCell>{row.meetings.toLocaleString()}</TableCell>
+                    <TableCell>
+                      <StatusPill status={row.status} />
+                    </TableCell>
+                  </TableRow>
+                ))
+              : null}
           </TableBody>
         </Table>
+        {campaignComparisonTotalPages > 1 && !showCampaignComparisonSkeleton ? (
+          <TablePagination
+            currentPage={campaignComparisonPage}
+            totalPages={campaignComparisonTotalPages}
+            onPageChange={(nextPage) => void fetchCampaignComparison({ page: nextPage })}
+          />
+        ) : null}
       </Card>
 
-      {/* Deliverability */}
-      <Card className="p-5 shadow-card">
-        <div className="flex items-center justify-between">
-          <h3 className="font-display text-base font-bold">Deliverability Health</h3>
-          <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-semibold text-success">
-            <CheckCircle2 className="h-3 w-3" /> Healthy
-          </span>
-        </div>
-        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <HealthBar label="Bounce Rate" value={bounce} threshold={{ warn: 2, bad: 4 }} />
-          <HealthBar label="Spam Rate" value={spam} threshold={{ warn: 0.5, bad: 1 }} />
-          <HealthBar label="Unsubscribe Rate" value={unsub} threshold={{ warn: 1, bad: 2 }} />
-        </div>
-        <div className="mt-5 flex items-start gap-3 rounded-lg border border-warning/30 bg-warning/5 p-3">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-warning" />
-          <div className="text-sm">
-            <p className="font-semibold">All metrics within healthy thresholds.</p>
-            <p className="mt-0.5 text-muted-foreground">Tip: keep daily sending volume under 200/day per inbox to maintain reputation.</p>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }

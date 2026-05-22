@@ -21,20 +21,36 @@ export interface GetCurrentUserResponse {
   };
 }
 
+/** PATCH /user — send only fields the user is updating. */
 export interface UpdateUserProfileRequest {
   name?: string;
-  profilePic?: string;
   address?: string;
   contact?: string;
   /** IANA timezone identifier, e.g. `America/New_York`. */
   timezone?: string;
+  notificationsEnabled?: boolean;
+  oldPassword?: string;
+  password?: string;
 }
 
 export interface UpdateUserProfileResponse {
   success: boolean;
-  message: string;
+  message?: string;
   data?: {
     user: ApiUserProfile;
     google?: UserGoogleLinkData;
+  };
+}
+
+export interface DeleteUserAccountResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface UploadUserAvatarResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    user: ApiUserProfile;
   };
 }

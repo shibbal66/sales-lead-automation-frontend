@@ -11,7 +11,6 @@ export {
   DASHBOARD_PERFORMANCE_EMPTY_MESSAGE,
   DASHBOARD_PERFORMANCE_SERIES_LABELS,
   DEFAULT_DASHBOARD_PERIOD,
-  formatPerformanceDateRange,
   getDashboardPeriodLabel,
   getPerformanceSubtitle,
   isCustomPerformanceRangeValid,

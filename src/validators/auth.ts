@@ -1,13 +1,41 @@
 import { z } from "zod";
 
-/** Email: valid format, 5–254 chars, trimmed and lowercased */
-const emailSchema = z
+const HOSTNAME_LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+const MAX_TLD_LENGTH = 6;
+
+const hasValidEmailDomain = (email: string): boolean => {
+  const atIndex = email.lastIndexOf("@");
+  if (atIndex <= 0 || atIndex >= email.length - 1) {
+    return false;
+  }
+
+  const labels = email.slice(atIndex + 1).split(".");
+  if (labels.length < 2 || labels.some((label) => label.length === 0)) {
+    return false;
+  }
+
+  const tld = labels[labels.length - 1];
+  if (tld.length < 2 || tld.length > MAX_TLD_LENGTH || !/^[a-z]+$/i.test(tld)) {
+    return false;
+  }
+
+  return labels.every(
+    (label) => label.length <= 63 && HOSTNAME_LABEL_RE.test(label),
+  );
+};
+
+/** Email: valid format, 5–254 chars, trimmed and lowercased on parse. */
+export const emailSchema = z
   .string()
+  .trim()
+  .toLowerCase()
   .min(1, "Email is required")
-  .min(5, "Email must be at least 5 characters long")
   .max(254, "Email must be less than 254 characters long")
-  .email("Please provide a valid email address")
-  .transform((v) => v.trim().toLowerCase());
+  .email({ message: "Please provide a valid email address" })
+  .refine(hasValidEmailDomain, {
+    message: "Please provide a valid email address",
+  });
+
 
 /** Password: for login, only required (no complexity enforced). */
 const passwordRequiredSchema = z.string().min(1, "Password is required");
@@ -43,25 +71,68 @@ export const loginSchema = z.object({
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 
+// --- Shared profile fields ---
+export const nameSchema = z
+  .string()
+  .trim()
+  .min(1, "Name is required")
+  .max(100, "Name must be less than 100 characters");
+
+export const phoneSchema = z
+  .string()
+  .trim()
+  .min(1, "This field is required")
+  .min(10, "Phone must be at least 10 characters long")
+  .max(20, "Phone must be less than 20 characters long")
+  .regex(/^[\d\s+\-()]+$/, "Phone must contain only digits, spaces, +, -, (, )");
+
+export const addressSchema = z
+  .string()
+  .trim()
+  .min(5, "Address is too short")
+  .max(500, "Address is too long")
+  .refine(
+    (v) => (v.match(/[a-zA-Z]/g)?.length ?? 0) >= 3 && !/^\d+$/.test(v.replace(/\s/g, "")),
+    "Address must include letters and not be only numbers"
+  );
+
+/** Optional phone: empty allowed; if provided, uses phoneSchema rules. */
+export const optionalPhoneSchema = z
+  .string()
+  .trim()
+  .superRefine((value, ctx) => {
+    if (!value) return;
+    const result = phoneSchema.safeParse(value);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue(issue);
+      }
+    }
+  });
+
+/** Optional address: empty allowed; if provided, uses addressSchema rules. */
+export const optionalAddressSchema = z
+  .string()
+  .trim()
+  .superRefine((value, ctx) => {
+    if (!value) return;
+    const result = addressSchema.safeParse(value);
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        ctx.addIssue(issue);
+      }
+    }
+  });
+
 // --- Sign up ---
 export const signupSchema = z
   .object({
-    name: z
-      .string()
-      .trim()
-      .min(1, "Name is required")
-      .max(100, "Name must be less than 100 characters"),
+    name: nameSchema,
     email: emailSchema,
     password: strongPasswordSchema,
     confirmPassword: z.string().min(1, "Please confirm your password"),
-    address: z.string().trim(),
-    contact: z.string().trim(),
-    profile_pic: z
-      .string()
-      .trim()
-      .refine((v) => v === "" || z.string().url().safeParse(v).success, {
-        message: "Please enter a valid profile picture URL"
-      })
+    address: addressSchema,
+    contact: phoneSchema
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -70,14 +141,33 @@ export const signupSchema = z
 
 export type SignupFormValues = z.infer<typeof signupSchema>;
 
+/** POST /auth/signup body (no confirmPassword). */
 export const signupPayloadSchema = z.object({
   email: emailSchema,
   password: strongPasswordSchema,
-  name: z.string().trim().min(1, "Name is required"),
-  profile_pic: z.string(),
-  address: z.string(),
-  contact: z.string()
+  name: nameSchema,
+  address: addressSchema,
+  contact: phoneSchema
 });
+
+export type SignupPayload = z.infer<typeof signupPayloadSchema>;
+
+// --- Settings profile (PATCH /user) ---
+export const updateProfileSchema = z.object({
+  name: nameSchema,
+  contact: optionalPhoneSchema,
+  address: optionalAddressSchema,
+  timezone: z.string().trim().min(1, "Please select a timezone")
+});
+
+export type UpdateProfileFormValues = z.infer<typeof updateProfileSchema>;
+
+/** Settings profile form (includes read-only email). */
+export const profileSettingsSchema = updateProfileSchema.extend({
+  email: z.string()
+});
+
+export type ProfileSettingsFormValues = z.infer<typeof profileSettingsSchema>;
 
 // --- Forgot password / Request OTP ---
 export const forgotPasswordSchema = z.object({
@@ -137,7 +227,7 @@ export const resetPasswordSchema = z
 
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
-// --- Update password (PATCH /user/me): old + new required together, old !== new ---
+// --- Update password (PATCH /user): old + new required together, old !== new ---
 export const updatePasswordSchema = z
   .object({
     oldPassword: passwordRequiredSchema,

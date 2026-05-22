@@ -1,4 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,15 +13,10 @@ import { login } from "@/services/auth/authServices";
 import { useAuthStore } from "@/store/auth/authStore";
 import { getApiErrorMessage, showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { startGoogleOAuthRedirect } from "@/lib/googleAuth";
-import { loginSchema } from "@/validators";
+import { loginSchema, type LoginFormValues } from "@/validators";
 import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
 import { consumePendingAuthError, setPendingVerification } from "@/utils/authSorage";
 import { AUTH_ERROR_CODE } from "@/types/auth";
-
-type LoginErrors = {
-  email?: string;
-  password?: string;
-};
 
 function isEmailNotVerifiedPayload(payload: unknown): boolean {
   return (
@@ -33,11 +30,18 @@ export default function Login() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<LoginErrors>({});
   const setCredentials = useAuthStore((state) => state.setCredentials);
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors }
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    mode: "onChange",
+    defaultValues: { email: "", password: "" }
+  });
 
   useEffect(() => {
     const pendingMessage = consumePendingAuthError();
@@ -46,35 +50,23 @@ export default function Login() {
     }
   }, []);
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = loginSchema.safeParse({ email, password });
-    if (!parsed.success) {
-      const fieldErrors = parsed.error.flatten().fieldErrors;
-      setErrors({
-        email: fieldErrors.email?.[0],
-        password: fieldErrors.password?.[0]
-      });
-      return;
-    }
-    setErrors({});
-
+  const onSubmit = async (data: LoginFormValues) => {
     setLoading(true);
     try {
       const response = await login({
-        email: parsed.data.email,
-        password: parsed.data.password
+        email: data.email,
+        password: data.password
       });
 
       if (!response.success || !response.data) {
         if (response.code === AUTH_ERROR_CODE.EMAIL_NOT_VERIFIED) {
-          setPendingVerification({ email: parsed.data.email });
+          setPendingVerification({ email: data.email });
           showApiSuccessToast(
             response.message || "Email not verified. A new verification code has been sent to your email."
           );
           navigate("/verify-otp", {
             replace: true,
-            state: { email: parsed.data.email }
+            state: { email: data.email }
           });
           return;
         }
@@ -93,14 +85,14 @@ export default function Login() {
     } catch (error) {
       const errorBody = error instanceof AxiosError ? error.response?.data : error;
       if (isEmailNotVerifiedPayload(errorBody)) {
-        setPendingVerification({ email: parsed.data.email });
+        setPendingVerification({ email: data.email });
         showApiSuccessToast(
           getApiErrorMessage(errorBody) ||
             "Email not verified. A new verification code has been sent to your email."
         );
         navigate("/verify-otp", {
           replace: true,
-          state: { email: parsed.data.email }
+          state: { email: data.email }
         });
         return;
       }
@@ -123,53 +115,66 @@ export default function Login() {
       <h2 className="font-display text-2xl font-bold">Welcome back</h2>
       <p className="mt-1 text-sm text-muted-foreground">Sign in to your Rapid AI workspace.</p>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@company.com"
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              if (errors.email) setErrors((prev) => ({ ...prev, email: undefined }));
-            }}
-            required
-          />
-          {errors.email ? <p className="text-xs text-destructive">{errors.email}</p> : null}
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-xs font-medium text-brand-text hover:underline">
-              Forgot password?
-            </Link>
-          </div>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (errors.password) setErrors((prev) => ({ ...prev, password: undefined }));
-              }}
-              className="pr-10"
-              required
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.password ? <p className="text-xs text-destructive">{errors.password}</p> : null}
-        </div>
+      <form
+        noValidate
+        onSubmit={handleSubmit(onSubmit)}
+        className="mt-8 space-y-4"
+      >
+        <Controller
+          name="email"
+          control={control}
+          render={({ field }) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@company.com"
+                aria-invalid={!!errors.email}
+                {...field}
+              />
+              {errors.email?.message ? (
+                <p className="text-xs text-destructive">{errors.email.message}</p>
+              ) : null}
+            </div>
+          )}
+        />
+
+        <Controller
+          name="password"
+          control={control}
+          render={({ field }) => (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link to="/forgot-password" className="text-xs font-medium text-brand-text hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="pr-10"
+                  aria-invalid={!!errors.password}
+                  {...field}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {errors.password?.message ? (
+                <p className="text-xs text-destructive">{errors.password.message}</p>
+              ) : null}
+            </div>
+          )}
+        />
 
         <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Signing in..." : "Sign In"}

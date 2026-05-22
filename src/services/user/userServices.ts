@@ -1,9 +1,12 @@
 import apiInvoker from "@/lib/apiInvoker";
+import axiosInstance from "@/lib/axiosInstance";
 import { END_POINT } from "@/lib/apiURL";
 import type {
+  DeleteUserAccountResponse,
   GetCurrentUserResponse,
   UpdateUserProfileRequest,
-  UpdateUserProfileResponse
+  UpdateUserProfileResponse,
+  UploadUserAvatarResponse
 } from "@/types/user";
 
 export function getCurrentUser() {
@@ -12,4 +15,18 @@ export function getCurrentUser() {
 
 export function updateCurrentUser(payload: UpdateUserProfileRequest) {
   return apiInvoker<UpdateUserProfileResponse>(END_POINT.user.profile, "PATCH", payload);
+}
+
+export function deleteCurrentUser() {
+  return apiInvoker<DeleteUserAccountResponse>(END_POINT.user.profile, "DELETE");
+}
+
+export async function uploadUserAvatar(image: File) {
+  const formData = new FormData();
+  formData.append("image", image);
+  const response = await axiosInstance.post<UploadUserAvatarResponse>(
+    END_POINT.user.avatar,
+    formData
+  );
+  return response.data;
 }

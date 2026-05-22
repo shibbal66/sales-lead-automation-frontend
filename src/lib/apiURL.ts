@@ -24,19 +24,36 @@ export const END_POINT = {
   },
 
   user: {
-    profile: "/user"
+    profile: "/user",
+    avatar: "/user/avatar"
   } as const,
 
   dashboard: {
     summary: "/dashboard/summary",
     performance: "/dashboard/performance",
     activeCampaigns: "/dashboard/active-campaigns",
-    recentActivity: "/dashboard/recent-activity"
+    recentActivity: "/dashboard/recent-activity",
+    meetingStats: "/dashboard/meeting-stats"
   } as const,
 
   meeting: {
     list: "/meetings",
     create: "/meetings",
     byId: (id: string) => `/meetings/${id}`
+  } as const,
+
+  analytics: {
+    overview: "/analytics/overview",
+    sentVsReplies: "/analytics/sent-vs-replies",
+    replyBreakdown: "/analytics/reply-breakdown",
+    campaignComparison: "/analytics/campaign-comparison",
+    campaignChart: "/analytics/campaign-chart"
+  } as const,
+
+  notifications: {
+    list: "/notifications",
+    unreadCount: "/notifications/unread-count",
+    readAll: "/notifications/read-all",
+    readById: (id: string) => `/notifications/${id}/read`
   } as const
 };

@@ -13,6 +13,7 @@ export interface User {
   address?: string | null;
   contact?: string | null;
   timezone?: string | null;
+  notificationsEnabled?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }

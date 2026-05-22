@@ -5,7 +5,10 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth/authStore";
-import { getUserDisplayEmail, getUserDisplayName, getUserInitials } from "@/lib/userProfile";
+import { formatNotificationUnreadBadge } from "@/lib/notifications/unreadCount";
+import { getUserDisplayEmail, getUserDisplayName } from "@/lib/userProfile";
+import { UserProfileAvatar } from "@/components/user-profile-avatar";
+import { useNotificationsStore } from "@/store/notifications/notificationsStore";
 import {
   LayoutGrid, Users, Megaphone, Calendar, BarChart3, Settings, Bell,
   ChevronLeft, ChevronRight, Sparkles,
@@ -16,8 +19,8 @@ const items = [
   { to: "/leads", label: "Leads", icon: Users },
   { to: "/campaigns", label: "Campaigns", icon: Megaphone },
   { to: "/meetings", label: "Meetings", icon: Calendar },
-  // { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  // { to: "/notifications", label: "Notifications", icon: Bell, badge: 5 },
+  { to: "/analytics", label: "Analytics", icon: BarChart3 },
+  { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -43,9 +46,9 @@ function SidebarPanel({
   onNavigate,
 }: SidebarPanelProps) {
   const user = useAuthStore((state) => state.user);
-  const userInitials = getUserInitials(user);
   const userDisplayName = getUserDisplayName(user);
   const userDisplayEmail = getUserDisplayEmail(user);
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   return (
     <>
@@ -70,11 +73,11 @@ function SidebarPanel({
               <span className="active-bar pointer-events-none absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-primary opacity-0 transition-opacity" />
               <Icon className="h-[18px] w-[18px] shrink-0" />
               {!collapsed && <span className="flex-1">{item.label}</span>}
-              {/* {!collapsed && item.badge ? (
+              {!collapsed && item.to === "/notifications" && unreadCount > 0 ? (
                 <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold text-brand-text">
-                  {item.badge}
+                  {formatNotificationUnreadBadge(unreadCount)}
                 </span>
-              ) : null} */}
+              ) : null}
             </NavLink>
           );
         })}
@@ -87,9 +90,11 @@ function SidebarPanel({
             !collapsed && "bg-sidebar-accent/60",
           )}
         >
-          <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-brand text-sm font-semibold text-primary-foreground">
-            {userInitials}
-          </div>
+          <UserProfileAvatar
+            user={user}
+            className="h-9 w-9 shrink-0 ring-2 ring-sidebar-border"
+            initialsClassName="text-sm"
+          />
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold leading-tight">{userDisplayName}</p>

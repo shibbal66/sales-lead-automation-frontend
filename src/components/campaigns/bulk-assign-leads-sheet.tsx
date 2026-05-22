@@ -20,7 +20,7 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { TablePagination } from "@/components/layout/table-pagination";
-import { UserAvatar } from "@/components/user-avatar";
+import { UserProfileAvatar } from "@/components/user-profile-avatar";
 import { BulkAssignLeadsTableSkeleton } from "@/components/skeletons/leads/bulk-assign-leads-table-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getLeads } from "@/services/lead/leadServices";
@@ -335,7 +335,7 @@ export function BulkAssignLeadsSheet({
                       </TableCell>
                       <TableCell>
                         <div className="flex min-w-[140px] items-center gap-2">
-                          <UserAvatar name={row.name} size={28} />
+                          <UserProfileAvatar name={row.name} size={28} />
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium">{row.name}</p>
                             <p className="truncate text-xs text-muted-foreground">{row.title}</p>
