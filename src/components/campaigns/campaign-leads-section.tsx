@@ -32,6 +32,8 @@ export function CampaignLeadsSection({ campaignId }: CampaignLeadsSectionProps) 
     isUpdatingCampaignLead,
     isDeletingCampaignLead,
     handlePageChange,
+    statusFilter,
+    handleStatusFilterChange,
     bulkAssignLeads,
     saveCampaignLead,
     removeCampaignLead
@@ -71,6 +73,8 @@ export function CampaignLeadsSection({ campaignId }: CampaignLeadsSectionProps) 
           totalPages={totalPages}
           isLoading={isFetchingCampaignLeads}
           onPageChange={handlePageChange}
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
           onAssignClick={() => setAssignLeadsOpen(true)}
           onEditLead={setEditingLead}
           onDeleteLead={setDeletingLead}

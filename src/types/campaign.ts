@@ -115,11 +115,15 @@ export interface CampaignLeadApiModel {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  lead_name?: string | null;
+  lead_email?: string | null;
+  lead_company?: string | null;
 }
 
 export interface GetCampaignLeadsQuery {
   page?: number;
   limit?: number;
+  status?: CampaignLeadStatus;
 }
 
 export interface GetCampaignLeadsResponse {
@@ -166,8 +170,16 @@ export interface BulkAddCampaignLeadsResponse {
 }
 
 /** Allowed campaign-assignment lead statuses (API + edit dialog). */
-export const CAMPAIGN_LEAD_STATUSES = ["pending", "sent", "failed", "skipped"] as const;
+export const CAMPAIGN_LEAD_STATUSES = [
+  "pending",
+  "template_generated",
+  "sent",
+  "failed",
+  "skipped",
+] as const;
 export type CampaignLeadStatus = (typeof CAMPAIGN_LEAD_STATUSES)[number];
+
+export type CampaignLeadsStatusFilter = "all" | CampaignLeadStatus;
 
 export interface UpdateCampaignLeadRequest {
   status: CampaignLeadStatus;

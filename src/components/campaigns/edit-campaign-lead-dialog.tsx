@@ -67,7 +67,10 @@ export function EditCampaignLeadDialog({
         <DialogHeader>
           <DialogTitle>Edit campaign lead</DialogTitle>
           {lead ? (
-            <p className="text-sm text-muted-foreground">Lead ID: {lead.lead_data_id}</p>
+            <p className="text-sm text-muted-foreground">
+              {lead.lead_email?.trim() || `Lead ID: ${lead.lead_data_id}`}
+              {lead.lead_name?.trim() ? ` · ${lead.lead_name.trim()}` : ""}
+            </p>
           ) : null}
         </DialogHeader>
         <div className="space-y-4">

@@ -28,41 +28,15 @@ import { parseLeadsListResponse } from "@/lib/parseLeadsListResponse";
 import { mapLeadApiToListRow } from "@/lib/leadPresentation";
 import { showApiErrorToast } from "@/lib/apiToast";
 import { clampPage, getTotalPages } from "@/lib/listPagination";
-import type { GetLeadsQuery, LeadApiModel } from "@/types";
+import type { LeadApiModel } from "@/types";
+import {
+  EMPTY_LEADS_BROWSE_FILTERS,
+  leadsBrowseFiltersToQuery,
+  type LeadsBrowseFilters,
+} from "@/lib/leads/query";
 import { Plus, RotateCcw, Search } from "lucide-react";
 
-type LeadsBrowseFilters = {
-  search: string;
-  emailStatus: string;
-  country: string;
-  state: string;
-  city: string;
-  industry: string;
-};
-
-const EMPTY_FILTERS: LeadsBrowseFilters = {
-  search: "",
-  emailStatus: "",
-  country: "",
-  state: "",
-  city: "",
-  industry: ""
-};
-
 const PAGE_LIMIT = 20;
-
-function filtersToQuery(filters: LeadsBrowseFilters, page: number): GetLeadsQuery {
-  return {
-    page,
-    limit: PAGE_LIMIT,
-    search: filters.search.trim() || undefined,
-    emailStatus: filters.emailStatus.trim() || undefined,
-    country: filters.country.trim() || undefined,
-    state: filters.state.trim() || undefined,
-    city: filters.city.trim() || undefined,
-    industry: filters.industry.trim() || undefined
-  };
-}
 
 type BulkAssignLeadsSheetProps = {
   open: boolean;
@@ -79,8 +53,8 @@ export function BulkAssignLeadsSheet({
   onOpenChange,
   onAssign
 }: BulkAssignLeadsSheetProps) {
-  const [draftFilters, setDraftFilters] = useState<LeadsBrowseFilters>(EMPTY_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState<LeadsBrowseFilters>(EMPTY_FILTERS);
+  const [draftFilters, setDraftFilters] = useState<LeadsBrowseFilters>(EMPTY_LEADS_BROWSE_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<LeadsBrowseFilters>(EMPTY_LEADS_BROWSE_FILTERS);
   const [leads, setLeads] = useState<LeadApiModel[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -99,7 +73,14 @@ export function BulkAssignLeadsSheet({
   const loadLeads = useCallback(async (filters: LeadsBrowseFilters, nextPage: number) => {
     setIsFetching(true);
     try {
-      const response = await getLeads(filtersToQuery(filters, nextPage));
+      const response = await getLeads(
+        leadsBrowseFiltersToQuery(filters, {
+          page: nextPage,
+          limit: PAGE_LIMIT,
+          sortBy: "created_at",
+          sortOrder: "desc",
+        }),
+      );
       const parsed = parseLeadsListResponse(response, nextPage, PAGE_LIMIT);
       if (!parsed) {
         showApiErrorToast(response);
@@ -116,8 +97,8 @@ export function BulkAssignLeadsSheet({
   }, []);
 
   const resetSheetState = useCallback(() => {
-    setDraftFilters(EMPTY_FILTERS);
-    setAppliedFilters(EMPTY_FILTERS);
+    setDraftFilters(EMPTY_LEADS_BROWSE_FILTERS);
+    setAppliedFilters(EMPTY_LEADS_BROWSE_FILTERS);
     setSelected(new Set());
     setPage(1);
   }, []);
@@ -125,7 +106,7 @@ export function BulkAssignLeadsSheet({
   useEffect(() => {
     if (!open) return;
     resetSheetState();
-    void loadLeads(EMPTY_FILTERS, 1);
+    void loadLeads(EMPTY_LEADS_BROWSE_FILTERS, 1);
   }, [loadLeads, open, resetSheetState]);
 
   useEffect(() => {
@@ -147,10 +128,10 @@ export function BulkAssignLeadsSheet({
   };
 
   const handleResetFilters = () => {
-    setDraftFilters(EMPTY_FILTERS);
-    setAppliedFilters(EMPTY_FILTERS);
+    setDraftFilters(EMPTY_LEADS_BROWSE_FILTERS);
+    setAppliedFilters(EMPTY_LEADS_BROWSE_FILTERS);
     setSelected(new Set());
-    void loadLeads(EMPTY_FILTERS, 1);
+    void loadLeads(EMPTY_LEADS_BROWSE_FILTERS, 1);
   };
 
   const handlePageChange = (nextPage: number) => {

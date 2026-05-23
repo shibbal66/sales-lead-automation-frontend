@@ -3,6 +3,7 @@ import axiosInstance from "@/lib/axiosInstance";
 import { END_POINT } from "@/lib/apiURL";
 import type {
   DeleteUserAccountResponse,
+  DeleteUserAvatarResponse,
   GetCurrentUserResponse,
   UpdateUserProfileRequest,
   UpdateUserProfileResponse,
@@ -29,4 +30,8 @@ export async function uploadUserAvatar(image: File) {
     formData
   );
   return response.data;
+}
+
+export function deleteUserAvatar() {
+  return apiInvoker<DeleteUserAvatarResponse>(END_POINT.user.avatar, "DELETE");
 }

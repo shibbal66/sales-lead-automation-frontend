@@ -418,9 +418,6 @@ export function CampaignDetail({
                 <p className="text-xs text-destructive">{errors.mailTemplateSamples}</p>
               ) : null}
             </div>
-            <Button className="mt-4" variant="secondary" onClick={() => setPreviewOpen(true)}>
-              <Sparkles className="h-4 w-4" /> Generate Preview Email
-            </Button>
           </Card>
 
           <Card className="p-5 shadow-card">
@@ -636,27 +633,6 @@ export function CampaignDetail({
             <Button onClick={() => void handleCreateFollowUp()} disabled={isCreatingCampaignFollowUp}>
               {isCreatingCampaignFollowUp ? "Adding..." : "Add step"}
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>AI Preview Email</DialogTitle></DialogHeader>
-          <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
-            <div>
-              <p className="text-[11px] font-semibold uppercase text-muted-foreground">Subject</p>
-              <p className="font-semibold">Quick idea for Vertex&apos;s SDR team</p>
-            </div>
-            <div className="prose prose-sm max-w-none text-sm leading-relaxed">
-              <p>Hi Sarah,</p>
-              <p>Noticed Vertex just expanded the SDR team after the Series B — congrats.</p>
-              <p>Worth a 15-min chat next week?</p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setPreviewOpen(false)}><X className="h-4 w-4" /> Close</Button>
-            <Button><Sparkles className="h-4 w-4" /> Regenerate</Button>
           </div>
         </DialogContent>
       </Dialog>

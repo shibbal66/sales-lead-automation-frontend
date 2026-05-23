@@ -266,7 +266,7 @@ export function CreateMeetingDialog({
 
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="meeting-title">Title</Label>
+              <Label htmlFor="meeting-title">Title <span className="text-xs text-red-500">*</span></Label>
               <Input
                 id="meeting-title"
                 value={form.title}
@@ -353,7 +353,7 @@ export function CreateMeetingDialog({
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="meeting-attendee">Attendee email</Label>
+              <Label htmlFor="meeting-attendee">Attendee email <span className="text-xs text-red-500">*</span></Label>
               <Input
                 id="meeting-attendee"
                 type="email"

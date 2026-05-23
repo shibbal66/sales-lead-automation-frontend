@@ -31,7 +31,6 @@ export function UserProfileAvatar({
   if (avatarUrl) {
     return (
       <img
-        key={avatarUrl}
         src={avatarUrl}
         alt={displayName}
         style={sizeStyle}

@@ -168,24 +168,7 @@ export default function Meetings() {
                 hint={kpi.hint}
                 delta={kpi.delta}
                 icon={kpi.icon}
-                accent={
-                  kpi.label === "Conversion Rate" && conversionDefinition ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="grid h-9 w-9 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          aria-label="How conversion rate is calculated"
-                        >
-                          <Info className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-xs text-xs leading-relaxed">
-                        {conversionDefinition}
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : undefined
-                }
+              
               />
             ))}
       </div>
@@ -207,7 +190,6 @@ export default function Meetings() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <Button variant="outline">Export CSV</Button>
           </div>
         </div>
 

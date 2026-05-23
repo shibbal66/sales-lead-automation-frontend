@@ -36,19 +36,14 @@ export const useLeadStore = create<LeadStoreState>((set, get) => ({
 
   fetchLeads: async (query = {}) => {
     const { page: currentPage, limit: currentLimit } = get();
-    const { page = currentPage, limit = currentLimit, search, emailStatus, country, state, city, industry } =
-      query;
+    const page = query.page ?? currentPage;
+    const limit = query.limit ?? currentLimit;
     set({ isFetching: true });
     try {
       const response = await getLeadsApi({
+        ...query,
         page,
         limit,
-        search,
-        emailStatus,
-        country,
-        state,
-        city,
-        industry
       });
       if (!response.success) {
         showApiErrorToast(response);

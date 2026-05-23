@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  isValidOptionalPhoneNumber,
+  isValidPhoneNumber,
+  parsePhoneNumber,
+  phoneLocalNumberSchemaForIso
+} from "@/lib/phoneNumber";
 
 const HOSTNAME_LABEL_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
 const MAX_TLD_LENGTH = 6;
@@ -78,13 +84,26 @@ export const nameSchema = z
   .min(1, "Name is required")
   .max(100, "Name must be less than 100 characters");
 
+/** Full phone stored as E.164 (+countryCode + national digits). */
 export const phoneSchema = z
   .string()
   .trim()
-  .min(1, "This field is required")
-  .min(10, "Phone must be at least 10 characters long")
-  .max(20, "Phone must be less than 20 characters long")
-  .regex(/^[\d\s+\-()]+$/, "Phone must contain only digits, spaces, +, -, (, )");
+  .min(1, "Phone is required")
+  .superRefine((value, ctx) => {
+    if (isValidPhoneNumber(value)) return;
+    const parsed = parsePhoneNumber(value);
+    const localResult = phoneLocalNumberSchemaForIso(parsed.iso).safeParse(parsed.local);
+    if (!localResult.success) {
+      for (const issue of localResult.error.issues) {
+        ctx.addIssue(issue);
+      }
+      return;
+    }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Please enter a valid phone number"
+    });
+  });
 
 export const addressSchema = z
   .string()
@@ -102,12 +121,19 @@ export const optionalPhoneSchema = z
   .trim()
   .superRefine((value, ctx) => {
     if (!value) return;
-    const result = phoneSchema.safeParse(value);
-    if (!result.success) {
-      for (const issue of result.error.issues) {
+    if (isValidOptionalPhoneNumber(value)) return;
+    const parsed = parsePhoneNumber(value);
+    const localResult = phoneLocalNumberSchemaForIso(parsed.iso).safeParse(parsed.local);
+    if (!localResult.success) {
+      for (const issue of localResult.error.issues) {
         ctx.addIssue(issue);
       }
+      return;
     }
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Please enter a valid phone number"
+    });
   });
 
 /** Optional address: empty allowed; if provided, uses addressSchema rules. */

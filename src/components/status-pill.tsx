@@ -29,12 +29,16 @@ export function StatusPill({
     failed: "bg-destructive/10 text-destructive border-destructive/20",
     enriched: "bg-primary/15 text-brand-text border-primary/20",
     pending: "bg-muted text-muted-foreground border-border",
+    template_generated: "bg-info/15 text-info border-info/20",
     sent: "bg-primary/15 text-brand-text border-primary/20",
     skipped: "bg-muted text-muted-foreground border-border",
   };
   const label =
     typeof status === "string" && status.length > 0
-      ? status[0].toUpperCase() + status.slice(1)
+      ? status
+          .split("_")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join(" ")
       : status;
   return (
     <span

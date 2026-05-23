@@ -16,6 +16,7 @@ import type {
   BulkAddCampaignLeadsRequest,
   CampaignApiModel,
   CampaignLeadApiModel,
+  CampaignLeadStatus,
   CampaignStatus,
   CreateCampaignRequest,
   GetCampaignByIdResponse,
@@ -75,6 +76,7 @@ interface CampaignStoreState {
   campaignLeadsTotal: number;
   campaignLeadsPage: number;
   campaignLeadsLimit: number;
+  campaignLeadsStatusFilter: CampaignLeadStatus | undefined;
   isFetchingCampaignLeads: boolean;
   isAddingCampaignLead: boolean;
   isBulkAddingCampaignLeads: boolean;
@@ -87,6 +89,7 @@ interface CampaignStoreState {
   fetchCampaignById: (campaignId: string) => Promise<CampaignApiModel>;
   fetchCampaignLeads: (campaignId: string, query?: GetCampaignLeadsQuery) => Promise<void>;
   setCampaignLeadsPage: (page: number) => void;
+  setCampaignLeadsStatusFilter: (status: CampaignLeadStatus | undefined) => void;
   addCampaignLead: (campaignId: string, payload: AddCampaignLeadRequest) => Promise<CampaignLeadApiModel>;
   bulkAddCampaignLeads: (campaignId: string, payload: BulkAddCampaignLeadsRequest) => Promise<string>;
   updateCampaignLead: (
@@ -116,6 +119,7 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
   campaignLeadsTotal: 0,
   campaignLeadsPage: 1,
   campaignLeadsLimit: 20,
+  campaignLeadsStatusFilter: undefined,
   isFetchingCampaignLeads: false,
   isAddingCampaignLead: false,
   isBulkAddingCampaignLeads: false,
@@ -226,12 +230,17 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
   },
 
   fetchCampaignLeads: async (campaignId, query = {}) => {
-    const { campaignLeadsPage, campaignLeadsLimit } = get();
+    const { campaignLeadsPage, campaignLeadsLimit, campaignLeadsStatusFilter } = get();
     const page = query.page ?? campaignLeadsPage;
     const limit = query.limit ?? campaignLeadsLimit;
+    const status = query.status ?? campaignLeadsStatusFilter;
     set({ isFetchingCampaignLeads: true });
     try {
-      const response = await getCampaignLeadsApi(campaignId, { page, limit });
+      const response = await getCampaignLeadsApi(campaignId, {
+        page,
+        limit,
+        ...(status ? { status } : {}),
+      });
       const parsed = parseCampaignLeadsSuccess(response, page, limit);
       if (!parsed) {
         showApiErrorToast(response);
@@ -326,6 +335,8 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
 
   setCampaignLeadsPage: (page) => set({ campaignLeadsPage: page }),
 
+  setCampaignLeadsStatusFilter: (status) => set({ campaignLeadsStatusFilter: status }),
+
   clearSelectedCampaign: () => set({ selectedCampaign: null }),
 
   clearCampaignLeads: () =>
@@ -333,6 +344,7 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
       campaignLeads: [],
       campaignLeadsTotal: 0,
       campaignLeadsPage: 1,
-      campaignLeadsLimit: 20
+      campaignLeadsLimit: 20,
+      campaignLeadsStatusFilter: undefined,
     })
 }));

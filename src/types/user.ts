@@ -54,3 +54,11 @@ export interface UploadUserAvatarResponse {
     user: ApiUserProfile;
   };
 }
+
+export interface DeleteUserAvatarResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    user: ApiUserProfile;
+  };
+}

@@ -2,7 +2,11 @@ import { useCallback, useEffect } from "react";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { clampPage, getTotalPages } from "@/lib/listPagination";
-import type { UpdateCampaignLeadRequest } from "@/types";
+import type {
+  CampaignLeadStatus,
+  CampaignLeadsStatusFilter,
+  UpdateCampaignLeadRequest,
+} from "@/types";
 
 export function useCampaignLeads(campaignId: string) {
   const campaignLeads = useCampaignStore((state) => state.campaignLeads);
@@ -21,17 +25,41 @@ export function useCampaignLeads(campaignId: string) {
   const deleteCampaignLead = useCampaignStore((state) => state.deleteCampaignLead);
   const clearCampaignLeads = useCampaignStore((state) => state.clearCampaignLeads);
   const setCampaignLeadsPage = useCampaignStore((state) => state.setCampaignLeadsPage);
+  const campaignLeadsStatusFilter = useCampaignStore(
+    (state) => state.campaignLeadsStatusFilter,
+  );
+  const setCampaignLeadsStatusFilter = useCampaignStore(
+    (state) => state.setCampaignLeadsStatusFilter,
+  );
 
   const totalPages = getTotalPages(campaignLeadsTotal, campaignLeadsLimit);
+  const statusFilter: CampaignLeadsStatusFilter =
+    campaignLeadsStatusFilter ?? "all";
 
   useEffect(() => {
     clearCampaignLeads();
     setCampaignLeadsPage(1);
-  }, [campaignId, clearCampaignLeads, setCampaignLeadsPage]);
+    setCampaignLeadsStatusFilter(undefined);
+  }, [
+    campaignId,
+    clearCampaignLeads,
+    setCampaignLeadsPage,
+    setCampaignLeadsStatusFilter,
+  ]);
 
   useEffect(() => {
-    void fetchCampaignLeads(campaignId, { page: campaignLeadsPage, limit: campaignLeadsLimit });
-  }, [campaignId, campaignLeadsPage, campaignLeadsLimit, fetchCampaignLeads]);
+    void fetchCampaignLeads(campaignId, {
+      page: campaignLeadsPage,
+      limit: campaignLeadsLimit,
+      status: campaignLeadsStatusFilter,
+    });
+  }, [
+    campaignId,
+    campaignLeadsPage,
+    campaignLeadsLimit,
+    campaignLeadsStatusFilter,
+    fetchCampaignLeads,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -57,7 +85,15 @@ export function useCampaignLeads(campaignId: string) {
     (page: number) => {
       setCampaignLeadsPage(clampPage(page, totalPages));
     },
-    [setCampaignLeadsPage, totalPages]
+    [setCampaignLeadsPage, totalPages],
+  );
+
+  const handleStatusFilterChange = useCallback(
+    (value: CampaignLeadsStatusFilter) => {
+      setCampaignLeadsStatusFilter(value === "all" ? undefined : value);
+      setCampaignLeadsPage(1);
+    },
+    [setCampaignLeadsPage, setCampaignLeadsStatusFilter],
   );
 
   const assignLead = useCallback(
@@ -158,6 +194,8 @@ export function useCampaignLeads(campaignId: string) {
     isUpdatingCampaignLead,
     isDeletingCampaignLead,
     handlePageChange,
+    statusFilter,
+    handleStatusFilterChange,
     assignLead,
     bulkAssignLeads,
     saveCampaignLead,

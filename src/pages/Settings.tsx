@@ -10,7 +10,6 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { billingHistory } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
-import type { AuthUser } from "@/core/types/user.types";
 import {
   User, Mail, CreditCard, Bell, AlertTriangle, Check, KeyRound,
 } from "lucide-react";
@@ -22,13 +21,14 @@ import { toast } from "@/hooks/use-toast";
 import { showApiErrorToast } from "@/lib/apiToast";
 import { useAuthStore } from "@/store/auth/authStore";
 import { GoogleLinkCard } from "@/components/auth/google-link-card";
+import { PhoneNumberField } from "@/components/shared/phone-number-field";
 import { PasswordField } from "@/components/settings/password-field";
 import { ProfileAvatarUpload } from "@/components/settings/profile-avatar-upload";
+import { UserProfileAvatar } from "@/components/user-profile-avatar";
 import { profileTimezoneSelectOptions, PROFILE_TIMEZONE_OPTIONS } from "@/lib/profileTimezones";
 import {
   getUserDisplayEmail,
   getUserDisplayName,
-  getUserInitials,
   emptyPasswordFormState,
   notificationPreferencesFromAuthUser,
   profileFormFromAuthUser,
@@ -80,32 +80,6 @@ function formatUserRole(role?: string) {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function UserAvatarCircle({ user, className }: { user: AuthUser | null; className?: string }) {
-  const displayName = getUserDisplayName(user);
-  const initials = getUserInitials(user);
-
-  if (user?.avatarUrl) {
-    return (
-      <img
-        src={user.avatarUrl}
-        alt={displayName}
-        className={cn("rounded-full object-cover", className)}
-      />
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "grid place-items-center rounded-full bg-gradient-brand font-bold text-primary-foreground",
-        className
-      )}
-    >
-      {initials}
-    </div>
-  );
-}
-
 export default function Settings() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -115,6 +89,7 @@ export default function Settings() {
   const profileSaving = useAuthStore((state) => state.profileSaving);
   const avatarUploading = useAuthStore((state) => state.avatarUploading);
   const uploadAvatar = useAuthStore((state) => state.uploadAvatar);
+  const deleteAvatar = useAuthStore((state) => state.deleteAvatar);
   const notificationPreferencesSaving = useAuthStore((state) => state.notificationPreferencesSaving);
   const passwordSaving = useAuthStore((state) => state.passwordSaving);
   const fetchCurrentUser = useAuthStore((state) => state.fetchCurrentUser);
@@ -255,6 +230,7 @@ export default function Settings() {
                 disabled={profileLoading || profileSaving || avatarUploading}
                 uploading={avatarUploading}
                 onUpload={(file) => void uploadAvatar(file)}
+                onDelete={() => void deleteAvatar()}
                 onInvalidFile={(message) => showApiErrorToast(message)}
               />
             </div>
@@ -296,20 +272,14 @@ export default function Settings() {
                   name="contact"
                   control={profileControl}
                   render={({ field }) => (
-                    <div className="space-y-1.5">
-                      <Label htmlFor="profile-contact">Phone</Label>
-                      <Input
-                        id="profile-contact"
-                        type="tel"
-                        placeholder="+1 555 000 0000"
-                        disabled={profileLoading || profileSaving || avatarUploading}
-                        aria-invalid={!!profileErrors.contact}
-                        {...field}
-                      />
-                      {profileErrors.contact?.message ? (
-                        <p className="text-xs text-destructive">{profileErrors.contact.message}</p>
-                      ) : null}
-                    </div>
+                    <PhoneNumberField
+                      id="profile-contact"
+                      label="Phone"
+                      value={field.value}
+                      disabled={profileLoading || profileSaving || avatarUploading}
+                      onChange={field.onChange}
+                      error={profileErrors.contact?.message}
+                    />
                   )}
                 />
                 <Controller
@@ -607,7 +577,11 @@ export default function Settings() {
               <div className="mt-4 space-y-2">
                 {currentTeamMember ? (
                   <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-                    <UserAvatarCircle user={user} className="h-9 w-9 text-xs" />
+                    <UserProfileAvatar
+                      user={user}
+                      size={36}
+                      initialsClassName="text-xs font-bold"
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold">{currentTeamMember.name}</p>
                       <p className="text-xs text-muted-foreground">{currentTeamMember.email}</p>
