@@ -43,12 +43,19 @@ export function getCampaignById(campaignId: string) {
   return apiInvoker<GetCampaignByIdResponse>(`${END_POINT.campaign.create}/${campaignId}`, "GET");
 }
 
-export function getCampaignLeads(campaignId: string, { page = 1, limit = 20 }: GetCampaignLeadsQuery = {}) {
+export function getCampaignLeads(
+  campaignId: string,
+  { page = 1, limit = 20, status }: GetCampaignLeadsQuery = {},
+) {
   return apiInvoker<GetCampaignLeadsResponse>(
     `${END_POINT.campaign.create}/${campaignId}/leads`,
     "GET",
     undefined,
-    { page, limit }
+    {
+      page,
+      limit,
+      ...(status ? { status } : {}),
+    },
   );
 }
 

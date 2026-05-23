@@ -109,9 +109,6 @@ export function Topbar({ onMenuClick }: TopbarProps) {
             <DropdownMenuItem onClick={() => navigate("/settings?tab=billing")}>
               Billing
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/settings?tab=team")}>
-              Team
-            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive"

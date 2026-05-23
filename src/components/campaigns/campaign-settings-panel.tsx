@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,15 +69,29 @@ export function CampaignSettingsPanel({
   onTargetLeadsChange,
   onStatusChange,
 }: CampaignSettingsPanelProps) {
+  const nameRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    const el = nameRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [name]);
+
   return (
     <Card className="p-5 shadow-card">
       <div className="flex items-start justify-between gap-3">
-        <input
+        <textarea
+          ref={nameRef}
+          rows={1}
           value={name}
+          aria-label="Campaign name"
           onChange={(event) => onNameChange(event.target.value)}
-          className="w-full bg-transparent font-display text-lg font-bold focus:outline-none focus:ring-0"
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.preventDefault();
+          }}
+          className="w-full resize-none overflow-hidden break-words border-0 bg-transparent p-0 font-display text-lg font-bold outline-none ring-0 focus:outline-none focus:ring-0"
         />
-        <Pencil className="h-4 w-4 shrink-0 text-muted-foreground" />
       </div>
       <FieldError message={errors.name} />
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
+import { avatarSourcesMatch, mapApiUserToAuthUser, normalizeAvatarSource } from "@/lib/mapAuthUser";
 import type { ApiUserProfile } from "@/types/user";
 
 const apiUser: ApiUserProfile = {
@@ -33,5 +33,11 @@ describe("mapApiUserToAuthUser", () => {
   it("returns no avatarUrl when profilePic is empty", () => {
     const user = mapApiUserToAuthUser({ ...apiUser, profilePic: null });
     expect(user.avatarUrl).toBeUndefined();
+  });
+
+  it("treats cache-busted URLs as the same source", () => {
+    const busted = `${apiUser.profilePic}?v=1234567890`;
+    expect(avatarSourcesMatch(apiUser.profilePic, busted)).toBe(true);
+    expect(normalizeAvatarSource(busted)).toBe(apiUser.profilePic);
   });
 });

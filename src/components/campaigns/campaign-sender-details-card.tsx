@@ -1,3 +1,4 @@
+import { PhoneNumberField } from "@/components/shared/phone-number-field";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +55,7 @@ export function CampaignSenderDetailsCard({
         ) : null}
       </div>
 
-      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-4 flex gap-4 flex-wrap ">
         <div className="space-y-1.5">
           <Label htmlFor="sender-display-name" className="flex items-center gap-1.5 text-xs">
             <User className="h-3.5 w-3.5" /> Display name
@@ -69,6 +70,22 @@ export function CampaignSenderDetailsCard({
             <p className="text-xs text-destructive">{errors.senderDisplayName}</p>
           ) : null}
         </div>
+       
+        <div className="space-y-1.5">
+          <PhoneNumberField
+            id="sender-phone"
+            label={
+              <span className="flex items-center gap-1.5 text-xs">
+                <Phone className="h-3.5 w-3.5" /> Phone
+              </span>
+            }
+            value={senderPhone}
+            localPlaceholder="555 000 0000"
+            error={errors.senderPhone}
+            onChange={onSenderPhoneChange}
+          />
+        </div>
+
         <div className="space-y-1.5">
           <Label htmlFor="sender-address" className="flex items-center gap-1.5 text-xs">
             <Mail className="h-3.5 w-3.5" /> Sender address
@@ -83,20 +100,6 @@ export function CampaignSenderDetailsCard({
           {errors.senderAddress ? (
             <p className="text-xs text-destructive">{errors.senderAddress}</p>
           ) : null}
-        </div>
-        <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-          <Label htmlFor="sender-phone" className="flex items-center gap-1.5 text-xs">
-            <Phone className="h-3.5 w-3.5" /> Phone
-          </Label>
-          <Input
-            id="sender-phone"
-            type="tel"
-            maxLength={15}
-            value={senderPhone}
-            placeholder={senderPlaceholder(senderPhone)}
-            onChange={(event) => onSenderPhoneChange(event.target.value)}
-          />
-          {errors.senderPhone ? <p className="text-xs text-destructive">{errors.senderPhone}</p> : null}
         </div>
       </div>
     </Card>

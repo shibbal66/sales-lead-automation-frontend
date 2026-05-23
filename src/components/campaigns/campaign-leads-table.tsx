@@ -16,10 +16,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import type { CampaignLeadApiModel } from "@/types";
+import { cn } from "@/lib/utils";
+import {
+  CAMPAIGN_LEAD_STATUSES,
+  type CampaignLeadApiModel,
+  type CampaignLeadStatus,
+  type CampaignLeadsStatusFilter,
+} from "@/types";
 import { formatDateTime } from "@/lib/dateFormatting";
 import { MailTemplatePreview } from "@/components/campaigns/mail-template-preview";
-import { CampaignLeadsTableSkeleton } from "@/components/skeletons/campaigns/campaign-leads-table-skeleton";
+import { CampaignLeadsTableRowsSkeleton } from "@/components/skeletons/campaigns/campaign-leads-table-skeleton";
+
+function formatCampaignLeadStatusLabel(status: CampaignLeadStatus): string {
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 type CampaignLeadsTableProps = {
   leads: CampaignLeadApiModel[];
@@ -27,6 +40,8 @@ type CampaignLeadsTableProps = {
   currentPage: number;
   totalPages: number;
   isLoading: boolean;
+  statusFilter: CampaignLeadsStatusFilter;
+  onStatusFilterChange: (value: CampaignLeadsStatusFilter) => void;
   onPageChange: (page: number) => void;
   onAssignClick: () => void;
   onEditLead: (lead: CampaignLeadApiModel) => void;
@@ -39,32 +54,65 @@ export function CampaignLeadsTable({
   currentPage,
   totalPages,
   isLoading,
+  statusFilter,
+  onStatusFilterChange,
   onPageChange,
   onAssignClick,
   onEditLead,
   onDeleteLead,
 }: CampaignLeadsTableProps) {
-  if (isLoading && leads.length === 0) {
-    return <CampaignLeadsTableSkeleton />;
-  }
+  const skeletonRows = leads.length > 0 ? leads.length : 6;
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3 p-5">
-        <div>
-          <h3 className="font-display text-base font-bold">Campaign Leads</h3>
-          <p className="text-sm text-muted-foreground">{total} assigned</p>
+      <div className="space-y-3 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-display text-base font-bold">Campaign Leads</h3>
+            <p className="text-sm text-muted-foreground">
+              {total} {statusFilter === "all" ? "assigned" : "matching"}
+            </p>
+          </div>
+          <div className="flex items-end justify-end gap-2">
+            <Button onClick={onAssignClick} size="sm">
+              <Plus className="h-4 w-4" /> Add
+            </Button>
+          </div>
         </div>
-        <div className="flex items-end justify-end gap-2">
-          <Button onClick={onAssignClick} size="sm">
-            <Plus className="h-4 w-4" /> Add
-          </Button>
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => onStatusFilterChange("all")}
+            className={cn(
+              "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+              statusFilter === "all"
+                ? "border-primary bg-primary/15 text-brand-text"
+                : "border-border text-muted-foreground hover:bg-muted",
+            )}
+          >
+            All
+          </button>
+          {CAMPAIGN_LEAD_STATUSES.map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => onStatusFilterChange(option)}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+                statusFilter === option
+                  ? "border-primary bg-primary/15 text-brand-text"
+                  : "border-border text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {formatCampaignLeadStatusLabel(option)}
+            </button>
+          ))}
         </div>
       </div>
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
-            <TableHead>Lead ID</TableHead>
+            <TableHead>Email</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Mail Template</TableHead>
             <TableHead>Sent At</TableHead>
@@ -74,19 +122,34 @@ export function CampaignLeadsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
+          {isLoading ? (
+            <CampaignLeadsTableRowsSkeleton rows={skeletonRows} />
+          ) : null}
           {!isLoading && leads.length === 0 ? (
             <TableRow>
               <TableCell
                 colSpan={7}
                 className="py-8 text-center text-sm text-muted-foreground"
               >
-                No leads assigned to this campaign yet.
+                {statusFilter === "all"
+                  ? "No leads assigned to this campaign yet."
+                  : `No leads with status "${formatCampaignLeadStatusLabel(statusFilter)}".`}
               </TableCell>
             </TableRow>
           ) : null}
-          {leads.map((lead) => (
+          {!isLoading
+            ? leads.map((lead) => (
             <TableRow key={lead.id} className="hover:bg-primary/5">
-              <TableCell className="font-medium">{lead.lead_data_id}</TableCell>
+              <TableCell className="max-w-[240px]">
+                <p className="truncate text-sm font-medium">
+                  {lead.lead_email?.trim() || "—"}
+                </p>
+                {lead.lead_name?.trim() ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {lead.lead_name.trim()}
+                  </p>
+                ) : null}
+              </TableCell>
               <TableCell>
                 <StatusPill status={lead.status} />
               </TableCell>
@@ -130,7 +193,8 @@ export function CampaignLeadsTable({
                 </DropdownMenu>
               </TableCell>
             </TableRow>
-          ))}
+              ))
+            : null}
         </TableBody>
       </Table>
       <TablePagination

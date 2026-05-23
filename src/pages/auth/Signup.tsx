@@ -13,6 +13,7 @@ import { signup } from "@/services/auth/authServices";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { startGoogleOAuthRedirect } from "@/lib/googleAuth";
 import { setPendingVerification } from "@/utils/authSorage";
+import { PhoneNumberField } from "@/components/shared/phone-number-field";
 import { signupSchema, type SignupFormValues } from "@/validators";
 import type { SignupRequest } from "@/types/auth";
 
@@ -141,19 +142,13 @@ export default function Signup() {
             name="contact"
             control={control}
             render={({ field }) => (
-              <div className="space-y-1.5">
-                <Label htmlFor="contact">Contact</Label>
-                <Input
-                  id="contact"
-                  type="tel"
-                  placeholder="+1 555 000 0000"
-                  aria-invalid={!!errors.contact}
-                  {...field}
-                />
-                {errors.contact?.message ? (
-                  <p className="text-xs text-destructive">{errors.contact.message}</p>
-                ) : null}
-              </div>
+              <PhoneNumberField
+                id="contact"
+                label="Contact"
+                value={field.value}
+                onChange={field.onChange}
+                error={errors.contact?.message}
+              />
             )}
           />
           <Controller

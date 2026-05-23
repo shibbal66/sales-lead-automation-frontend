@@ -3,6 +3,7 @@ import { type AuthUser } from "../../core/types/user.types";
 import { logout as logoutApi, logoutAll as logoutAllApi } from "../../services/auth/authServices";
 import {
   deleteCurrentUser,
+  deleteUserAvatar,
   getCurrentUser,
   updateCurrentUser,
   uploadUserAvatar
@@ -15,7 +16,7 @@ import {
   type NotificationPreferencesFormState,
   type ProfileFormState
 } from "../../lib/userProfile";
-import { mapApiUserToAuthUser } from "../../lib/mapAuthUser";
+import { avatarSourcesMatch, mapApiUserToAuthUser } from "../../lib/mapAuthUser";
 import type { ApiUserProfile, UpdateUserProfileRequest, UserGoogleLinkData } from "../../types/user";
 import type { UpdatePasswordFormValues } from "../../validators";
 import {
@@ -39,23 +40,31 @@ function getHydratedAuth(): { user: AuthUser | null; token: string | null; isAut
 }
 
 const hydrated = getHydratedAuth();
-const AVATAR_UPLOAD_GUARD_MS = 10_000;
 
 function applyProfileData(
   set: (partial: Partial<AuthState>) => void,
+  get: () => AuthState,
   apiUser: ApiUserProfile,
   google?: UserGoogleLinkData,
-  options?: { bustAvatar?: boolean; avatarUrl?: string }
+  options?: { bustAvatar?: boolean },
 ) {
+  const currentAvatarUrl = get().user?.avatarUrl;
   let user = mapApiUserToAuthUser(apiUser, options?.bustAvatar);
-  if (options?.avatarUrl) {
-    user = { ...user, avatarUrl: options.avatarUrl };
+
+  if (
+    !options?.bustAvatar &&
+    currentAvatarUrl &&
+    user.avatarUrl &&
+    avatarSourcesMatch(user.avatarUrl, currentAvatarUrl)
+  ) {
+    user = { ...user, avatarUrl: currentAvatarUrl };
   }
+
   setStoredUser(user);
   set({
     user,
     isAuthenticated: true,
-    ...(google !== undefined ? { googleLink: google } : {})
+    ...(google !== undefined ? { googleLink: google } : {}),
   });
 }
 
@@ -73,15 +82,16 @@ function commitUserAvatar(
 
 async function patchCurrentUser(
   set: (partial: Partial<AuthState>) => void,
+  get: () => AuthState,
   payload: UpdateUserProfileRequest,
-  successMessage: string
+  successMessage: string,
 ): Promise<boolean> {
   const response = await updateCurrentUser(payload);
   if (!response.success || !response.data?.user) {
     showApiErrorToast(response);
     return false;
   }
-  applyProfileData(set, response.data.user, response.data.google);
+  applyProfileData(set, get, response.data.user, response.data.google);
   showApiSuccessToast(response.message || successMessage);
   return true;
 }
@@ -95,7 +105,6 @@ interface AuthState {
   profileLoading: boolean;
   profileSaving: boolean;
   avatarUploading: boolean;
-  lastAvatarUploadedAt: number | null;
   notificationPreferencesSaving: boolean;
   passwordSaving: boolean;
   accountDeleting: boolean;
@@ -109,6 +118,7 @@ interface AuthState {
   fetchCurrentUser: () => Promise<boolean>;
   saveProfile: (form: ProfileFormState) => Promise<boolean>;
   uploadAvatar: (file: File) => Promise<boolean>;
+  deleteAvatar: () => Promise<boolean>;
   saveNotificationPreferences: (form: NotificationPreferencesFormState) => Promise<boolean>;
   savePassword: (form: UpdatePasswordFormValues) => Promise<boolean>;
   initializeAuth: () => void;
@@ -134,7 +144,6 @@ export const useAuthStore = create<AuthState>((set, get) => {
       profileLoading: false,
       profileSaving: false,
       avatarUploading: false,
-      lastAvatarUploadedAt: null,
       notificationPreferencesSaving: false,
       passwordSaving: false,
       accountDeleting: false
@@ -150,7 +159,6 @@ export const useAuthStore = create<AuthState>((set, get) => {
     profileLoading: false,
     profileSaving: false,
     avatarUploading: false,
-    lastAvatarUploadedAt: null,
     notificationPreferencesSaving: false,
     passwordSaving: false,
     accountDeleting: false,
@@ -234,15 +242,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           return false;
         }
 
-        const apiUser = response.data.user;
-        const uploadedRecently =
-          get().lastAvatarUploadedAt !== null &&
-          Date.now() - get().lastAvatarUploadedAt < AVATAR_UPLOAD_GUARD_MS;
-
-        applyProfileData(set, apiUser, response.data.google ?? null, {
-          avatarUrl: uploadedRecently ? get().user?.avatarUrl : undefined,
-          bustAvatar: !uploadedRecently && Boolean(apiUser.profilePic?.trim())
-        });
+        applyProfileData(set, get, response.data.user, response.data.google ?? null);
         return true;
       } catch (error) {
         showApiErrorToast(error);
@@ -257,8 +257,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
       try {
         return await patchCurrentUser(
           set,
+          get,
           buildUpdateProfilePayload(form),
-          "Profile updated successfully."
+          "Profile updated successfully.",
         );
       } catch (error) {
         showApiErrorToast(error);
@@ -281,12 +282,11 @@ export const useAuthStore = create<AuthState>((set, get) => {
           return false;
         }
 
-        applyProfileData(set, response.data.user, undefined, { bustAvatar: true });
+        applyProfileData(set, get, response.data.user, undefined, { bustAvatar: true });
         if (!get().user?.avatarUrl) {
           showApiErrorToast("Upload succeeded but no profile image URL was returned.");
           return false;
         }
-        set({ lastAvatarUploadedAt: Date.now() });
         showApiSuccessToast(response.message || "Profile image uploaded.");
         return true;
       } catch (error) {
@@ -304,13 +304,36 @@ export const useAuthStore = create<AuthState>((set, get) => {
       }
     },
 
+    deleteAvatar: async () => {
+      if (!get().user?.avatarUrl) return false;
+
+      set({ avatarUploading: true });
+      try {
+        const response = await deleteUserAvatar();
+        if (!response.success || !response.data?.user) {
+          showApiErrorToast(response);
+          return false;
+        }
+
+        applyProfileData(set, get, response.data.user);
+        showApiSuccessToast(response.message || "Profile image removed.");
+        return true;
+      } catch (error) {
+        showApiErrorToast(error);
+        return false;
+      } finally {
+        set({ avatarUploading: false });
+      }
+    },
+
     saveNotificationPreferences: async (form) => {
       set({ notificationPreferencesSaving: true });
       try {
         return await patchCurrentUser(
           set,
+          get,
           buildUpdateNotificationPreferencesPayload(form),
-          "Notification preferences updated."
+          "Notification preferences updated.",
         );
       } catch (error) {
         showApiErrorToast(error);
@@ -325,8 +348,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
       try {
         return await patchCurrentUser(
           set,
+          get,
           buildUpdatePasswordPayload(form),
-          "Password updated successfully."
+          "Password updated successfully.",
         );
       } catch (error) {
         showApiErrorToast(error);

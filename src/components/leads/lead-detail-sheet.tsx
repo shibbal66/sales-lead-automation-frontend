@@ -9,11 +9,16 @@ import { LeadDetailSheetSkeleton } from "@/components/skeletons/leads/lead-detai
 import type { LeadApiModel } from "@/types";
 import type { LeadListRowViewModel } from "@/lib/leadPresentation";
 import { ExternalLink, RefreshCw } from "lucide-react";
-import { formatRelativeDate, hasPresentableDate } from "@/lib/dateFormatting";
+import { formatDateTime, formatRelativeDate, hasPresentableDate } from "@/lib/dateFormatting";
+import { cn } from "@/lib/utils";
 
 function isLeadValueEmpty(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   return String(value).trim() === "";
+}
+
+function formatLeadDateValue(value: string): string {
+  return hasPresentableDate(value) ? formatDateTime(value) : String(value).trim();
 }
 
 function DetailRow({
@@ -21,7 +26,8 @@ function DetailRow({
   value,
   multiline,
   href,
-  alwaysShow
+  alwaysShow,
+  className
 }: {
   label: string;
   value: string;
@@ -29,28 +35,42 @@ function DetailRow({
   href?: boolean;
   /** When true, row is shown even if value is empty (e.g. numeric id). */
   alwaysShow?: boolean;
+  className?: string;
 }) {
   if (!alwaysShow && isLeadValueEmpty(value)) return null;
   const display = alwaysShow && isLeadValueEmpty(value) ? "—" : String(value).trim();
   const isLink = Boolean(href && display && display !== "—" && /^https?:\/\//i.test(display));
+  const useCapitalize = Boolean(className?.includes("capitalize"));
+  const displayText =
+    useCapitalize && display !== "—" && !isLink ? display.toLowerCase() : display;
 
   return (
-    <div className="rounded-lg border border-border bg-muted/30 p-3">
+    <div className="min-w-0 rounded-lg border border-border bg-muted/30 p-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
       {multiline ? (
-        <p className="mt-1.5 whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground">{display}</p>
+        <p
+          className={cn(
+            "mt-1.5 break-words whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground",
+            className
+          )}
+        >
+          {displayText}
+        </p>
       ) : isLink ? (
         <a
           href={display}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-brand-text hover:underline"
+          className={cn(
+            "mt-1.5 inline-flex max-w-full flex-wrap items-center gap-1 break-all text-sm font-medium text-brand-text hover:underline",
+            className
+          )}
         >
           {display}
           <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
         </a>
       ) : (
-        <p className="mt-1.5 text-sm text-foreground">{display}</p>
+        <p className={cn("mt-1.5 break-words text-sm text-foreground", className)}>{displayText}</p>
       )}
     </div>
   );
@@ -152,7 +172,7 @@ export function LeadDetailSheet({
     : [];
 
   const sheetTitleLabel =
-    isFetchingDetail && !selectedLeadRow
+    isFetchingDetail && !selectedLead
       ? "Loading lead details"
       : selectedLeadRow
         ? `Lead details: ${selectedLeadRow.name}`
@@ -162,7 +182,7 @@ export function LeadDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-lg p-0">
         <SheetTitle className="sr-only">{sheetTitleLabel}</SheetTitle>
-        {isFetchingDetail && !selectedLeadRow ? <LeadDetailSheetSkeleton /> : null}
+        {isFetchingDetail && !selectedLead ? <LeadDetailSheetSkeleton /> : null}
         {selectedLeadRow && selectedLead ? (
           <div className="flex h-full flex-col bg-background">
             <div className="flex items-start gap-4 border-b border-border bg-muted/25 p-6">
@@ -208,7 +228,7 @@ export function LeadDetailSheet({
                     <SectionTitle>Record</SectionTitle>
                     <div className="grid gap-2 sm:grid-cols-2">
                       <DetailRow label="ID" value={String(selectedLead.id)} alwaysShow />
-                      <DetailRow label="Date added" value={selectedLead.dateAdded} />
+                      <DetailRow label="Date added" value={formatLeadDateValue(selectedLead.dateAdded)} />
                     </div>
                   </Card>
 
@@ -220,9 +240,9 @@ export function LeadDetailSheet({
                         <DetailRow label="First name" value={selectedLead.firstName} />
                         <DetailRow label="Last name" value={selectedLead.lastName} />
                         <DetailRow label="Email" value={selectedLead.email} />
-                        <DetailRow label="Email status" value={selectedLead.emailStatus} />
+                        <DetailRow label="Email status" value={selectedLead.emailStatus} className="capitalize" />
                         <DetailRow label="Title" value={selectedLead.title} />
-                        <DetailRow label="Seniority" value={selectedLead.seniority} />
+                        <DetailRow label="Seniority" value={selectedLead.seniority} className="capitalize" />
                         <DetailRow label="Department" value={selectedLead.department} />
                       </div>
                     </Card>
@@ -249,7 +269,7 @@ export function LeadDetailSheet({
                         <DetailRow label="Domain" value={selectedLead.domain} />
                         <DetailRow label="Company city" value={selectedLead.companyCity} />
                         <DetailRow label="Company state (API)" value={selectedLead.compantyState} />
-                        <DetailRow label="Industry" value={selectedLead.industry} />
+                        <DetailRow label="Industry" value={selectedLead.industry} className="capitalize" />
                         <DetailRow label="Employees" value={selectedLead.employees} />
                         <DetailRow label="Revenue" value={selectedLead.revenue} />
                         <DetailRow label="Company phone" value={selectedLead.companyPhone} />
@@ -274,10 +294,13 @@ export function LeadDetailSheet({
                       <div className="grid gap-2 sm:grid-cols-2">
                         <DetailRow label="Email source" value={selectedLead.emailSource} />
                         <DetailRow label="Email sent" value={selectedLead.emailSent} />
-                        <DetailRow label="Email sent date" value={selectedLead.emailSentDate} />
+                        <DetailRow
+                          label="Email sent date"
+                          value={formatLeadDateValue(selectedLead.emailSentDate)}
+                        />
                         <DetailRow label="Reply received" value={selectedLead.replyReceived} />
-                        <DetailRow label="Reply date" value={selectedLead.replyDate} />
-                        <DetailRow label="Outreach status" value={selectedLead.outreachStatus} />
+                        <DetailRow label="Reply date" value={formatLeadDateValue(selectedLead.replyDate)} />
+                        <DetailRow label="Outreach status" value={selectedLead.outreachStatus} className="capitalize" />
                       </div>
                       <DetailRow label="Email subject" value={selectedLead.emailSubject} />
                       {!isLeadValueEmpty(selectedLead.emailBody) ? (
@@ -309,7 +332,10 @@ export function LeadDetailSheet({
                       <SectionTitle>LinkedIn outreach</SectionTitle>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <DetailRow label="LinkedIn sent" value={selectedLead.linkedinSent} />
-                        <DetailRow label="LinkedIn sent date" value={selectedLead.linkedSentDate} />
+                        <DetailRow
+                          label="LinkedIn sent date"
+                          value={formatLeadDateValue(selectedLead.linkedSentDate)}
+                        />
                       </div>
                       {!isLeadValueEmpty(selectedLead.linkedinMessage) ? (
                         <div className="rounded-lg border border-border bg-muted/20 p-3">
@@ -329,11 +355,8 @@ export function LeadDetailSheet({
                 <TabsContent value="fit" className="m-0 mt-4 space-y-4">
                   {showFitScoringCard ? (
                     <Card className="space-y-3 border-border bg-card p-4 shadow-card">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start">
                         <SectionTitle>Fit scoring</SectionTitle>
-                        <Button variant="outline" size="sm">
-                          <RefreshCw className="mr-2 h-3.5 w-3.5" /> Re-enrich
-                        </Button>
                       </div>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <DetailRow label="Fit tag" value={selectedLead.fitTag} />
@@ -360,7 +383,7 @@ export function LeadDetailSheet({
                           <li key={`${item.label}-${i}`} className="relative">
                             <span className="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
                             <p className="text-sm font-medium text-foreground">{item.label}</p>
-                            <p className="text-xs text-muted-foreground">{String(item.value).trim()}</p>
+                            <p className="text-xs text-muted-foreground">{formatLeadDateValue(String(item.value))}</p>
                             {item.value?.trim() && hasPresentableDate(item.value) ? (
                               <p className="mt-0.5 text-[10px] text-brand-text/80">
                                 {formatRelativeDate(item.value)}

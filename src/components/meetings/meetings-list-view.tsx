@@ -40,8 +40,8 @@ export function MeetingsListView({
           <TableHead>Title</TableHead>
           <TableHead>Email</TableHead>
           <TableHead>Campaign</TableHead>
-          <TableHead>Meeting Date & Time</TableHead>
-          <TableHead>Booked At</TableHead>
+          <TableHead className="min-w-[180px]">Meeting Date & Time</TableHead>
+          <TableHead className="min-w-[100px]">Booked At</TableHead>
           <TableHead>Status</TableHead>
           {showActions ? <TableHead className="w-[180px] text-right">Actions</TableHead> : null}
         </TableRow>

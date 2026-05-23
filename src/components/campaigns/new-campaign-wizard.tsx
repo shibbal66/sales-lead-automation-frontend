@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { Bot, Hand, Check, ArrowLeft, ArrowRight, Plus, Trash2, Users } from "lucide-react";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import { PhoneNumberField } from "@/components/shared/phone-number-field";
 import { createCampaignSchema, mailTemplateSampleSchema } from "@/validators";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { CAMPAIGN_LEAD_SOURCES, CAMPAIGN_TONES } from "@/lib/campaignPresentation";
@@ -518,21 +519,15 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   <p className="text-xs text-destructive">{errors.sender_address}</p>
                 ) : null}
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="senderPhone">Sender phone</Label>
-                <Input
-                  id="senderPhone"
-                  type="tel"
-                  maxLength={16}
-                  value={senderPhone}
-                  aria-invalid={!!errors.sender_phone}
-                  onChange={(e) =>
-                    patchField("sender_phone", e.target.value, () => setSenderPhone(e.target.value))
-                  }
-                  placeholder="+1 555 000 0000"
-                />
-                {errors.sender_phone ? <p className="text-xs text-destructive">{errors.sender_phone}</p> : null}
-              </div>
+              <PhoneNumberField
+                id="senderPhone"
+                label="Sender phone"
+                value={senderPhone}
+                error={errors.sender_phone}
+                onChange={(value) =>
+                  patchField("sender_phone", value, () => setSenderPhone(value))
+                }
+              />
             </div>
           )}
 

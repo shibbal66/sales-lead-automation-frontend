@@ -50,6 +50,19 @@ export interface LeadApiModel {
   outreachStatus: string;
 }
 
+export const LEAD_SORT_BY_VALUES = [
+  "created_at",
+  "fullName",
+  "email",
+  "company",
+  "country",
+  "fitScore",
+  "dateAdded",
+] as const;
+
+export type LeadSortBy = (typeof LEAD_SORT_BY_VALUES)[number];
+export type LeadSortOrder = "asc" | "desc";
+
 export interface GetLeadsQuery {
   page?: number;
   limit?: number;
@@ -59,6 +72,13 @@ export interface GetLeadsQuery {
   state?: string;
   city?: string;
   industry?: string;
+  seniority?: string;
+  department?: string;
+  company?: string;
+  outreachStatus?: string;
+  fitTag?: string;
+  sortBy?: LeadSortBy;
+  sortOrder?: LeadSortOrder;
 }
 
 /** Legacy list body before `data` + top-level `pagination`. */
