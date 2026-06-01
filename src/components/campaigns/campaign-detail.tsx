@@ -284,12 +284,15 @@ export function CampaignDetail({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4" /> Back to campaigns</Button>
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col flex-wrap gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="ghost" size="sm" onClick={onBack} className="w-fit shrink-0">
+          <ArrowLeft className="h-4 w-4" /> Back to campaigns
+        </Button>
+        <div className="flex flex-wrap gap-2 sm:items-center sm:justify-end">
           {isManualRunMode && campaign.status === "active" ? (
             <Button
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => void handleRunManualLeads()}
               disabled={isRunningLeads}
             >
@@ -297,10 +300,16 @@ export function CampaignDetail({
               {isRunningLeads ? "Sending…" : "Send emails"}
             </Button>
           ) : null}
-          <Button variant="destructive" onClick={() => setDeleteOpen(true)} disabled={isDeleting}>
+          <Button
+            variant="destructive"
+            className="w-full sm:w-auto"
+            onClick={() => setDeleteOpen(true)}
+            disabled={isDeleting}
+          >
             {isDeleting ? "Deleting..." : "Delete Campaign"}
           </Button>
           <Button
+            className="w-full sm:w-auto"
             onClick={() => void handleSaveChanges()}
             disabled={!hasChanges || isUpdating || checkingGoogleLink || hasValidationErrors}
           >

@@ -72,3 +72,41 @@ export interface MarkNotificationReadResponse {
   message?: string;
   data?: string;
 }
+
+export interface RegisterPushTokenRequest {
+  fcmToken: string;
+  deviceLabel: string;
+}
+
+export interface UnregisterPushTokenRequest {
+  fcmToken: string;
+}
+
+export interface RegisteredPushDeviceData {
+  id: string;
+  deviceLabel: string;
+  registeredAt: string;
+  updatedAt: string;
+}
+
+export interface RegisterPushTokenResponse {
+  success: boolean;
+  message?: string;
+  data?: RegisteredPushDeviceData;
+}
+
+export interface UnregisterPushTokenResponse {
+  success: boolean;
+  message?: string;
+}
+
+export interface PushNotificationStatusData {
+  fcmConfigured: boolean;
+  registeredDevices: number;
+}
+
+export interface GetPushNotificationStatusResponse {
+  success: boolean;
+  message?: string;
+  data?: PushNotificationStatusData;
+}
