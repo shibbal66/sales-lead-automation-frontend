@@ -31,9 +31,11 @@ const setAuthorizationHeader = (request: InternalAxiosRequestConfig, token: stri
   request.headers.Authorization = `Bearer ${token}`;
 };
 
-const handleRefreshFailure = (refreshError: unknown) => {
+const handleRefreshFailure = async (refreshError: unknown) => {
   setSuppressApiErrorToasts(true);
   processQueue(refreshError, null);
+  const { unregisterFcmPushToken } = await import("@/services/fcm/fcmPush");
+  await unregisterFcmPushToken();
   clearAuthStorage();
   setPendingAuthError(getApiErrorMessage(refreshError));
   window.location.href = LOGIN_PATH;
@@ -82,7 +84,7 @@ axiosInstance.interceptors.response.use(
         processQueue(null, newAccessToken);
         return axiosInstance(originalRequest);
       } catch (refreshError) {
-        handleRefreshFailure(refreshError);
+        await handleRefreshFailure(refreshError);
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

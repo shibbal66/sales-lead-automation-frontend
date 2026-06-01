@@ -83,17 +83,21 @@ function SidebarPanel({
         })}
       </nav>
 
-      <div className="shrink-0 border-t border-sidebar-border p-3">
+      <div className={cn("shrink-0 border-t border-sidebar-border", collapsed ? "p-2" : "p-3")}>
         <div
           className={cn(
-            "flex items-center gap-3 rounded-lg p-2",
-            !collapsed && "bg-sidebar-accent/60",
+            "flex items-center rounded-lg",
+            collapsed ? "justify-center" : "gap-3 bg-sidebar-accent/60 p-2",
           )}
+          title={collapsed ? userDisplayName : undefined}
         >
           <UserProfileAvatar
             user={user}
-            className="h-9 w-9 shrink-0 ring-2 ring-sidebar-border"
-            initialsClassName="text-sm"
+            className={cn(
+              "shrink-0 ring-2 ring-sidebar-border",
+              collapsed ? "h-8 w-8" : "h-9 w-9",
+            )}
+            initialsClassName={collapsed ? "text-xs" : "text-sm"}
           />
           {!collapsed && (
             <div className="min-w-0 flex-1">

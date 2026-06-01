@@ -30,6 +30,7 @@ import {
   setRefreshToken,
   setStoredUser
 } from "../../utils/authSorage";
+import { syncFcmPushRegistration, unregisterFcmPushToken } from "@/services/fcm/fcmPush";
 
 function getHydratedAuth(): { user: AuthUser | null; token: string | null; isAuthenticated: boolean } {
   if (typeof window === "undefined") return { user: null, token: null, isAuthenticated: false };
@@ -179,6 +180,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     logout: async () => {
       const refreshToken = getRefreshToken();
       try {
+        await unregisterFcmPushToken();
         if (refreshToken) {
           const response = await logoutApi({ refreshToken });
           if (response.success) {
@@ -196,6 +198,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         showApiErrorToast(response);
         return Promise.reject(response);
       }
+      await unregisterFcmPushToken();
       showApiSuccessToast(response.message || "Logged out from all devices.");
       clearAuthStorage();
     },
@@ -209,6 +212,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
           return false;
         }
         showApiSuccessToast(response.message || "Account deleted successfully.");
+        await unregisterFcmPushToken();
         clearAuthStorage();
         return true;
       } catch (error) {
@@ -329,12 +333,16 @@ export const useAuthStore = create<AuthState>((set, get) => {
     saveNotificationPreferences: async (form) => {
       set({ notificationPreferencesSaving: true });
       try {
-        return await patchCurrentUser(
+        const ok = await patchCurrentUser(
           set,
           get,
           buildUpdateNotificationPreferencesPayload(form),
           "Notification preferences updated.",
         );
+        if (ok && form.notificationsEnabled) {
+          void syncFcmPushRegistration();
+        }
+        return ok;
       } catch (error) {
         showApiErrorToast(error);
         return false;

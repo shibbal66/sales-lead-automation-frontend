@@ -1,1 +1,18 @@
+# Logs
+*.log
+
+# Dependency Directories
 node_modules
+
+# Build Output
+dist
+
+# Environment Variable Files
+.env
+.env.*
+!.env.example
+
+# Developer Directories
+.Extras
+.claude
+.vercel

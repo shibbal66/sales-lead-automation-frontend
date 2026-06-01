@@ -10,6 +10,15 @@ import { Plus, MoreVertical } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { CampaignDetail } from "@/components/campaigns/campaign-detail";
 import { CampaignDetailSkeleton } from "@/components/skeletons/campaigns/campaign-detail-skeleton";
 import { CampaignsGridSkeleton } from "@/components/skeletons/campaigns/campaign-card-skeleton";
@@ -31,9 +40,11 @@ export default function CampaignsPage() {
   const clearSelectedCampaign = useCampaignStore((state) => state.clearSelectedCampaign);
   const updateCampaign = useCampaignStore((state) => state.updateCampaign);
   const deleteCampaign = useCampaignStore((state) => state.deleteCampaign);
+  const isDeleting = useCampaignStore((state) => state.isDeleting);
   const createCampaign = useCampaignStore((state) => state.createCampaign);
   const [tab, setTab] = useState<"all" | "running" | "paused" | "completed" | "draft">("all");
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<CampaignApiModel | null>(null);
   const apiStatus: CampaignStatus | undefined = tab === "all" ? undefined : tab === "running" ? "active" : tab;
 
   useEffect(() => {
@@ -91,10 +102,12 @@ export default function CampaignsPage() {
     }
   };
 
-  const handleDelete = async (campaign: CampaignApiModel) => {
+  const handleConfirmDelete = async () => {
+    if (!campaignToDelete) return;
     try {
-      const message = await deleteCampaign(campaign.id);
+      const message = await deleteCampaign(campaignToDelete.id);
       showApiSuccessToast(message || "Campaign deleted successfully.");
+      setCampaignToDelete(null);
     } catch {
       // Error toast is already handled in store.
     }
@@ -173,7 +186,7 @@ export default function CampaignsPage() {
                       onClick={() => {
                         const campaign = apiCampaigns[idx];
                         if (!campaign) return;
-                        handleDelete(campaign);
+                        setCampaignToDelete(campaign);
                       }}
                     >
                       Delete
@@ -218,6 +231,32 @@ export default function CampaignsPage() {
       </div>
 
       <NewCampaignWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+
+      <AlertDialog
+        open={campaignToDelete !== null}
+        onOpenChange={(open) => !open && setCampaignToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete campaign?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {campaignToDelete
+                ? `This will permanently delete "${campaignToDelete.name}". This action cannot be undone.`
+                : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={() => void handleConfirmDelete()}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

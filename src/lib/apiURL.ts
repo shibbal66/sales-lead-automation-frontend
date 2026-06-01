@@ -54,6 +54,8 @@ export const END_POINT = {
     list: "/notifications",
     unreadCount: "/notifications/unread-count",
     readAll: "/notifications/read-all",
-    readById: (id: string) => `/notifications/${id}/read`
+    readById: (id: string) => `/notifications/${id}/read`,
+    pushRegister: "/notifications/push/register",
+    pushStatus: "/notifications/push/status"
   } as const
 };
