@@ -1,10 +1,22 @@
 import type { AxiosError } from "axios";
 import { describe, expect, it } from "vitest";
-import { isAuthEndpoint, shouldRefreshAccessToken } from "../lib/authTokenErrors";
+import {
+  isAuthEndpoint,
+  isTokenExpiredError,
+  shouldRefreshAccessToken,
+  TOKEN_EXPIRED_CODE,
+} from "../lib/authTokenErrors";
 
-const createAxiosError = (status: number, url = "/leads"): AxiosError => {
+const createAxiosError = (
+  status: number,
+  url = "/leads",
+  code?: string
+): AxiosError => {
   return {
-    response: { status, data: { success: false, message: "Unauthorized" } },
+    response: {
+      status,
+      data: { success: false, message: "Unauthorized", ...(code ? { code } : {}) },
+    },
     config: { url },
   } as AxiosError;
 };
@@ -17,13 +29,20 @@ describe("authTokenErrors", () => {
     );
   });
 
-  it("refreshes on 401 for non-auth endpoints", () => {
-    const error = createAxiosError(401);
+  it("refreshes on 401 with TOKEN_EXPIRED for non-auth endpoints", () => {
+    const error = createAxiosError(401, "/leads", TOKEN_EXPIRED_CODE);
+    expect(isTokenExpiredError(error)).toBe(true);
     expect(shouldRefreshAccessToken(error, error.config)).toBe(true);
   });
 
+  it("does not refresh on 401 without TOKEN_EXPIRED", () => {
+    const error = createAxiosError(401);
+    expect(isTokenExpiredError(error)).toBe(false);
+    expect(shouldRefreshAccessToken(error, error.config)).toBe(false);
+  });
+
   it("does not refresh on non-401 errors", () => {
-    const error = createAxiosError(500);
+    const error = createAxiosError(500, "/leads", TOKEN_EXPIRED_CODE);
     expect(shouldRefreshAccessToken(error, error.config)).toBe(false);
   });
 });
