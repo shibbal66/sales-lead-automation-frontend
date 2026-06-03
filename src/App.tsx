@@ -18,6 +18,8 @@ import Meetings from "./pages/Meetings";
 import Analytics from "./pages/Analytics";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
+import BillingSuccess from "./pages/billing/BillingSuccess";
+import BillingCancel from "./pages/billing/BillingCancel";
 import NotFound from "./pages/NotFound.tsx";
 import { useAuthStore } from "@/store/auth/authStore";
 
@@ -49,6 +51,8 @@ function AppRoutes() {
         <Route path="/meetings" element={<Meetings />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/billing/success" element={<BillingSuccess />} />
+        <Route path="/billing/cancel" element={<BillingCancel />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

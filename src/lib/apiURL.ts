@@ -57,5 +57,19 @@ export const END_POINT = {
     readById: (id: string) => `/notifications/${id}/read`,
     pushRegister: "/notifications/push/register",
     pushStatus: "/notifications/push/status"
+  } as const,
+
+  billing: {
+    plans: "/billing/plans",
+    subscription: "/billing/subscription",
+    checkout: "/billing/checkout",
+    upgrade: "/billing/upgrade",
+    downgrade: "/billing/downgrade",
+    cancel: "/billing/cancel",
+    reactivate: "/billing/reactivate",
+    portal: "/billing/portal",
+    paymentMethods: "/billing/payment-methods",
+    paymentMethodsDefault: "/billing/payment-methods/default",
+    paymentMethodById: (paymentMethodId: string) => `/billing/payment-methods/${paymentMethodId}`
   } as const
 };

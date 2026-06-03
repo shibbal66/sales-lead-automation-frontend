@@ -7,24 +7,51 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
-import { billingHistory } from "@/lib/mock-data";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  canCancelPaidSubscription,
+  canDeletePaymentMethod,
+  canOpenBillingPortal,
+  canReactivateSubscription,
+  formatBillingInterval,
+  formatBillingPlanBillingLine,
+  formatBillingPlanPrice,
+  formatPaymentMethodBrand,
+  formatPaymentMethodExpiry,
+  getBillingPlanAction,
+  getBillingPlanActionLoadingLabel,
+  getBillingPlanButtonLabel,
+  getNextBillingPlan,
+  getSubscriptionPendingChangeMessage,
+  sortBillingPlans,
+  sortPaymentMethods,
+  subscriptionAfterCancel
+} from "@/lib/billing";
 import { cn } from "@/lib/utils";
 import {
-  User, Mail, CreditCard, Bell, AlertTriangle, Check, KeyRound, ChevronDown,
+  User, Mail, CreditCard, Bell, AlertTriangle, KeyRound, ChevronDown,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { showApiErrorToast } from "@/lib/apiToast";
+import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { useAuthStore } from "@/store/auth/authStore";
+import { useBillingStore } from "@/store/billing/billingStore";
 import { GoogleLinkCard } from "@/components/auth/google-link-card";
 import { PhoneNumberField } from "@/components/shared/phone-number-field";
 import { PasswordField } from "@/components/settings/password-field";
 import { ProfileAvatarUpload } from "@/components/settings/profile-avatar-upload";
-import { UserProfileAvatar } from "@/components/user-profile-avatar";
 import { profileTimezoneSelectOptions, resolveProfileTimezone } from "@/lib/profileTimezones";
 import {
   getUserDisplayEmail,
@@ -40,6 +67,19 @@ import {
   type ProfileSettingsFormValues,
   type UpdatePasswordFormValues
 } from "@/validators";
+import {
+  deleteBillingPaymentMethod,
+  getBillingPaymentMethods,
+  getBillingPlans,
+  postBillingCancel,
+  postBillingPortal,
+  postBillingSetDefaultPaymentMethod,
+  postBillingReactivate,
+  postBillingCheckout,
+  postBillingDowngrade,
+  postBillingUpgrade
+} from "@/services/billing/billingServices";
+import type { BillingPaymentMethod, BillingPlan } from "@/types/billing";
 
 const sections = [
   { id: "profile", label: "Profile", icon: User },
@@ -106,12 +146,25 @@ export default function Settings() {
   };
   const [inviteOpen, setInviteOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [cancelSubscriptionOpen, setCancelSubscriptionOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
   const [logoutAllLoading, setLogoutAllLoading] = useState(false);
   const [mobileOpenSection, setMobileOpenSection] = useState<SettingsSectionId | null>(section);
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferencesFormState>(() =>
     user ? notificationPreferencesFromAuthUser(user) : { notificationsEnabled: true }
   );
+  const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([]);
+  const subscription = useBillingStore((state) => state.subscription);
+  const setSubscription = useBillingStore((state) => state.setSubscription);
+  const fetchSubscription = useBillingStore((state) => state.fetchSubscription);
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingActionPlanId, setBillingActionPlanId] = useState<string | null>(null);
+  const [billingCanceling, setBillingCanceling] = useState(false);
+  const [billingReactivating, setBillingReactivating] = useState(false);
+  const [billingPortalOpening, setBillingPortalOpening] = useState(false);
+  const [paymentMethods, setPaymentMethods] = useState<BillingPaymentMethod[]>([]);
+  const [defaultPaymentMethodId, setDefaultPaymentMethodId] = useState<string | null>(null);
+  const [deletingPaymentMethodId, setDeletingPaymentMethodId] = useState<string | null>(null);
 
   const {
     control: profileControl,
@@ -154,6 +207,226 @@ export default function Settings() {
   useEffect(() => {
     setMobileOpenSection(section);
   }, [section]);
+
+  useEffect(() => {
+    if (section !== "billing") return;
+
+    let cancelled = false;
+    setBillingLoading(true);
+
+    void Promise.all([
+      getBillingPlans(),
+      fetchSubscription({ force: true }),
+      getBillingPaymentMethods()
+    ])
+      .then(([plansResponse, , paymentMethodsResponse]) => {
+        if (cancelled) return;
+
+        if (plansResponse.success && plansResponse.data?.plans) {
+          setBillingPlans(sortBillingPlans(plansResponse.data.plans));
+        } else {
+          showApiErrorToast(plansResponse);
+        }
+
+        if (paymentMethodsResponse.success && paymentMethodsResponse.data?.paymentMethods) {
+          setPaymentMethods(sortPaymentMethods(paymentMethodsResponse.data.paymentMethods));
+        } else if (!paymentMethodsResponse.success) {
+          setPaymentMethods([]);
+          showApiErrorToast(paymentMethodsResponse);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) showApiErrorToast(error);
+      })
+      .finally(() => {
+        if (!cancelled) setBillingLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [section, fetchSubscription]);
+
+  const currentPlanId = subscription?.planId;
+  const nextPlan = useMemo(
+    () => getNextBillingPlan(billingPlans, currentPlanId),
+    [billingPlans, currentPlanId]
+  );
+
+  const handleBillingPlanAction = async (planId: string) => {
+    const plan = billingPlans.find((p) => p.id === planId);
+    const hasStripeSubscription = Boolean(subscription?.stripeSubscriptionId);
+    const action = plan
+      ? getBillingPlanAction(plan, { currentPlanId, plans: billingPlans, hasStripeSubscription })
+      : "unavailable";
+
+    if (
+      !plan ||
+      action === "current" ||
+      action === "unavailable" ||
+      billingActionPlanId ||
+      billingCanceling ||
+      billingReactivating
+    ) {
+      return;
+    }
+
+    setBillingActionPlanId(planId);
+    try {
+      if (action === "downgrade") {
+        const response = await postBillingDowngrade(planId);
+        if (response.success) {
+          if (response.message) showApiSuccessToast(response.message);
+          await fetchSubscription({ force: true });
+          return;
+        }
+        showApiErrorToast(response);
+        return;
+      }
+
+      if (action === "checkout") {
+        const response = await postBillingCheckout(planId);
+        if (response.success && response.data?.checkoutUrl) {
+          if (response.message) showApiSuccessToast(response.message);
+          window.location.assign(response.data.checkoutUrl);
+          return;
+        }
+        showApiErrorToast(response);
+        return;
+      }
+
+      const response = await postBillingUpgrade(planId);
+      if (response.success) {
+        if (response.message) showApiSuccessToast(response.message);
+        await fetchSubscription({ force: true });
+        if (response.data?.checkoutUrl) {
+          window.location.assign(response.data.checkoutUrl);
+        }
+        return;
+      }
+      showApiErrorToast(response);
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setBillingActionPlanId(null);
+    }
+  };
+
+  const handleBillingCancel = async () => {
+    if (!canCancelPaidSubscription(subscription) || billingCanceling || billingReactivating || billingActionPlanId) {
+      return;
+    }
+
+    setBillingCanceling(true);
+    try {
+      const response = await postBillingCancel();
+      if (response.success) {
+        setCancelSubscriptionOpen(false);
+        if (response.message) showApiSuccessToast(response.message);
+        if (response.data?.subscription) {
+          setSubscription(subscriptionAfterCancel(response.data.subscription));
+        }
+        await fetchSubscription({ force: true, treatAsCancel: true });
+        return;
+      }
+      showApiErrorToast(response);
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setBillingCanceling(false);
+    }
+  };
+
+  const handleSetDefaultPaymentMethod = async (paymentMethodId: string) => {
+    if (defaultPaymentMethodId || deletingPaymentMethodId) return;
+
+    setDefaultPaymentMethodId(paymentMethodId);
+    try {
+      const response = await postBillingSetDefaultPaymentMethod(paymentMethodId);
+      if (response.success && response.data?.paymentMethods) {
+        setPaymentMethods(sortPaymentMethods(response.data.paymentMethods));
+        if (response.message) showApiSuccessToast(response.message);
+        return;
+      }
+      showApiErrorToast(response);
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setDefaultPaymentMethodId(null);
+    }
+  };
+
+  const handleDeletePaymentMethod = async (paymentMethodId: string) => {
+    const method = paymentMethods.find((m) => m.id === paymentMethodId);
+    if (!method || !canDeletePaymentMethod(method, paymentMethods) || deletingPaymentMethodId || defaultPaymentMethodId) {
+      return;
+    }
+
+    setDeletingPaymentMethodId(paymentMethodId);
+    try {
+      const response = await deleteBillingPaymentMethod(paymentMethodId);
+      if (response.success) {
+        if (response.data?.paymentMethods) {
+          setPaymentMethods(sortPaymentMethods(response.data.paymentMethods));
+        } else {
+          const refreshed = await getBillingPaymentMethods();
+          if (refreshed.success && refreshed.data?.paymentMethods) {
+            setPaymentMethods(sortPaymentMethods(refreshed.data.paymentMethods));
+          }
+        }
+        if (response.message) showApiSuccessToast(response.message);
+        return;
+      }
+      showApiErrorToast(response);
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setDeletingPaymentMethodId(null);
+    }
+  };
+
+  const handleBillingPortal = async () => {
+    if (!canOpenBillingPortal(subscription) || billingPortalOpening) return;
+
+    setBillingPortalOpening(true);
+    try {
+      const response = await postBillingPortal();
+      if (response.success && response.data?.portalUrl) {
+        if (response.message) showApiSuccessToast(response.message);
+        window.location.assign(response.data.portalUrl);
+        return;
+      }
+      showApiErrorToast(response);
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setBillingPortalOpening(false);
+    }
+  };
+
+  const handleBillingReactivate = async () => {
+    if (!canReactivateSubscription(subscription) || billingReactivating || billingCanceling || billingActionPlanId) {
+      return;
+    }
+
+    setBillingReactivating(true);
+    try {
+      const response = await postBillingReactivate();
+      if (response.success) {
+        if (response.message) showApiSuccessToast(response.message);
+        if (response.data?.subscription) {
+          setSubscription(response.data.subscription);
+        }
+        await fetchSubscription({ force: true });
+        return;
+      }
+      showApiErrorToast(response);
+    } catch (error) {
+      showApiErrorToast(error);
+    } finally {
+      setBillingReactivating(false);
+    }
+  };
 
   const onSaveProfile = handleProfileSubmit(async (data: ProfileSettingsFormValues) => {
     await saveProfile(data);
@@ -419,130 +692,289 @@ export default function Settings() {
     }
 
     if (sectionId === "billing") {
+      const hasStripeSubscription = Boolean(subscription?.stripeSubscriptionId);
+      const pendingChangeMessage = subscription ? getSubscriptionPendingChangeMessage(subscription) : null;
+
       return (
         <>
           <Card className="p-6 shadow-card">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className="font-display text-lg font-bold">Pro Plan</h3>
-                <p className="text-sm text-muted-foreground">$149 / month · billed monthly</p>
+            {billingLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-48" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Skeleton className="h-20 rounded-lg" />
+                  <Skeleton className="h-20 rounded-lg" />
+                </div>
               </div>
-              <Button>Upgrade Plan</Button>
-            </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {[
-                { label: "Leads", val: 2148, max: 5000 },
-                { label: "Active campaigns", val: 3, max: 5 },
-              ].map((u) => {
-                const pct = Math.round((u.val / u.max) * 100);
-                return (
-                  <div key={u.label} className="rounded-lg border border-border p-4">
-                    <p className="text-xs text-muted-foreground">{u.label}</p>
-                    <p className="mt-1 font-display text-xl font-bold">
-                      {u.val.toLocaleString()}
-                      <span className="text-sm font-medium text-muted-foreground"> / {u.max.toLocaleString()}</span>
+            ) : subscription ? (
+              <>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="font-display text-lg font-bold">{subscription.plan.name}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {formatBillingPlanBillingLine(subscription.plan)}
+                      {subscription.status ? ` · ${subscription.status}` : ""}
                     </p>
-                    <Progress value={pct} className="mt-2 h-1.5" />
+                    {pendingChangeMessage && (
+                      <p className="mt-1 text-sm text-warning">{pendingChangeMessage}</p>
+                    )}
                   </div>
-                );
-              })}
+                  <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+                    <Button
+                      disabled={
+                        !nextPlan ||
+                        Boolean(billingActionPlanId) ||
+                        billingCanceling ||
+                        billingReactivating
+                      }
+                      onClick={() => nextPlan && void handleBillingPlanAction(nextPlan.id)}
+                    >
+                      {billingActionPlanId === nextPlan?.id ? "Redirecting..." : "Upgrade Plan"}
+                    </Button>
+                    {canReactivateSubscription(subscription) && (
+                      <Button
+                        variant="outline"
+                        disabled={billingReactivating || billingCanceling || Boolean(billingActionPlanId)}
+                        onClick={() => void handleBillingReactivate()}
+                      >
+                        {billingReactivating ? "Reactivating..." : "Undo cancellation"}
+                      </Button>
+                    )}
+                    {canCancelPaidSubscription(subscription) && (
+                      <Button
+                        variant="outline"
+                        className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        disabled={billingCanceling || billingReactivating || Boolean(billingActionPlanId)}
+                        onClick={() => setCancelSubscriptionOpen(true)}
+                      >
+                        Cancel subscription
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  {[
+                    {
+                      label: "Leads per campaign",
+                      value: subscription.limits.maxLeadsPerCampaign
+                    },
+                    {
+                      label: "Campaigns",
+                      value: subscription.limits.maxCampaigns
+                    }
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-lg border border-border p-4">
+                      <p className="text-xs text-muted-foreground">{item.label}</p>
+                      <p className="mt-1 font-display text-xl font-bold">{item.value.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">Unable to load your subscription.</p>
+            )}
+          </Card>
+
+          <Card className="overflow-hidden shadow-card">
+            <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="font-display text-lg font-bold">Payment methods</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Cards saved for your subscription billing.</p>
+              </div>
+              {canOpenBillingPortal(subscription) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={billingLoading || billingPortalOpening}
+                  onClick={() => void handleBillingPortal()}
+                >
+                  Manage cards
+                </Button>
+              )}
+            </div>
+            <div className="divide-y divide-border border-t border-border">
+              {billingLoading ? (
+                Array.from({ length: 2 }, (_, i) => (
+                  <div key={`payment-method-skeleton-${i}`} className="flex items-center gap-4 p-4">
+                    <Skeleton className="h-10 w-14 rounded-md" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-20" />
+                    </div>
+                  </div>
+                ))
+              ) : paymentMethods.length === 0 ? (
+                <p className="p-6 text-sm text-muted-foreground">No payment methods on file.</p>
+              ) : (
+                paymentMethods.map((method) => (
+                  <div key={method.id} className="flex items-center justify-between gap-4 p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-10 w-14 items-center justify-center rounded-md border border-border bg-muted/40">
+                        <CreditCard className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">
+                          {formatPaymentMethodBrand(method.brand)} ···· {method.last4}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Expires {formatPaymentMethodExpiry(method.expMonth, method.expYear)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                      {method.isDefault ? (
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-brand-text">
+                          Default
+                        </span>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={Boolean(defaultPaymentMethodId || deletingPaymentMethodId)}
+                          onClick={() => void handleSetDefaultPaymentMethod(method.id)}
+                        >
+                          {defaultPaymentMethodId === method.id ? "Saving..." : "Set as default"}
+                        </Button>
+                      )}
+                      {canDeletePaymentMethod(method, paymentMethods) && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          disabled={Boolean(defaultPaymentMethodId || deletingPaymentMethodId)}
+                          onClick={() => void handleDeletePaymentMethod(method.id)}
+                        >
+                          {deletingPaymentMethodId === method.id ? "Removing..." : "Remove"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </Card>
 
           <Card className="overflow-hidden shadow-card">
-            <div className="p-6 pb-0">
+            <div className="p-6 pb-2">
               <h3 className="font-display text-lg font-bold">Compare Plans</h3>
               <p className="mt-1 text-sm text-muted-foreground">Pick the plan that matches your outreach volume.</p>
             </div>
-            <div className="grid grid-cols-1 gap-px bg-border p-px md:grid-cols-3">
-              {[
-                {
-                  name: "Pro",
-                  price: "$149",
-                  priceSuffix: "/mo",
-                  leads: "5,000 leads",
-                  campaigns: "5 campaigns",
-                  current: true,
-                  cta: "Current Plan",
-                  features: ["AI email generation", "Multi-inbox sending", "Reply tracking", "Basic analytics"],
-                },
-                {
-                  name: "Plus",
-                  price: "$399",
-                  priceSuffix: "/mo",
-                  leads: "20,000 leads",
-                  campaigns: "20 campaigns",
-                  cta: "Upgrade to Plus",
-                  features: ["Everything in Pro", "Advanced analytics", "AI reply handling", "Priority support"],
-                },
-                {
-                  name: "Enterprise",
-                  price: "Custom",
-                  priceSuffix: "",
-                  leads: "Unlimited leads",
-                  campaigns: "Unlimited campaigns",
-                  cta: "Contact Admin",
-                  contact: true,
-                  features: ["Custom plan built by admin", "Dedicated success manager", "SSO & advanced security", "Custom integrations"],
-                },
-              ].map((plan) => (
-                <div key={plan.name} className={cn("flex flex-col gap-3 bg-card p-5", plan.current && "ring-2 ring-primary")}>
-                  <div className="flex items-center justify-between">
-                    <p className="font-display text-lg font-bold">{plan.name}</p>
-                    {plan.current && <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-brand-text">Current</span>}
-                  </div>
-                  <p className="font-display text-2xl font-bold">
-                    {plan.price}
-                    {plan.priceSuffix && <span className="text-xs text-muted-foreground"> {plan.priceSuffix}</span>}
-                  </p>
-                  <div className="space-y-1.5 rounded-lg bg-muted/40 p-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Leads</span>
-                      <span className="font-semibold">{plan.leads}</span>
+            <div
+              className={cn(
+                "grid grid-cols-1 gap-px bg-border p-px",
+                billingPlans.length === 2 && "md:grid-cols-2",
+                billingPlans.length >= 3 && "md:grid-cols-3"
+              )}
+            >
+              {billingLoading
+                ? Array.from({ length: 3 }, (_, i) => (
+                    <div key={`billing-plan-skeleton-${i}`} className="flex flex-col gap-3 bg-card p-5">
+                      <Skeleton className="h-6 w-24" />
+                      <Skeleton className="h-8 w-20" />
+                      <Skeleton className="h-20 w-full rounded-lg" />
+                      <Skeleton className="mt-1 h-9 w-full" />
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Campaigns</span>
-                      <span className="font-semibold">{plan.campaigns}</span>
-                    </div>
-                  </div>
-                  <ul className="flex-1 space-y-1.5 text-sm">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2">
-                        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Button
-                    variant={plan.current ? "outline" : plan.contact ? "outline" : "default"}
-                    disabled={plan.current}
-                    className="mt-1 w-full"
-                    onClick={() => {
-                      if (plan.contact) {
-                        toast({ title: "Request sent", description: "Your admin will reach out with a custom plan." });
-                      } else if (!plan.current) {
-                        toast({ title: `Upgrading to ${plan.name}`, description: "Redirecting to checkout..." });
-                      }
-                    }}
-                  >
-                    {plan.cta}
-                  </Button>
-                </div>
-              ))}
+                  ))
+                : billingPlans.length === 0
+                  ? (
+                      <div className="col-span-full bg-card p-8 text-center text-sm text-muted-foreground">
+                        No plans available right now.
+                      </div>
+                    )
+                  : billingPlans.map((plan) => {
+                      const planAction = getBillingPlanAction(plan, {
+                        currentPlanId,
+                        plans: billingPlans,
+                        hasStripeSubscription
+                      });
+                      const isCurrent = planAction === "current";
+                      const isLoading = billingActionPlanId === plan.id;
+                      const isDisabled =
+                        isCurrent ||
+                        planAction === "unavailable" ||
+                        Boolean(billingActionPlanId) ||
+                        billingCanceling ||
+                        billingReactivating;
+
+                      return (
+                        <div
+                          key={plan.id}
+                          className={cn("flex flex-col gap-3 bg-card p-5", isCurrent && "rounded-lg ring-2 ring-primary")}
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="font-display text-lg font-bold">{plan.name}</p>
+                            {isCurrent && (
+                              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-brand-text">
+                                Current
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-display text-2xl font-bold">
+                            {formatBillingPlanPrice(plan)}
+                            {plan.priceCents > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                {" "}
+                                {formatBillingInterval(plan.billingInterval)}
+                              </span>
+                            )}
+                          </p>
+                          <div className="space-y-1.5 rounded-lg bg-muted/40 p-3 text-xs">
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Leads per campaign</span>
+                              <span className="font-semibold">{plan.maxLeadsPerCampaign.toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-muted-foreground">Campaigns</span>
+                              <span className="font-semibold">{plan.maxCampaigns.toLocaleString()}</span>
+                            </div>
+                          </div>
+                          <Button
+                            variant={isCurrent || planAction === "downgrade" ? "outline" : "default"}
+                            disabled={isDisabled}
+                            className="mt-1 w-full"
+                            onClick={() => void handleBillingPlanAction(plan.id)}
+                          >
+                            {isLoading
+                              ? getBillingPlanActionLoadingLabel(planAction)
+                              : getBillingPlanButtonLabel(plan, planAction)}
+                          </Button>
+                        </div>
+                      );
+                    })}
             </div>
           </Card>
 
           <Card className="overflow-hidden shadow-card">
-            <div className="p-6"><h3 className="font-display text-lg font-bold">Billing History</h3></div>
-            <div className="divide-y divide-border">
-              {billingHistory.map((b) => (
-                <div key={b.id} className="flex items-center justify-between p-4 text-sm">
-                  <span>{b.date}</span>
-                  <span className="font-mono">{b.amount}</span>
-                  <a href="#" className="text-brand-text hover:underline">{b.invoice}</a>
-                </div>
-              ))}
+            <div className="flex flex-col gap-4 p-6 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="font-display text-lg font-bold">Billing History</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  View invoices, update payment methods, and manage billing details in the Stripe customer portal.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="shrink-0"
+                disabled={
+                  billingLoading ||
+                  billingPortalOpening ||
+                  !canOpenBillingPortal(subscription) ||
+                  Boolean(billingActionPlanId) ||
+                  billingCanceling ||
+                  billingReactivating
+                }
+                onClick={() => void handleBillingPortal()}
+              >
+                {billingPortalOpening ? "Opening..." : "Open billing portal"}
+              </Button>
             </div>
+            {!billingLoading && !canOpenBillingPortal(subscription) && (
+              <p className="border-t border-border px-6 pb-6 text-sm text-muted-foreground">
+                Subscribe to a paid plan to access invoices and billing management.
+              </p>
+            )}
           </Card>
         </>
       );
@@ -687,6 +1119,36 @@ export default function Settings() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel subscription */}
+      <AlertDialog
+        open={cancelSubscriptionOpen}
+        onOpenChange={(open) => {
+          if (billingCanceling) return;
+          setCancelSubscriptionOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">Cancel subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {subscription
+                ? `Your ${subscription.plan.name} subscription will stay active until the end of the current billing period. After that, paid features will end. You can undo cancellation before the period ends.`
+                : "Your subscription will stay active until the end of the current billing period. You can undo cancellation before the period ends."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={billingCanceling}>Keep subscription</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={billingCanceling}
+              onClick={() => void handleBillingCancel()}
+            >
+              {billingCanceling ? "Canceling..." : "Cancel at period end"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete */}
       <Dialog

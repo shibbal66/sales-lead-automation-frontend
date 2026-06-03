@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth/authStore";
 import { formatNotificationUnreadBadge } from "@/lib/notifications/unreadCount";
 import { getUserDisplayEmail, getUserDisplayName } from "@/lib/userProfile";
 import { UserProfileAvatar } from "@/components/user-profile-avatar";
+import { useBillingStore } from "@/store/billing/billingStore";
 import { useNotificationsStore } from "@/store/notifications/notificationsStore";
 import {
   LayoutGrid, Users, Megaphone, Calendar, BarChart3, Settings, Bell,
@@ -49,6 +50,8 @@ function SidebarPanel({
   const userDisplayName = getUserDisplayName(user);
   const userDisplayEmail = getUserDisplayEmail(user);
   const unreadCount = useNotificationsStore((state) => state.unreadCount);
+  const subscriptionPlanName = useBillingStore((state) => state.subscription?.plan.name);
+  const isFetchingSubscription = useBillingStore((state) => state.isFetchingSubscription);
 
   return (
     <>
@@ -103,9 +106,12 @@ function SidebarPanel({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold leading-tight">{userDisplayName}</p>
               <p className="truncate text-xs text-muted-foreground">{userDisplayEmail}</p>
-              <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-brand-text">
-                <Sparkles className="h-2.5 w-2.5" /> Pro Plan
-              </span>
+              {(subscriptionPlanName || isFetchingSubscription) && (
+                <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-brand-text">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  {subscriptionPlanName ?? "Loading…"}
+                </span>
+              )}
             </div>
           )}
         </div>
