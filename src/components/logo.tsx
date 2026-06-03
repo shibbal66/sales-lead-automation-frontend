@@ -17,7 +17,7 @@ export function Logo({ className, showWordmark = true, size = "md" }: LogoProps)
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
       <img
-        src="/public/rapidai.png"
+        src="/rapidai.png"
         alt="Rapid AI"
         className={cn("rounded-lg object-cover shadow-card", s.mark)}
       />
