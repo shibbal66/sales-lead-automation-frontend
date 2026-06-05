@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
-import type { CampaignStatus, RunMode } from "@/lib/mock-data";
+import type { CampaignDetailRunMode } from "@/lib/campaignPresentation";
+import type { CampaignStatus } from "@/types/campaign";
 import type { LeadPresentationStatus } from "@/types";
 
 export function StatusPill({
@@ -53,7 +54,7 @@ export function StatusPill({
   );
 }
 
-export function RunModeBadge({ mode }: { mode: RunMode }) {
+export function RunModeBadge({ mode }: { mode: CampaignDetailRunMode }) {
   return (
     <span
       className={cn(

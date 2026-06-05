@@ -13,6 +13,51 @@ export const CAMPAIGN_DETAIL_STATUSES = ["draft", "active", "paused", "completed
 export const CAMPAIGN_TONES = ["Friendly", "Professional", "Direct", "Consultative"] as const;
 export const CAMPAIGN_LEAD_SOURCES: CampaignLeadSource[] = [...CAMPAIGN_LEAD_SOURCE_VALUES];
 
+export const DEFAULT_MAIL_TRAINING_INSTRUCTION =
+  "Write in a warm, conversational tone.";
+
+type CampaignApiRaw = CampaignApiModel & {
+  targetZone?: string;
+  callToAction?: string;
+  runMode?: CampaignApiModel["run_mode"];
+  targetTone?: string;
+  mailTrainingInstruction?: string | null;
+  mailTemplateSamples?: MailTemplateSample[] | null;
+  leadSource?: CampaignLeadSource;
+  senderDisplayName?: string | null;
+  senderAddress?: string | null;
+  senderPhone?: string | null;
+  targetLeads?: number;
+};
+
+function firstNonEmptyString(...candidates: Array<string | null | undefined>): string {
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+/** Merges snake_case and camelCase API shapes so list/detail payloads map consistently. */
+export function normalizeCampaignApiModel(campaign: CampaignApiModel): CampaignApiModel {
+  const raw = campaign as CampaignApiRaw;
+  return {
+    ...campaign,
+    target_zone: firstNonEmptyString(campaign.target_zone, raw.targetZone),
+    call_to_action: firstNonEmptyString(campaign.call_to_action, raw.callToAction),
+    run_mode: campaign.run_mode ?? raw.runMode ?? "auto",
+    target_tone: firstNonEmptyString(campaign.target_tone, raw.targetTone) || CAMPAIGN_TONES[0],
+    mail_training_instruction:
+      campaign.mail_training_instruction ?? raw.mailTrainingInstruction ?? null,
+    mail_template_samples:
+      campaign.mail_template_samples ?? raw.mailTemplateSamples ?? null,
+    lead_source: campaign.lead_source ?? raw.leadSource ?? "new",
+    sender_display_name: campaign.sender_display_name ?? raw.senderDisplayName ?? null,
+    sender_address: campaign.sender_address ?? raw.senderAddress ?? null,
+    sender_phone: campaign.sender_phone ?? raw.senderPhone ?? null,
+    target_leads: campaign.target_leads ?? raw.targetLeads ?? 1
+  };
+}
+
 export type CampaignDetailStatus = (typeof CAMPAIGN_DETAIL_STATUSES)[number];
 export type CampaignDetailRunMode = "automatic" | "manual";
 export type CampaignTone = (typeof CAMPAIGN_TONES)[number];
@@ -63,27 +108,59 @@ export function mapApiStatusToListStatus(status: CampaignStatus): CampaignStatus
 }
 
 export function mapCampaignApiToDetail(campaign: CampaignApiModel): CampaignDetailViewModel {
-  const mailTrainingInstruction = campaign.mail_training_instruction ?? "";
+  const normalized = normalizeCampaignApiModel(campaign);
+  const mailTrainingInstruction = normalized.mail_training_instruction ?? "";
 
   return {
-    id: campaign.id,
-    name: campaign.name,
-    goal: campaign.goal,
-    status: mapApiStatusToDetailStatus(campaign.status),
-    runMode: mapApiRunMode(campaign.run_mode),
-    targetZone: campaign.target_zone,
-    callToAction: campaign.call_to_action,
-    leadSource: campaign.lead_source,
-    targetTone: campaign.target_tone ?? CAMPAIGN_TONES[0],
+    id: normalized.id,
+    name: normalized.name,
+    goal: normalized.goal,
+    status: mapApiStatusToDetailStatus(normalized.status),
+    runMode: mapApiRunMode(normalized.run_mode),
+    targetZone: normalized.target_zone,
+    callToAction: normalized.call_to_action,
+    leadSource: normalized.lead_source,
+    targetTone: normalized.target_tone ?? CAMPAIGN_TONES[0],
     mailTrainingInstruction: mailTrainingInstruction,
-    mailTemplateSamples: campaign.mail_template_samples ?? [],
-    senderDisplayName: campaign.sender_display_name ?? "",
-    senderAddress: campaign.sender_address ?? "",
-    senderPhone: campaign.sender_phone ?? "",
-    targetLeads: campaign.target_leads,
-    createdAt: campaign.created_at,
-    updatedAt: campaign.updated_at
+    mailTemplateSamples: normalized.mail_template_samples ?? [],
+    senderDisplayName: normalized.sender_display_name ?? "",
+    senderAddress: normalized.sender_address ?? "",
+    senderPhone: normalized.sender_phone ?? "",
+    targetLeads: normalized.target_leads,
+    createdAt: normalized.created_at,
+    updatedAt: normalized.updated_at
   };
+}
+
+function resolveCampaignTone(value: string): CampaignTone {
+  return (CAMPAIGN_TONES as readonly string[]).includes(value) ? (value as CampaignTone) : CAMPAIGN_TONES[0];
+}
+
+/** Build a create payload for duplicating a campaign (draft, validated shape). */
+export function mapCampaignApiToDuplicateRequest(
+  campaign: CampaignApiModel,
+  options?: { name?: string }
+): CreateCampaignFormValues {
+  const detail = mapCampaignApiToDetail(campaign);
+  const form: CampaignDetailFormState = {
+    name: options?.name ?? `${detail.name} (Copy)`,
+    goal: detail.goal,
+    targetZone: detail.targetZone,
+    callToAction: detail.callToAction,
+    leadSource: detail.leadSource,
+    runMode: detail.runMode,
+    mailTemplate:
+      detail.mailTrainingInstruction.trim() || DEFAULT_MAIL_TRAINING_INSTRUCTION,
+    exampleTraining: "",
+    mailTemplateSamples: detail.mailTemplateSamples.map((sample) => ({ ...sample })),
+    tone: resolveCampaignTone(detail.targetTone),
+    targetLeads: detail.targetLeads,
+    status: "draft",
+    senderDisplayName: detail.senderDisplayName,
+    senderAddress: detail.senderAddress,
+    senderPhone: detail.senderPhone
+  };
+  return { ...campaignDetailFormToCreateValues(form), status: "draft", name: form.name };
 }
 
 export function mapCampaignApiToListCard(campaign: CampaignApiModel): CampaignListCardViewModel {

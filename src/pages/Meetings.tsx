@@ -15,7 +15,12 @@ import {
 } from "@/components/meetings/meetings-filters-bar";
 import { MeetingsListView } from "@/components/meetings/meetings-list-view";
 import { TablePagination } from "@/components/layout/table-pagination";
-import { buildMeetingStatsKpis, MEETING_STATS_KPI_COUNT, type MeetingsViewMode } from "@/lib/meetings";
+import {
+  buildMeetingStatsKpis,
+  isAllowedMeetingCalendarDay,
+  MEETING_STATS_KPI_COUNT,
+  type MeetingsViewMode
+} from "@/lib/meetings";
 import type { Meeting } from "@/types/meeting";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { useMeetingsStore } from "@/store/meetings/meetingsStore";
@@ -116,6 +121,7 @@ export default function Meetings() {
   const filtersDisabled = isFetching || isFetchingCalendar;
 
   const openCreateDialog = (day?: Date) => {
+    if (day && !isAllowedMeetingCalendarDay(day)) return;
     setEditingMeeting(null);
     setCreateInitialDay(day);
     setCreateOpen(true);
@@ -190,7 +196,7 @@ export default function Meetings() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>
+          </div>add
         </div>
 
         {view === "list" ? (

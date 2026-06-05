@@ -111,7 +111,7 @@ export function FollowUpStepRow({
                 value={draft.body_template}
                 disabled={isRowBusy}
                 onChange={(event) => onDraftChange({ body_template: event.target.value })}
-                placeholder="Hi {{firstName}}, ..."
+                placeholder="Hi, hope you're doing well! Just wanted to gently follow up on my last note — happy to answer any questions when you have a moment."
               />
             </div>
           ) : null}

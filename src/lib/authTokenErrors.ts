@@ -1,4 +1,4 @@
-import type { AxiosError, InternalAxiosRequestConfig } from "axios";
+import { AxiosError, type AxiosResponse, type InternalAxiosRequestConfig } from "axios";
 import { END_POINT } from "@/lib/apiURL";
 
 export const TOKEN_EXPIRED_CODE = "TOKEN_EXPIRED";
@@ -21,19 +21,31 @@ export function isAuthEndpoint(url?: string): boolean {
   return AUTH_ENDPOINTS.some((endpoint) => url.includes(endpoint));
 }
 
-function getApiErrorCode(error: unknown): string | undefined {
-  const data = (error as AxiosError).response?.data;
+/** Read API `code` from a response body or axios error payload. */
+export function getApiErrorCodeFromBody(data: unknown): string | undefined {
   if (!data || typeof data !== "object") return undefined;
   const code = (data as { code?: unknown }).code;
   return typeof code === "string" ? code : undefined;
 }
 
+function getApiErrorCode(error: unknown): string | undefined {
+  const axiosError = error as AxiosError;
+  return getApiErrorCodeFromBody(axiosError.response?.data);
+}
+
+export function isTokenExpiredPayload(data: unknown): boolean {
+  return getApiErrorCodeFromBody(data) === TOKEN_EXPIRED_CODE;
+}
+
 export function isTokenExpiredError(error: unknown): boolean {
   const axiosError = error as AxiosError;
-  return (
-    axiosError.response?.status === 401 &&
-    getApiErrorCode(error) === TOKEN_EXPIRED_CODE
-  );
+  const status = axiosError.response?.status;
+  const code = getApiErrorCode(error);
+
+  if (code !== TOKEN_EXPIRED_CODE) return false;
+
+  // Standard 401, or 200/403/etc. when the backend still returns TOKEN_EXPIRED in the body.
+  return status === 401 || status === 200 || status === 403;
 }
 
 /** True when the interceptor should refresh the access token and retry. */
@@ -43,4 +55,17 @@ export function shouldRefreshAccessToken(
 ): boolean {
   if (isAuthEndpoint(config?.url)) return false;
   return isTokenExpiredError(error);
+}
+
+/** Turn a successful HTTP response that carries TOKEN_EXPIRED into an axios error for the refresh flow. */
+export function tokenExpiredResponseToAxiosError(response: AxiosResponse): AxiosError {
+  const message =
+    (response.data as { message?: string })?.message ?? "Access token expired. Please login again.";
+  return new AxiosError(
+    message,
+    AxiosError.ERR_BAD_REQUEST,
+    response.config,
+    response.request,
+    { ...response, status: 401 }
+  );
 }

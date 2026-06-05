@@ -117,15 +117,15 @@ export default function Leads() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></TableHead>
+              {/* <TableHead className="w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></TableHead> */}
               <TableHead>Name</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Campaign</TableHead>
+              {/* <TableHead>Campaign</TableHead> */}
               <TableHead>Fit Score</TableHead>
-              <TableHead>Last Contacted</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>Contacted</TableHead>
+              {/* <TableHead className="text-right">Actions</TableHead> */}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -142,25 +142,25 @@ export default function Leads() {
             {!isFetching
               ? leads.map((l) => (
                   <TableRow key={l.id} className="hover:bg-primary/5">
-                    <TableCell><Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggleOne(l.id)} /></TableCell>
+                    {/* <TableCell><Checkbox checked={selected.has(l.id)} onCheckedChange={() => toggleOne(l.id)} /></TableCell> */}
                     <TableCell>
                       <div className="flex items-center gap-2.5">
                         <UserProfileAvatar name={l.name} size={28} />
                         <div>
-                          <p className="text-sm font-medium leading-tight">{l.name}</p>
-                          <p className="text-xs text-muted-foreground">{l.title}</p>
+                          <p className="max-w-[200px] text-sm font-medium leading-tight">{l.name}</p>
+                          <p className="max-w-[200px] truncate text-xs text-muted-foreground">{l.title}</p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">{l.company}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{l.email}</TableCell>
+                    <TableCell className="max-w-[160px] truncate text-sm">{l.company}</TableCell>
+                    <TableCell className="max-w-[180px] truncate text-sm text-muted-foreground">{l.email}</TableCell>
                     <TableCell><StatusPill status={l.status} /></TableCell>
-                    <TableCell className="text-sm">{l.campaignName ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                    {/* <TableCell className="text-sm">{l.campaignName ?? <span className="text-muted-foreground">—</span>}</TableCell> */}
                     <TableCell>
                       <StatusPill status={l.fitScore} />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{l.lastContacted}</TableCell>
-                    <TableCell className="text-right">
+                    {/* <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="default"
@@ -187,7 +187,7 @@ export default function Leads() {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                    </TableCell>
+                    </TableCell> */}
                   </TableRow>
                 ))
               : null}

@@ -29,6 +29,7 @@ import {
 import { MEETING_STATUS_FORM_OPTIONS } from "@/lib/meetings/filters";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { useMeetingsStore } from "@/store/meetings/meetingsStore";
+import type { CampaignLeadApiModel } from "@/types/campaign";
 import type { Meeting, MeetingApiStatus } from "@/types/meeting";
 import {
   buildCreateMeetingPayload,
@@ -41,6 +42,15 @@ import {
 
 const EMPTY_CAMPAIGN = "__none__";
 const EMPTY_LEAD = "__none__";
+
+function getCampaignLeadOptionName(lead: CampaignLeadApiModel): string {
+  return lead.lead_name?.trim() || lead.lead_email?.trim() || "Unnamed lead";
+}
+
+function getCampaignLeadOptionCompany(lead: CampaignLeadApiModel): string | null {
+  const company = lead.lead_company?.trim();
+  return company || null;
+}
 
 type CreateMeetingDialogProps = {
   open: boolean;
@@ -178,6 +188,10 @@ export function CreateMeetingDialog({
   const [errors, setErrors] = useState<FormErrors>({});
 
   const selectedCampaignId = form.campaign_id === EMPTY_CAMPAIGN ? "" : form.campaign_id;
+  const selectedCampaignLead = useMemo(() => {
+    if (form.campaign_lead_id === EMPTY_LEAD) return null;
+    return campaignLeads.find((lead) => lead.id === form.campaign_lead_id) ?? null;
+  }, [form.campaign_lead_id, campaignLeads]);
   const isAlreadyCancelled = meeting?.apiStatus === "cancelled";
 
   useEffect(() => {
@@ -428,18 +442,45 @@ export function CreateMeetingDialog({
                         setForm((f) => ({ ...f, campaign_lead_id }))
                       }
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-auto min-h-10 py-2">
                         <SelectValue
                           placeholder={selectedCampaignId ? "Select lead" : "Select campaign first"}
-                        />
+                        >
+                          {selectedCampaignLead ? (
+                            <span className="flex flex-col items-start gap-0.5 text-left">
+                              <span className="truncate font-medium leading-tight">
+                                {getCampaignLeadOptionName(selectedCampaignLead)}
+                              </span>
+                              {getCampaignLeadOptionCompany(selectedCampaignLead) ? (
+                                <span className="truncate text-xs font-normal">
+                                  {getCampaignLeadOptionCompany(selectedCampaignLead)}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={EMPTY_LEAD}>None</SelectItem>
-                        {campaignLeads.map((lead) => (
-                          <SelectItem key={lead.id} value={lead.id}>
-                            Lead {lead.lead_data_id}
-                          </SelectItem>
-                        ))}
+                        {campaignLeads.map((lead) => {
+                          const company = getCampaignLeadOptionCompany(lead);
+                          const name = getCampaignLeadOptionName(lead);
+                          return (
+                            <SelectItem
+                              key={lead.id}
+                              value={lead.id}
+                              textValue={company ? `${name} ${company}` : name}
+                              className="py-2"
+                            >
+                              <span className="flex flex-col items-start gap-0.5">
+                                <span className="font-medium leading-tight">{name}</span>
+                                {company ? (
+                                  <span className="text-xs truncate text-muted-foreground">{company}</span>
+                                ) : null}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
                       </SelectContent>
                     </Select>
                     {errors.campaign_lead_id ? (

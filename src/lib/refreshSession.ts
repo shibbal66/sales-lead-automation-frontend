@@ -1,6 +1,6 @@
 import axios from "axios";
 import { END_POINT } from "./apiURL";
-import { getRefreshToken, setAuthToken, setRefreshToken } from "@/utils/authSorage";
+import { getRefreshToken, setAuthToken, setRefreshToken } from "@/utils/authStorage";
 import type { RefreshTokenResponse } from "@/types";
 
 export async function refreshSession(): Promise<string> {

@@ -1,5 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff } from "lucide-react";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Label } from "@/components/ui/label";
@@ -8,20 +10,11 @@ import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { resetPassword } from "@/services/auth/authServices";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
-import { resetPasswordSchema } from "@/validators";
-import { useAuthStore } from "@/store/auth/authStore";
-import { clearPendingPasswordReset, getPendingPasswordReset } from "@/utils/authSorage";
-import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
+import { resetPasswordSchema, type ResetPasswordFormValues } from "@/validators";
+import { clearPendingPasswordReset, getPendingPasswordReset } from "@/utils/authStorage";
 
 type ResetPasswordLocationState = {
   email?: string;
-};
-
-type ResetPasswordErrors = {
-  email?: string;
-  otp?: string;
-  password?: string;
-  confirmPassword?: string;
 };
 
 export default function ResetPassword() {
@@ -31,62 +24,55 @@ export default function ResetPassword() {
   const { email: routeEmail } = ((state as ResetPasswordLocationState) || {}) as ResetPasswordLocationState;
   const resolvedEmail = routeEmail || pending?.email;
 
-  const setCredentials = useAuthStore((s) => s.setCredentials);
-  const [otp, setOtp] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<ResetPasswordErrors>({});
 
-  const clearFieldError = (field: keyof ResetPasswordErrors) => {
-    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
-  };
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = resetPasswordSchema.safeParse({
-      email: resolvedEmail,
-      otp,
-      password,
-      confirmPassword
-    });
-    if (!parsed.success) {
-      const fieldErrors = parsed.error.flatten().fieldErrors;
-      setErrors({
-        email: fieldErrors.email?.[0],
-        otp: fieldErrors.otp?.[0],
-        password: fieldErrors.password?.[0],
-        confirmPassword: fieldErrors.confirmPassword?.[0]
-      });
-      return;
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    trigger,
+    formState: { errors }
+  } = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    mode: "onChange",
+    defaultValues: {
+      email: resolvedEmail || "",
+      otp: "",
+      password: "",
+      confirmPassword: ""
     }
-    setErrors({});
+  });
 
+  const otp = watch("otp");
+
+  useEffect(() => {
+    if (resolvedEmail) {
+      setValue("email", resolvedEmail, { shouldValidate: true });
+    }
+  }, [resolvedEmail, setValue]);
+
+  const onSubmit = async (data: ResetPasswordFormValues) => {
     setLoading(true);
     try {
       const response = await resetPassword({
-        email: parsed.data.email,
-        otp: parsed.data.otp,
-        password: parsed.data.password
+        email: data.email,
+        otp: data.otp,
+        password: data.password
       });
 
-      const { data } = response;
-      if (!response.success || !data?.accessToken || !data.refreshToken || !data.user?.id) {
+      if (!response.success) {
         showApiErrorToast(response);
         return;
       }
 
-      setCredentials({
-        user: mapApiUserToAuthUser(data.user),
-        token: data.accessToken,
-        refreshToken: data.refreshToken
-      });
       clearPendingPasswordReset();
-
-      showApiSuccessToast(response.message || "Password reset successful.");
-      navigate("/dashboard", { replace: true });
+      showApiSuccessToast(
+        response.message || "Password reset successful. Sign in with your new password."
+      );
+      navigate("/login", { replace: true });
     } catch (error) {
       showApiErrorToast(error);
     } finally {
@@ -106,85 +92,100 @@ export default function ResetPassword() {
           : "Enter the code from your email and your new password."}
       </p>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-5">
-        <div className="space-y-3">
-          <Label htmlFor="otp">Reset code</Label>
-          <InputOTP
-            id="otp"
-            maxLength={6}
-            value={otp}
-            onChange={(value) => {
-              setOtp(value);
-              clearFieldError("otp");
-            }}
-          >
-            <InputOTPGroup className="w-full justify-between">
-              <InputOTPSlot index={0} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={1} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={2} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={3} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={4} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={5} className="h-12 w-11 text-lg" />
-            </InputOTPGroup>
-          </InputOTP>
-          {errors.otp ? <p className="text-xs text-destructive">{errors.otp}</p> : null}
-        </div>
+      <form noValidate onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
+        <Controller
+          name="otp"
+          control={control}
+          render={({ field }) => (
+            <div className="space-y-3">
+              <Label htmlFor="otp">Reset code</Label>
+              <InputOTP
+                id="otp"
+                maxLength={6}
+                value={field.value}
+                onChange={field.onChange}
+              >
+                <InputOTPGroup className="w-full justify-between">
+                  <InputOTPSlot index={0} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={1} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={2} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={3} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={4} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={5} className="h-12 w-11 text-lg" />
+                </InputOTPGroup>
+              </InputOTP>
+              {errors.otp?.message ? (
+                <p className="text-xs text-destructive">{errors.otp.message}</p>
+              ) : null}
+            </div>
+          )}
+        />
 
-        <div className="space-y-1.5">
-          <Label htmlFor="password">New password</Label>
-          <div className="relative">
-            <Input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Enter your new password"
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                clearFieldError("password");
-              }}
-              className="pr-10"
-              required
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.password ? <p className="text-xs text-destructive">{errors.password}</p> : null}
-        </div>
+        <Controller
+          name="password"
+          control={control}
+          render={({ field }) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="password">New password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your new password"
+                  className="pr-10"
+                  aria-invalid={!!errors.password}
+                  {...field}
+                  onChange={(e) => {
+                    field.onChange(e);
+                    void trigger("confirmPassword");
+                  }}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {errors.password?.message ? (
+                <p className="text-xs text-destructive">{errors.password.message}</p>
+              ) : null}
+            </div>
+          )}
+        />
 
-        <div className="space-y-1.5">
-          <Label htmlFor="confirmPassword">Confirm new password</Label>
-          <div className="relative">
-            <Input
-              id="confirmPassword"
-              type={showConfirmPassword ? "text" : "password"}
-              placeholder="Confirm your new password"
-              value={confirmPassword}
-              onChange={(e) => {
-                setConfirmPassword(e.target.value);
-                clearFieldError("confirmPassword");
-              }}
-              className="pr-10"
-              required
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
-              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-            >
-              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
-          {errors.confirmPassword ? (
-            <p className="text-xs text-destructive">{errors.confirmPassword}</p>
-          ) : null}
-        </div>
+        <Controller
+          name="confirmPassword"
+          control={control}
+          render={({ field }) => (
+            <div className="space-y-1.5">
+              <Label htmlFor="confirmPassword">Confirm new password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm your new password"
+                  className="pr-10"
+                  aria-invalid={!!errors.confirmPassword}
+                  {...field}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {errors.confirmPassword?.message ? (
+                <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+              ) : null}
+            </div>
+          )}
+        />
 
         <Button
           type="submit"
@@ -197,7 +198,7 @@ export default function ResetPassword() {
 
       {!resolvedEmail ? (
         <p className="mt-6 text-sm text-destructive">
-          {errors.email || "Missing reset context. Please request a new code."}
+          {errors.email?.message || "Missing reset context. Please request a new code."}
         </p>
       ) : null}
 

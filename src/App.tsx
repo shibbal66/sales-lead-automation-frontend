@@ -1,10 +1,10 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AppShell } from "@/components/layout/app-shell";
+import Home from "./pages/Home";
 import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import VerifyOtp from "./pages/auth/VerifyOtp";
@@ -28,14 +28,17 @@ function AppRoutes() {
   const isLoading = useAuthStore((state) => state.isLoading);
 
   useEffect(() => {
-    useAuthStore.getState().initializeAuth();
+    void useAuthStore.getState().initializeAuth();
   }, []);
 
   if (isLoading) return null;
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
+      <Route
+        path="/"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Home />}
+      />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route path="/verify-otp" element={<VerifyOtp />} />
@@ -62,7 +65,6 @@ function AppRoutes() {
 const App = () => (
   <ThemeProvider>
     <TooltipProvider>
-      <Toaster />
       <Sonner />
       <BrowserRouter>
         <AppRoutes />

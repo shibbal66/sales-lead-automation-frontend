@@ -12,7 +12,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { signup } from "@/services/auth/authServices";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { startGoogleOAuthRedirect } from "@/lib/googleAuth";
-import { setPendingVerification } from "@/utils/authSorage";
+import { setPendingVerification } from "@/utils/authStorage";
 import { PhoneNumberField } from "@/components/shared/phone-number-field";
 import { signupSchema, type SignupFormValues } from "@/validators";
 import type { SignupRequest } from "@/types/auth";

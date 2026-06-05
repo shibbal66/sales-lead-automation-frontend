@@ -1,6 +1,8 @@
 import { format } from "date-fns";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { MEETING_PAST_DATE_MESSAGE } from "@/lib/meetings";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,8 @@ type MeetingsDayDetailDialogProps = {
   onEditMeeting?: (meeting: Meeting) => void;
   onDeleteMeeting?: (meeting: Meeting) => void;
   actionsDisabled?: boolean;
+  /** False when the selected day is before today (create blocked). */
+  canAddMeeting?: boolean;
 };
 
 export function MeetingsDayDetailDialog({
@@ -30,8 +34,10 @@ export function MeetingsDayDetailDialog({
   onAddMeeting,
   onEditMeeting,
   onDeleteMeeting,
-  actionsDisabled
+  actionsDisabled,
+  canAddMeeting = true
 }: MeetingsDayDetailDialogProps) {
+  const addMeetingDisabled = actionsDisabled || !canAddMeeting;
   const dayLabel = format(day, "EEEE, MMMM d");
 
   return (
@@ -57,10 +63,24 @@ export function MeetingsDayDetailDialog({
         </div>
 
         <DialogFooter className="border-t border-border px-6 py-4 sm:justify-stretch">
-          <Button type="button" className="w-full gap-1.5" onClick={onAddMeeting}>
-            <Plus className="h-4 w-4" />
-            Add meeting
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="w-full">
+                <Button
+                  type="button"
+                  className="w-full gap-1.5"
+                  disabled={addMeetingDisabled}
+                  onClick={onAddMeeting}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add meeting
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!canAddMeeting ? (
+              <TooltipContent>{MEETING_PAST_DATE_MESSAGE}</TooltipContent>
+            ) : null}
+          </Tooltip>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -1,4 +1,4 @@
-import { getAuthToken } from "@/utils/authSorage";
+import { getAuthToken } from "@/utils/authStorage";
 import { getDeviceLabel } from "@/lib/fcm/deviceLabel";
 import {
   clearStoredFcmToken,

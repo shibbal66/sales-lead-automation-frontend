@@ -1,23 +1,20 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { resendOtp, verifyOtp } from "@/services/auth/authServices";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
-import { resendOtpSchema, verifyOtpSchema } from "@/validators";
+import { resendOtpSchema, verifyOtpSchema, type VerifyOtpFormValues } from "@/validators";
 import { useAuthStore } from "@/store/auth/authStore";
-import { clearPendingVerification, getPendingVerification } from "@/utils/authSorage";
+import { clearPendingVerification, getPendingVerification } from "@/utils/authStorage";
 import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
 
 type VerifyOtpLocationState = {
   email?: string;
-};
-
-type VerifyOtpErrors = {
-  email?: string;
-  otp?: string;
 };
 
 export default function VerifyOtp() {
@@ -27,41 +24,47 @@ export default function VerifyOtp() {
   const { email: routeEmail } = ((state as VerifyOtpLocationState) || {}) as VerifyOtpLocationState;
   const resolvedEmail = routeEmail || pending?.email;
   const setCredentials = useAuthStore((s) => s.setCredentials);
-  const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const [errors, setErrors] = useState<VerifyOtpErrors>({});
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsed = verifyOtpSchema.safeParse({ email: resolvedEmail, otp });
-    if (!parsed.success) {
-      const fieldErrors = parsed.error.flatten().fieldErrors;
-      setErrors({
-        email: fieldErrors.email?.[0],
-        otp: fieldErrors.otp?.[0]
-      });
-      return;
+  const {
+    control,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors }
+  } = useForm<VerifyOtpFormValues>({
+    resolver: zodResolver(verifyOtpSchema),
+    mode: "onChange",
+    defaultValues: { email: resolvedEmail || "", otp: "" }
+  });
+
+  const otp = watch("otp");
+
+  useEffect(() => {
+    if (resolvedEmail) {
+      setValue("email", resolvedEmail, { shouldValidate: true });
     }
-    setErrors({});
+  }, [resolvedEmail, setValue]);
 
+  const onSubmit = async (data: VerifyOtpFormValues) => {
     setLoading(true);
     try {
       const response = await verifyOtp({
-        email: parsed.data.email,
-        otp: parsed.data.otp
+        email: data.email,
+        otp: data.otp
       });
 
-      const { data } = response;
-      if (!response.success || !data?.accessToken || !data.refreshToken || !data.user?.id) {
+      const { data: responseData } = response;
+      if (!response.success || !responseData?.accessToken || !responseData.refreshToken || !responseData.user?.id) {
         showApiErrorToast(response);
         return;
       }
 
       setCredentials({
-        user: mapApiUserToAuthUser(data.user),
-        token: data.accessToken,
-        refreshToken: data.refreshToken
+        user: mapApiUserToAuthUser(responseData.user),
+        token: responseData.accessToken,
+        refreshToken: responseData.refreshToken
       });
       clearPendingVerification();
 
@@ -77,14 +80,8 @@ export default function VerifyOtp() {
   const onResendCode = async () => {
     const parsed = resendOtpSchema.safeParse({ email: resolvedEmail });
     if (!parsed.success) {
-      const emailError = parsed.error.flatten().fieldErrors.email?.[0];
-      setErrors((prev) => ({
-        ...prev,
-        email: emailError || "Missing signup context. Please create your account again."
-      }));
       return;
     }
-    setErrors((prev) => ({ ...prev, email: undefined }));
 
     setResending(true);
     try {
@@ -93,7 +90,7 @@ export default function VerifyOtp() {
         showApiErrorToast(response);
         return;
       }
-      setOtp("");
+      setValue("otp", "");
       showApiSuccessToast(
         response.message || "A new verification code has been sent to your email."
       );
@@ -116,29 +113,34 @@ export default function VerifyOtp() {
           : "Enter the 6-digit code from your email."}
       </p>
 
-      <form onSubmit={onSubmit} className="mt-8 space-y-6">
-        <div className="space-y-3">
-          <Label htmlFor="otp">Verification code</Label>
-          <InputOTP
-            id="otp"
-            maxLength={6}
-            value={otp}
-            onChange={(value) => {
-              setOtp(value);
-              if (errors.otp) setErrors((prev) => ({ ...prev, otp: undefined }));
-            }}
-          >
-            <InputOTPGroup className="w-full justify-between">
-              <InputOTPSlot index={0} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={1} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={2} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={3} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={4} className="h-12 w-11 text-lg" />
-              <InputOTPSlot index={5} className="h-12 w-11 text-lg" />
-            </InputOTPGroup>
-          </InputOTP>
-          {errors.otp ? <p className="text-xs text-destructive">{errors.otp}</p> : null}
-        </div>
+      <form noValidate onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-6">
+        <Controller
+          name="otp"
+          control={control}
+          render={({ field }) => (
+            <div className="space-y-3">
+              <Label htmlFor="otp">Verification code</Label>
+              <InputOTP
+                id="otp"
+                maxLength={6}
+                value={field.value}
+                onChange={field.onChange}
+              >
+                <InputOTPGroup className="w-full justify-between">
+                  <InputOTPSlot index={0} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={1} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={2} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={3} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={4} className="h-12 w-11 text-lg" />
+                  <InputOTPSlot index={5} className="h-12 w-11 text-lg" />
+                </InputOTPGroup>
+              </InputOTP>
+              {errors.otp?.message ? (
+                <p className="text-xs text-destructive">{errors.otp.message}</p>
+              ) : null}
+            </div>
+          )}
+        />
 
         <Button type="submit" className="w-full" disabled={loading || !resolvedEmail || otp.length !== 6}>
           {loading ? "Verifying..." : "Verify & Continue"}
@@ -147,7 +149,7 @@ export default function VerifyOtp() {
 
       {!resolvedEmail ? (
         <p className="mt-6 text-sm text-destructive">
-          {errors.email || "Missing signup context. Please create your account again."}
+          {errors.email?.message || "Missing signup context. Please create your account again."}
         </p>
       ) : null}
 
