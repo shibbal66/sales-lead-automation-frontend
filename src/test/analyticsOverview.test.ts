@@ -23,7 +23,7 @@ describe("buildAnalyticsOverviewKpis", () => {
     expect(kpis).toHaveLength(4);
     expect(kpis[0]?.value).toBe("120");
     expect(kpis[0]?.delta?.value).toContain("+15.5%");
-    expect(kpis[1]?.value).toBe("—");
+    expect(kpis[1]?.value).toBe("0%");
     expect(kpis[1]?.hint).toBe("Open tracking is not stored yet.");
     expect(kpis[1]?.delta).toBeUndefined();
     expect(kpis[2]?.value).toBe("18.3%");

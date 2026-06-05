@@ -44,7 +44,7 @@ export function buildAnalyticsOverviewKpis(data: AnalyticsOverviewData): Analyti
   const openRateValue =
     open_rate.tracked && open_rate.percent !== null
       ? formatAnalyticsRatePercent(open_rate.percent)
-      : "—";
+      : "0%";
 
   const openRateHint = !open_rate.tracked && meta.open_rate_note ? meta.open_rate_note : undefined;
 

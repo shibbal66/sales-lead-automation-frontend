@@ -13,7 +13,13 @@ import {
 } from "@/components/ui/select";
 import { datetimeLocalValueToIsoUtc, isoToDatetimeLocalValue } from "@/lib/dateFormatting";
 import { showApiErrorToast } from "@/lib/apiToast";
-import { CAMPAIGN_LEAD_STATUSES, type CampaignLeadApiModel, type CampaignLeadStatus, type UpdateCampaignLeadRequest } from "@/types";
+import {
+  CAMPAIGN_LEAD_STATUSES,
+  CAMPAIGN_LEAD_STATUS_OPTIONS,
+  type CampaignLeadApiModel,
+  type CampaignLeadStatus,
+  type UpdateCampaignLeadRequest
+} from "@/types";
 
 function normalizeCampaignLeadStatus(value: string): CampaignLeadStatus {
   return (CAMPAIGN_LEAD_STATUSES as readonly string[]).includes(value)
@@ -81,9 +87,9 @@ export function EditCampaignLeadDialog({
                 <SelectValue placeholder="Select status" />
               </SelectTrigger>
               <SelectContent>
-                {CAMPAIGN_LEAD_STATUSES.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {value}
+                {CAMPAIGN_LEAD_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
                   </SelectItem>
                 ))}
               </SelectContent>

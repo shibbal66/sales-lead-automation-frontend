@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { CampaignDetailRunMode } from "@/lib/campaignPresentation";
-import type { CampaignStatus } from "@/types/campaign";
+import { getCampaignLeadStatusLabel, type CampaignStatus } from "@/types/campaign";
 import type { LeadPresentationStatus } from "@/types";
 
 export function StatusPill({
@@ -36,10 +36,7 @@ export function StatusPill({
   };
   const label =
     typeof status === "string" && status.length > 0
-      ? status
-          .split("_")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(" ")
+      ? getCampaignLeadStatusLabel(status)
       : status;
   return (
     <span

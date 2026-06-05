@@ -144,7 +144,7 @@ sales-lead-automation-frontend/
 ├── tailwind.config.ts
 ├── vite.config.ts
 ├── vitest.config.ts
-└── vercel.json                      # SPA rewrites for client-side routing
+└── render.yaml                      # Render static site + SPA rewrite routes
 ```
 
 ## Environment variables
@@ -182,9 +182,24 @@ Server-only keys in `.env.example` (`FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_K
 - On app load, `initializeAuth()` proactively calls `/auth/refresh` when both tokens exist.
 - Axios interceptors refresh on `TOKEN_EXPIRED` (HTTP 401 or 200 error body) and retry failed requests.
 
-## Deployment
+## Deployment (Render)
 
-The app is a static SPA. `vercel.json` rewrites all routes to `index.html` for client-side routing. Set `VITE_API_BASE_URL` (and Firebase vars if using push) in your hosting provider’s environment. Ensure the backend sets Stripe `success_url` / `cancel_url` / portal `return_url` to your production frontend origin—not `localhost`.
+The app is a static SPA deployed to [Render](https://render.com) as a **Static Site**.
+
+| Setting | Value |
+| :--- | :--- |
+| Build Command | `npm install && npm run build` |
+| Publish Directory | `dist` |
+
+**SPA routing (required):** Direct URLs like `/login` and `/auth/google/callback` must rewrite to `index.html`, or the server returns 404 before React loads. Configure one of:
+
+1. **`render.yaml`** in the repo (included) — rewrite `/*` → `/index.html`
+2. **Render Dashboard** → your static site → **Redirects/Rewrites** → Add rule:
+   - Source: `/*`
+   - Destination: `/index.html`
+   - Action: **Rewrite**
+
+Set `VITE_API_BASE_URL` (and Firebase vars if using push) in Render **Environment** for the static site. Ensure the backend sets Stripe `success_url` / `cancel_url` / portal `return_url` to your production frontend origin—not `localhost`.
 
 ## Contributing
 
