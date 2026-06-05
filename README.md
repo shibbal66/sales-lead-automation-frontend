@@ -191,13 +191,15 @@ The app is a static SPA deployed to [Render](https://render.com) as a **Static S
 | Build Command | `npm install && npm run build` |
 | Publish Directory | `dist` |
 
-**SPA routing (required):** Direct URLs like `/login` and `/auth/google/callback` must rewrite to `index.html`, or the server returns 404 before React loads. Configure one of:
+**SPA routing (required):** Direct URLs like `/login` and `/auth/google/callback` must serve the app shell (`index.html`) so React Router can handle the path. This repo uses two layers:
 
-1. **`render.yaml`** in the repo (included) — rewrite `/*` → `/index.html`
-2. **Render Dashboard** → your static site → **Redirects/Rewrites** → Add rule:
-   - Source: `/*`
-   - Destination: `/index.html`
-   - Action: **Rewrite**
+1. **Build output (`scripts/spa-fallback.mjs`)** — copies `dist/index.html` to `dist/404.html` after every build. Render serves `404.html` for missing paths, which loads the SPA even when no rewrite rule is configured.
+2. **Render rewrite rule (recommended)** — configure one of:
+   - **`render.yaml`** in the repo (included) — rewrite `/*` → `/index.html` (applied when the service is managed by a Render Blueprint)
+   - **Render Dashboard** → your static site → **Redirects/Rewrites** → Add rule:
+     - Source: `/*`
+     - Destination: `/index.html`
+     - Action: **Rewrite** (not Redirect)
 
 Set `VITE_API_BASE_URL` (and Firebase vars if using push) in Render **Environment** for the static site. Ensure the backend sets Stripe `success_url` / `cancel_url` / portal `return_url` to your production frontend origin—not `localhost`.
 

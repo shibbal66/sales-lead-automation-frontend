@@ -1,3 +1,6 @@
+# Render Blueprint for the Rapid AI frontend static site.
+# If this service was created manually (not via Blueprint), also add the rewrite
+# rule in Dashboard → Static Site → Redirects/Rewrites (see README).
 services:
   - type: web
     name: rapidai-frontend
@@ -5,6 +8,7 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
     routes:
+      # React Router (BrowserRouter): rewrite unknown paths to index.html
       - type: rewrite
         source: /*
         destination: /index.html
