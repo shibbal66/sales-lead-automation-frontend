@@ -119,7 +119,7 @@ export default function Settings() {
     if (sectionId === "profile") {
       return (
         <ProfileSection
-          user={user}
+              user={user}
           profileLoading={profileLoading}
           profileSaving={profileSaving}
           avatarUploading={avatarUploading}
@@ -157,9 +157,9 @@ export default function Settings() {
       return (
         <NotificationsSection
           enabled={notificationPrefs.notificationsEnabled}
-          disabled={profileLoading || notificationPreferencesSaving}
+              disabled={profileLoading || notificationPreferencesSaving}
           onToggle={(checked) => void onNotificationToggle(checked)}
-        />
+            />
       );
     }
 

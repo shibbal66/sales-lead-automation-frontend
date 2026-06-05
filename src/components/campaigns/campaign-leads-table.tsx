@@ -18,21 +18,14 @@ import {
 import { EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  CAMPAIGN_LEAD_STATUSES,
+  CAMPAIGN_LEAD_STATUS_OPTIONS,
+  getCampaignLeadStatusLabel,
   type CampaignLeadApiModel,
-  type CampaignLeadStatus,
   type CampaignLeadsStatusFilter,
 } from "@/types";
 import { formatDateTime } from "@/lib/dateFormatting";
 import { MailTemplatePreview } from "@/components/campaigns/mail-template-preview";
 import { CampaignLeadsTableRowsSkeleton } from "@/components/skeletons/campaigns/campaign-leads-table-skeleton";
-
-function formatCampaignLeadStatusLabel(status: CampaignLeadStatus): string {
-  return status
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
 
 type CampaignLeadsTableProps = {
   leads: CampaignLeadApiModel[];
@@ -92,19 +85,19 @@ export function CampaignLeadsTable({
           >
             All
           </button>
-          {CAMPAIGN_LEAD_STATUSES.map((option) => (
+          {CAMPAIGN_LEAD_STATUS_OPTIONS.map((option) => (
             <button
-              key={option}
+              key={option.value}
               type="button"
-              onClick={() => onStatusFilterChange(option)}
+              onClick={() => onStatusFilterChange(option.value)}
               className={cn(
                 "rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
-                statusFilter === option
+                statusFilter === option.value
                   ? "border-primary bg-primary/15 text-brand-text"
                   : "border-border text-muted-foreground hover:bg-muted",
               )}
             >
-              {formatCampaignLeadStatusLabel(option)}
+              {option.label}
             </button>
           ))}
         </div>
@@ -133,7 +126,7 @@ export function CampaignLeadsTable({
               >
                 {statusFilter === "all"
                   ? "No leads assigned to this campaign yet."
-                  : `No leads with status "${formatCampaignLeadStatusLabel(statusFilter)}".`}
+                  : `No leads with status "${getCampaignLeadStatusLabel(statusFilter)}".`}
               </TableCell>
             </TableRow>
           ) : null}

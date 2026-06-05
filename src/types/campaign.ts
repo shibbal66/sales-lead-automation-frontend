@@ -175,9 +175,32 @@ export const CAMPAIGN_LEAD_STATUSES = [
   "template_generated",
   "sent",
   "failed",
-  "skipped",
 ] as const;
 export type CampaignLeadStatus = (typeof CAMPAIGN_LEAD_STATUSES)[number];
+
+/** User-facing labels for campaign lead statuses. */
+export const CAMPAIGN_LEAD_STATUS_LABELS: Record<CampaignLeadStatus, string> = {
+  pending: "Pending",
+  template_generated: "Email drafted",
+  sent: "Sent",
+  failed: "Failed",
+};
+
+export const CAMPAIGN_LEAD_STATUS_OPTIONS: { value: CampaignLeadStatus; label: string }[] =
+  CAMPAIGN_LEAD_STATUSES.map((value) => ({
+    value,
+    label: CAMPAIGN_LEAD_STATUS_LABELS[value],
+  }));
+
+export function getCampaignLeadStatusLabel(status: CampaignLeadStatus | string): string {
+  if ((CAMPAIGN_LEAD_STATUSES as readonly string[]).includes(status)) {
+    return CAMPAIGN_LEAD_STATUS_LABELS[status as CampaignLeadStatus];
+  }
+  return status
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 export type CampaignLeadsStatusFilter = "all" | CampaignLeadStatus;
 
