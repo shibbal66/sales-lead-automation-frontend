@@ -1,8 +1,13 @@
 import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { clearAuthStorage, getAuthToken, setPendingAuthError } from "@/utils/authSorage";
+import { clearAuthStorage, getAuthToken, setPendingAuthError } from "@/utils/authStorage";
 import { refreshSession } from "@/lib/refreshSession";
 import { getApiErrorMessage, setSuppressApiErrorToasts } from "@/lib/apiToast";
-import { shouldRefreshAccessToken } from "@/lib/authTokenErrors";
+import {
+  isAuthEndpoint,
+  isTokenExpiredPayload,
+  shouldRefreshAccessToken,
+  tokenExpiredResponseToAxiosError
+} from "@/lib/authTokenErrors";
 
 const LOGIN_PATH = "/login";
 
@@ -59,7 +64,12 @@ axiosInstance.interceptors.request.use(
 );
 
 axiosInstance.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (isTokenExpiredPayload(response.data) && !isAuthEndpoint(response.config?.url)) {
+      return Promise.reject(tokenExpiredResponseToAxiosError(response));
+    }
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableAxiosRequestConfig;
 

@@ -504,7 +504,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 ) : null}
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="senderAddress">Sender address</Label>
+                <Label htmlFor="senderAddress">Sender Address</Label>
                 <Input
                   id="senderAddress"
                   type="text"
@@ -521,7 +521,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
               </div>
               <PhoneNumberField
                 id="senderPhone"
-                label="Sender phone"
+                label="Sender Phone Number"
                 value={senderPhone}
                 error={errors.sender_phone}
                 onChange={(value) =>

@@ -15,7 +15,7 @@ import { getApiErrorMessage, showApiErrorToast, showApiSuccessToast } from "@/li
 import { startGoogleOAuthRedirect } from "@/lib/googleAuth";
 import { loginSchema, type LoginFormValues } from "@/validators";
 import { mapApiUserToAuthUser } from "@/lib/mapAuthUser";
-import { consumePendingAuthError, setPendingVerification } from "@/utils/authSorage";
+import { consumePendingAuthError, setPendingVerification } from "@/utils/authStorage";
 import { AUTH_ERROR_CODE } from "@/types/auth";
 
 function isEmailNotVerifiedPayload(payload: unknown): boolean {

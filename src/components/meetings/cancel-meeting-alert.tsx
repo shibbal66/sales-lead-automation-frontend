@@ -32,7 +32,7 @@ export function CancelMeetingAlert({
           <AlertDialogTitle>Cancel this meeting?</AlertDialogTitle>
           <AlertDialogDescription>
             {meeting
-              ? `"${meeting.leadName}" will be marked as cancelled. You can't edit it later.`
+              ? `"${meeting.leadName}" will be marked as cancelled.`
               : null}
           </AlertDialogDescription>
         </AlertDialogHeader>

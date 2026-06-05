@@ -29,7 +29,8 @@ import {
   setAuthToken,
   setRefreshToken,
   setStoredUser
-} from "../../utils/authSorage";
+} from "@/utils/authStorage";
+import { refreshSession } from "@/lib/refreshSession";
 import { syncFcmPushRegistration, unregisterFcmPushToken } from "@/services/fcm/fcmPush";
 
 function getHydratedAuth(): { user: AuthUser | null; token: string | null; isAuthenticated: boolean } {
@@ -122,7 +123,7 @@ interface AuthState {
   deleteAvatar: () => Promise<boolean>;
   saveNotificationPreferences: (form: NotificationPreferencesFormState) => Promise<boolean>;
   savePassword: (form: UpdatePasswordFormValues) => Promise<boolean>;
-  initializeAuth: () => void;
+  initializeAuth: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => {
@@ -155,7 +156,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
     user: hydrated.user,
     token: hydrated.token,
     isAuthenticated: hydrated.isAuthenticated,
-    isLoading: !hydrated.token,
+    isLoading: hydrated.isAuthenticated,
     googleLink: null,
     profileLoading: false,
     profileSaving: false,
@@ -368,15 +369,36 @@ export const useAuthStore = create<AuthState>((set, get) => {
       }
     },
 
-    initializeAuth: () => {
+    initializeAuth: async () => {
       const token = getAuthToken();
       const storedUser = getStoredUser();
-      if (token && storedUser) {
-        set({ user: storedUser, token, isAuthenticated: true, isLoading: false });
-        void get().fetchCurrentUser();
+      const refreshToken = getRefreshToken();
+
+      if (!token || !storedUser) {
+        set({ isLoading: false });
         return;
       }
+
+      set({ user: storedUser, token, isAuthenticated: true });
+
+      if (refreshToken) {
+        try {
+          const newAccessToken = await refreshSession();
+          set({ token: newAccessToken });
+        } catch {
+          clearAuthStorage();
+          set({
+            user: null,
+            token: null,
+            isAuthenticated: false,
+            isLoading: false
+          });
+          return;
+        }
+      }
+
       set({ isLoading: false });
+      void get().fetchCurrentUser();
     }
   };
 });

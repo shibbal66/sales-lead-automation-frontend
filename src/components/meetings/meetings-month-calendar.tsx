@@ -11,6 +11,7 @@ import {
   WEEKDAY_LABELS,
   type MonthCalendarCell
 } from "@/lib/meetings/calendarGrid";
+import { isAllowedMeetingCalendarDay } from "@/lib/meetings/meetingDates";
 import { getInitialCalendarDay, getMeetingsOnDay } from "@/lib/meetings/presentation";
 import type { Meeting } from "@/types/meeting";
 import { cn } from "@/lib/utils";
@@ -53,7 +54,9 @@ export function MeetingsMonthCalendar({
   const handleDayClick = (cell: MonthCalendarCell) => {
     const dayMeetings = getMeetingsOnDay(meetings, cell.date);
     if (dayMeetings.length === 0) {
-      onCreateMeeting(cell.date);
+      if (isAllowedMeetingCalendarDay(cell.date)) {
+        onCreateMeeting(cell.date);
+      }
       return;
     }
     onSelectedDayChange(cell.date);
@@ -114,6 +117,7 @@ export function MeetingsMonthCalendar({
           const visible = dayMeetings.slice(0, MAX_MEETINGS_VISIBLE_IN_CELL);
           const overflow = dayMeetings.length - visible.length;
           const isSelected = selectedDay ? isSameDay(selectedDay, cell.date) : false;
+          const isPastDay = !isAllowedMeetingCalendarDay(cell.date);
 
           return (
             <button
@@ -124,6 +128,7 @@ export function MeetingsMonthCalendar({
                 "flex min-h-[88px] flex-col border-b border-r border-border p-1.5 text-left transition-colors last:border-r-0",
                 "hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
                 !cell.isCurrentMonth && "bg-muted/15 text-muted-foreground",
+                isPastDay && "cursor-default opacity-60 hover:bg-transparent",
                 isSelected && "bg-primary/10 ring-1 ring-inset ring-primary/40"
               )}
             >

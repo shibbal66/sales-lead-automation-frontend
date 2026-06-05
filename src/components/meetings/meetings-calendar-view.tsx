@@ -3,7 +3,7 @@ import { MeetingsDayDetailDialog } from "@/components/meetings/meetings-day-deta
 import { MeetingsMonthCalendar } from "@/components/meetings/meetings-month-calendar";
 import { MeetingsCalendarSkeleton } from "@/components/skeletons/meetings/meetings-calendar-skeleton";
 import { cn } from "@/lib/utils";
-import { getMeetingsOnDay } from "@/lib/meetings";
+import { getMeetingsOnDay, isAllowedMeetingCalendarDay } from "@/lib/meetings";
 import type { Meeting } from "@/types/meeting";
 
 type MeetingsCalendarViewProps = {
@@ -33,11 +33,15 @@ export function MeetingsCalendarView({
   const dayDialogOpen = selectedDay !== null && selectedDayMeetings.length > 0;
 
   const handleAddMeeting = () => {
-    if (!selectedDay) return;
+    if (!selectedDay || !isAllowedMeetingCalendarDay(selectedDay)) return;
     const day = selectedDay;
     setSelectedDay(null);
     onCreateMeeting(day);
   };
+
+  const canAddMeetingOnSelectedDay = selectedDay
+    ? isAllowedMeetingCalendarDay(selectedDay)
+    : false;
 
   if (isLoading && meetings.length === 0) {
     return <MeetingsCalendarSkeleton />;
@@ -70,6 +74,7 @@ export function MeetingsCalendarView({
           day={selectedDay}
           meetings={selectedDayMeetings}
           onAddMeeting={handleAddMeeting}
+          canAddMeeting={canAddMeetingOnSelectedDay}
           onEditMeeting={(meeting) => {
             setSelectedDay(null);
             onEditMeeting?.(meeting);

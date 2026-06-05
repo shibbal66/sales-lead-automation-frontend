@@ -434,8 +434,7 @@ export function CampaignDetail({
               <div>
                 <h3 className="font-display text-base font-bold">Follow-up Sequence</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Configure timing and message body for each follow-up step. Use placeholders like{" "}
-                  <code className="rounded bg-muted px-1 py-0.5 text-xs">{"{{firstName}}"}</code>.
+                  Configure timing and message body for each follow-up step.
                 </p>
               </div>
               {hasFollowUpChanges && (
@@ -630,7 +629,7 @@ export function CampaignDetail({
                   setNewFollowUpBodyTemplate(value);
                   validateAddFollowUpFields(["body_template"], { body_template: value });
                 }}
-                placeholder="Hi {{firstName}}, ..."
+                placeholder="Hi, hope you're doing well! Just wanted to gently follow up on my last note — happy to answer any questions when you have a moment."
               />
               {addFollowUpErrors.body_template ? (
                 <p className="text-xs text-destructive">{addFollowUpErrors.body_template}</p>

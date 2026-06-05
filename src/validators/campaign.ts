@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { addressSchema, nameSchema, phoneSchema } from "@/validators/auth";
-import { CAMPAIGN_LEAD_SOURCE_VALUES, type CreateCampaignFollowUpRequest } from "@/types/campaign";
+import {
+  CAMPAIGN_LEAD_SOURCE_VALUES,
+  type CreateCampaignFollowUpRequest,
+  type CreateCampaignRequest
+} from "@/types/campaign";
 
 const mailTemplateSampleBaseSchema = z.object({
   subject: z.string().trim().min(1, "Subject is required").max(200, "Subject is too long"),
@@ -98,6 +102,37 @@ export const createCampaignFollowUpSchema = z.object({
 });
 
 export type CreateCampaignFollowUpFormValues = CreateCampaignFollowUpRequest;
+
+export type ParseCreateCampaignResult =
+  | { success: true; data: CreateCampaignRequest }
+  | { success: false; error: z.ZodError<CreateCampaignFormValues> };
+
+export function parseCreateCampaignPayload(value: unknown): ParseCreateCampaignResult {
+  const result = createCampaignSchema.safeParse(value);
+  if (!result.success) {
+    return { success: false as const, error: result.error };
+  }
+  const data = result.data;
+  return {
+    success: true as const,
+    data: {
+      name: data.name,
+      goal: data.goal,
+      target_zone: data.target_zone,
+      call_to_action: data.call_to_action,
+      run_mode: data.run_mode,
+      target_tone: data.target_tone,
+      mail_training_instruction: data.mail_training_instruction,
+      mail_template_samples: data.mail_template_samples,
+      lead_source: data.lead_source,
+      sender_display_name: data.sender_display_name,
+      sender_address: data.sender_address,
+      sender_phone: data.sender_phone,
+      target_leads: data.target_leads,
+      status: data.status
+    }
+  };
+}
 
 export function parseCreateCampaignFollowUpPayload(
   value: unknown

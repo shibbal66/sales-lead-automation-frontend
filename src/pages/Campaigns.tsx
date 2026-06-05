@@ -23,9 +23,15 @@ import { CampaignDetail } from "@/components/campaigns/campaign-detail";
 import { CampaignDetailSkeleton } from "@/components/skeletons/campaigns/campaign-detail-skeleton";
 import { CampaignsGridSkeleton } from "@/components/skeletons/campaigns/campaign-card-skeleton";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
-import { mapCampaignApiToDetail, mapCampaignApiToListCard } from "@/lib/campaignPresentation";
-import type { CampaignApiModel, CampaignStatus, CreateCampaignRequest, UpdateCampaignRequest } from "@/types";
-import { showApiSuccessToast } from "@/lib/apiToast";
+import {
+  mapCampaignApiToDetail,
+  mapCampaignApiToDuplicateRequest,
+  mapCampaignApiToListCard,
+  mapCreateCampaignZodErrors
+} from "@/lib/campaignPresentation";
+import type { CampaignApiModel, CampaignStatus, UpdateCampaignRequest } from "@/types";
+import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import { parseCreateCampaignPayload } from "@/validators/campaign";
 
 export default function CampaignsPage() {
   const { id } = useParams();
@@ -78,24 +84,16 @@ export default function CampaignsPage() {
 
   const handleDuplicate = async (campaign: CampaignApiModel) => {
     try {
-      const payload: CreateCampaignRequest = {
-        name: `${campaign.name} (Copy)`,
-        goal: campaign.goal,
-        target_zone: campaign.target_zone,
-        call_to_action: campaign.call_to_action,
-        run_mode: campaign.run_mode,
-        target_tone: campaign.target_tone ?? "Friendly",
-        mail_training_instruction:
-          campaign.mail_training_instruction ?? "",
-        mail_template_samples: campaign.mail_template_samples ?? [],
-        lead_source: campaign.lead_source,
-        sender_display_name: campaign.sender_display_name ?? "",
-        sender_address: campaign.sender_address ?? "",
-        sender_phone: campaign.sender_phone ?? "",
-        target_leads: campaign.target_leads,
-        status: "draft"
-      };
-      const { message } = await createCampaign(payload);
+      const source = await fetchCampaignById(campaign.id);
+      const payload = mapCampaignApiToDuplicateRequest(source);
+      const parsed = parseCreateCampaignPayload(payload);
+      if ("error" in parsed) {
+        const fieldErrors = mapCreateCampaignZodErrors(parsed.error);
+        const message = Object.values(fieldErrors).find((m) => m);
+        showApiErrorToast(message ?? "Cannot duplicate: campaign data is incomplete.");
+        return;
+      }
+      const { message } = await createCampaign(parsed.data);
       showApiSuccessToast(message || "Campaign duplicated successfully.");
     } catch {
       // Error toast is already handled in store.

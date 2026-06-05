@@ -7,7 +7,7 @@ import {
 import type { AuthUser } from "@/core/types/user.types";
 import type { GoogleApiResponse, GoogleAuthTokenData } from "@/types";
 import { showApiErrorToast } from "@/lib/apiToast";
-import { getAuthToken } from "@/utils/authSorage";
+import { getAuthToken } from "@/utils/authStorage";
 import {
   clearPendingGoogleLinkReturn,
   getPendingGoogleLinkReturn

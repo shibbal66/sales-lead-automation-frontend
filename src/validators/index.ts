@@ -40,6 +40,7 @@ export {
 export {
   createCampaignSchema,
   createCampaignFollowUpSchema,
+  parseCreateCampaignPayload,
   parseCreateCampaignFollowUpPayload,
   mailTemplateSampleSchema,
   type CreateCampaignFormValues,

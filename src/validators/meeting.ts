@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { datetimeLocalValueToIsoUtc } from "@/lib/dateFormatting";
+import {
+  isAllowedMeetingStartLocal,
+  MEETING_PAST_DATE_MESSAGE
+} from "@/lib/meetings/meetingDates";
 
 const optionalUuidSchema = z
   .string()
@@ -33,6 +37,13 @@ export const createMeetingSchema = z
       { startLocal: data.startLocal, endLocal: data.endLocal },
       ctx
     );
+    if (!isAllowedMeetingStartLocal(data.startLocal)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: MEETING_PAST_DATE_MESSAGE,
+        path: ["startLocal"]
+      });
+    }
     if (data.campaign_lead_id && !data.campaign_id) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
