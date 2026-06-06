@@ -78,7 +78,16 @@ export function ProfileSection({
             render={({ field }) => (
               <div className="space-y-1.5">
                 <Label htmlFor="profile-email">Email</Label>
-                <Input id="profile-email" disabled readOnly {...field} />
+                <Input
+                  id="profile-email"
+                  disabled
+                  readOnly
+                  aria-invalid={!!errors.email}
+                  {...field}
+                />
+                {errors.email?.message ? (
+                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                ) : null}
               </div>
             )}
           />

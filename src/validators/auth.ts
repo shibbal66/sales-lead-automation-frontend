@@ -82,7 +82,8 @@ export const nameSchema = z
   .string()
   .trim()
   .min(1, "Name is required")
-  .max(100, "Name must be less than 100 characters");
+  .max(30, "Name must be less than 30 characters")
+  .regex(/^[\p{L}\s]+$/u, "Name must contain only letters and spaces");
 
 /** Full phone stored as E.164 (+countryCode + national digits). */
 export const phoneSchema = z
@@ -190,7 +191,7 @@ export type UpdateProfileFormValues = z.infer<typeof updateProfileSchema>;
 
 /** Settings profile form (includes read-only email). */
 export const profileSettingsSchema = updateProfileSchema.extend({
-  email: z.string()
+  email: emailSchema
 });
 
 export type ProfileSettingsFormValues = z.infer<typeof profileSettingsSchema>;

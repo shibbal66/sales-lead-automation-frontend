@@ -6,8 +6,26 @@ import {
   type CreateCampaignRequest
 } from "@/types/campaign";
 
+function includesLetter(value: string): boolean {
+  return /\p{L}/u.test(value);
+}
+
+export const MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH = 200;
+
+export const mailTemplateSampleSubjectSchema = z
+  .string()
+  .trim()
+  .min(1, "Subject is required")
+  .max(
+    MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH,
+    `Subject must be ${MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH} characters or less`
+  )
+  .refine(includesLetter, {
+    message: "Subject must include at least one letter"
+  });
+
 const mailTemplateSampleBaseSchema = z.object({
-  subject: z.string().trim().min(1, "Subject is required").max(200, "Subject is too long"),
+  subject: mailTemplateSampleSubjectSchema,
   body: z.string(),
   html: z.string(),
   text: z.string()
@@ -53,20 +71,94 @@ export const mailTemplateSampleSchema = mailTemplateSampleBaseSchema.superRefine
   text: data.text.trim()
 }));
 
+export const CAMPAIGN_NAME_MAX_LENGTH = 120;
+
+const letterNumberSpacePattern = /^[\p{L}\p{N}\s]+$/u;
+
+export const campaignNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Campaign name is required")
+  .max(CAMPAIGN_NAME_MAX_LENGTH, `Campaign name must be ${CAMPAIGN_NAME_MAX_LENGTH} characters or less`)
+  .regex(letterNumberSpacePattern, "Campaign name must contain only letters, numbers, and spaces")
+  .refine(includesLetter, {
+    message: "Campaign name must include at least one letter"
+  });
+
+/** Strips invalid characters and enforces max length while typing. */
+export function sanitizeCampaignNameInput(value: string): string {
+  return value.replace(/[^\p{L}\p{N}\s]/gu, "").slice(0, CAMPAIGN_NAME_MAX_LENGTH);
+}
+
+export const TARGET_ZONE_MAX_LENGTH = 60;
+
+export const targetZoneSchema = z
+  .string()
+  .trim()
+  .min(1, "Target zone is required")
+  .max(TARGET_ZONE_MAX_LENGTH, `Target zone must be ${TARGET_ZONE_MAX_LENGTH} characters or less`)
+  .regex(letterNumberSpacePattern, "Target zone must contain only letters, numbers, and spaces")
+  .refine(includesLetter, {
+    message: "Target zone must include at least one letter"
+  });
+
+/** Strips invalid characters and enforces max length while typing. */
+export function sanitizeCampaignTargetZoneInput(value: string): string {
+  return value.replace(/[^\p{L}\p{N}\s]/gu, "").slice(0, TARGET_ZONE_MAX_LENGTH);
+}
+
+export const CALL_TO_ACTION_MAX_LENGTH = 120;
+
+export const callToActionSchema = z
+  .string()
+  .trim()
+  .min(1, "Call to action is required")
+  .max(CALL_TO_ACTION_MAX_LENGTH, `Call to action must be ${CALL_TO_ACTION_MAX_LENGTH} characters or less`)
+  .regex(letterNumberSpacePattern, "Call to action must contain only letters, numbers, and spaces")
+  .refine(includesLetter, {
+    message: "Call to action must include at least one letter"
+  });
+
+/** Strips invalid characters and enforces max length while typing. */
+export function sanitizeCampaignCallToActionInput(value: string): string {
+  return value.replace(/[^\p{L}\p{N}\s]/gu, "").slice(0, CALL_TO_ACTION_MAX_LENGTH);
+}
+
+export const MAIL_TRAINING_INSTRUCTION_MAX_LENGTH = 2000;
+
+export const mailTrainingInstructionSchema = z
+  .string()
+  .trim()
+  .min(1, "Mail training instructions are required")
+  .max(
+    MAIL_TRAINING_INSTRUCTION_MAX_LENGTH,
+    `Instructions must be ${MAIL_TRAINING_INSTRUCTION_MAX_LENGTH} characters or less`
+  )
+  .refine(includesLetter, {
+    message: "Mail training instructions must include at least one letter"
+  });
+
+export const CAMPAIGN_GOAL_MAX_LENGTH = 500;
+
+export const campaignGoalSchema = z
+  .string()
+  .trim()
+  .min(1, "Campaign goal is required")
+  .max(CAMPAIGN_GOAL_MAX_LENGTH, `Campaign goal must be ${CAMPAIGN_GOAL_MAX_LENGTH} characters or less`)
+  .refine(includesLetter, {
+    message: "Campaign goal must include at least one letter"
+  });
+
 export const createCampaignSchema = z.object({
-  name: z.string().trim().min(1, "Campaign name is required").max(120, "Campaign name is too long"),
-  goal: z.string().trim().min(1, "Campaign goal is required").max(500, "Goal is too long"),
-  target_zone: z.string().trim().min(1, "Target zone is required").max(180, "Target zone is too long"),
-  call_to_action: z.string().trim().min(1, "Call to action is required").max(180, "Call to action is too long"),
+  name: campaignNameSchema,
+  goal: campaignGoalSchema,
+  target_zone: targetZoneSchema,
+  call_to_action: callToActionSchema,
   run_mode: z.enum(["auto", "manual"], {
     errorMap: () => ({ message: "Run mode must be auto or manual" })
   }),
   target_tone: z.string().trim().min(1, "Target tone is required").max(80, "Target tone is too long"),
-  mail_training_instruction: z
-    .string()
-    .trim()
-    .min(1, "Mail training instructions are required")
-    .max(2000, "Instructions are too long"),
+  mail_training_instruction: mailTrainingInstructionSchema,
   mail_template_samples: z.array(mailTemplateSampleSchema),
   lead_source: z.enum(CAMPAIGN_LEAD_SOURCE_VALUES, {
     errorMap: () => ({ message: "Lead source must be new, old, or both" })

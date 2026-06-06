@@ -3,6 +3,7 @@ import { Outlet } from "react-router-dom";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Topbar } from "@/components/layout/topbar";
 import { useBillingStore } from "@/store/billing/billingStore";
+import { PlanLimitDialog } from "@/components/billing/plan-limit-dialog";
 import { useNotificationsStore } from "@/store/notifications/notificationsStore";
 import { useFcmPush } from "@/hooks/useFcmPush";
 
@@ -36,6 +37,7 @@ export function AppShell() {
           </div>
         </main>
       </div>
+      <PlanLimitDialog />
     </div>
   );
 }

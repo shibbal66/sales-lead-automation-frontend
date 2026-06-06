@@ -38,11 +38,20 @@ export {
 } from "./meeting";
 
 export {
+  CAMPAIGN_NAME_MAX_LENGTH,
+  TARGET_ZONE_MAX_LENGTH,
+  CALL_TO_ACTION_MAX_LENGTH,
+  MAIL_TRAINING_INSTRUCTION_MAX_LENGTH,
+  CAMPAIGN_GOAL_MAX_LENGTH,
+  MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH,
   createCampaignSchema,
   createCampaignFollowUpSchema,
   parseCreateCampaignPayload,
   parseCreateCampaignFollowUpPayload,
   mailTemplateSampleSchema,
+  sanitizeCampaignNameInput,
+  sanitizeCampaignTargetZoneInput,
+  sanitizeCampaignCallToActionInput,
   type CreateCampaignFormValues,
   type CreateCampaignFollowUpFormValues,
   type MailTemplateSampleFormValues

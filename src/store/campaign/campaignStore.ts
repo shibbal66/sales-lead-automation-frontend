@@ -11,6 +11,7 @@ import {
   updateCampaign as updateCampaignApi,
   updateCampaignLead as updateCampaignLeadApi
 } from "@/services/campaign/campaignServices";
+import { useBillingStore } from "@/store/billing/billingStore";
 import type {
   AddCampaignLeadRequest,
   BulkAddCampaignLeadsRequest,
@@ -25,6 +26,7 @@ import type {
   UpdateCampaignLeadRequest,
   UpdateCampaignRequest
 } from "@/types";
+import { showApiErrorOrPlanLimitDialog } from "@/lib/planLimit";
 import { showApiErrorToast } from "@/lib/apiToast";
 
 function campaignFromByIdData(data: NonNullable<GetCampaignByIdResponse["data"]>): CampaignApiModel | null {
@@ -132,16 +134,19 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
     try {
       const response = await createCampaignApi(payload);
       if (!response.success || !response.data?.campaign) {
-        showApiErrorToast(response);
         throw response;
       }
 
       const campaign = response.data.campaign;
       set((state) => ({ campaigns: [campaign, ...state.campaigns], total: state.total + 1 }));
+      void useBillingStore.getState().fetchBillingQuota();
       return {
         campaign,
         message: response.message ?? "Campaign created successfully."
       };
+    } catch (error) {
+      showApiErrorOrPlanLimitDialog(error);
+      throw error;
     } finally {
       set({ isCreating: false });
     }
@@ -159,6 +164,7 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
         campaigns: state.campaigns.filter((campaign) => campaign.id !== campaignId),
         selectedCampaign: state.selectedCampaign?.id === campaignId ? null : state.selectedCampaign
       }));
+      void useBillingStore.getState().fetchBillingQuota();
       return response.message ?? "Campaign deleted successfully.";
     } finally {
       set({ isDeleting: false });
@@ -265,6 +271,7 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
         showApiErrorToast(response);
         return Promise.reject(response);
       }
+      void useBillingStore.getState().fetchBillingQuota();
       return response.data.lead;
     } finally {
       set({ isAddingCampaignLead: false });
@@ -279,6 +286,7 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
         showApiErrorToast(response);
         return Promise.reject(response);
       }
+      void useBillingStore.getState().fetchBillingQuota();
       return response.message ?? "Leads added to campaign.";
     } finally {
       set({ isBulkAddingCampaignLeads: false });
@@ -328,6 +336,7 @@ export const useCampaignStore = create<CampaignStoreState>((set, get) => ({
         campaignLeads: state.campaignLeads.filter((l) => l.id !== campaignLeadId),
         campaignLeadsTotal: Math.max(0, state.campaignLeadsTotal - 1)
       }));
+      void useBillingStore.getState().fetchBillingQuota();
     } finally {
       set({ isDeletingCampaignLead: false });
     }

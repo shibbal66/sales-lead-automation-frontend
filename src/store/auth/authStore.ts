@@ -94,7 +94,7 @@ async function patchCurrentUser(
     return false;
   }
   applyProfileData(set, get, response.data.user, response.data.google);
-  showApiSuccessToast(response.message || successMessage);
+  showApiSuccessToast(successMessage || response.message);
   return true;
 }
 

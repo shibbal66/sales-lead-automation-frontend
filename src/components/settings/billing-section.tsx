@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { CreditCard } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -22,6 +23,7 @@ import {
   formatBillingPlanPrice,
   formatPaymentMethodBrand,
   formatPaymentMethodExpiry,
+  getBillingQuotaUsagePercent,
   getBillingPlanAction,
   getBillingPlanActionLoadingLabel,
   getBillingPlanButtonLabel,
@@ -31,12 +33,40 @@ import {
 import { cn } from "@/lib/utils";
 import { useBillingStore } from "@/store/billing/billingStore";
 
+type QuotaUsageBarProps = {
+  label: string;
+  used: number;
+  limit: number;
+  available: number;
+};
+
+function QuotaUsageBar({ label, used, limit, available }: QuotaUsageBarProps) {
+  const percent = getBillingQuotaUsagePercent(used, limit);
+
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="min-w-0 truncate text-sm font-medium" title={label}>
+          {label}
+        </p>
+        <p className="shrink-0 text-xs text-muted-foreground">
+          {used.toLocaleString()} / {limit.toLocaleString()}
+        </p>
+      </div>
+      <Progress value={percent} className="mt-3 h-2" />
+      <p className="mt-1.5 text-xs text-muted-foreground">{available.toLocaleString()} remaining</p>
+    </div>
+  );
+}
+
 export function BillingSection() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const subscription = useBillingStore((s) => s.subscription);
+  const quota = useBillingStore((s) => s.quota);
   const plans = useBillingStore((s) => s.plans);
   const paymentMethods = useBillingStore((s) => s.paymentMethods);
   const isLoading = useBillingStore((s) => s.isFetchingBillingData);
+  const isFetchingQuota = useBillingStore((s) => s.isFetchingQuota);
   const actionPlanId = useBillingStore((s) => s.actionPlanId);
   const isCanceling = useBillingStore((s) => s.isCanceling);
   const isReactivating = useBillingStore((s) => s.isReactivating);
@@ -44,6 +74,7 @@ export function BillingSection() {
   const defaultPaymentMethodId = useBillingStore((s) => s.defaultPaymentMethodId);
   const deletingPaymentMethodId = useBillingStore((s) => s.deletingPaymentMethodId);
   const fetchBillingData = useBillingStore((s) => s.fetchBillingData);
+  const fetchBillingQuota = useBillingStore((s) => s.fetchBillingQuota);
   const runPlanAction = useBillingStore((s) => s.runPlanAction);
   const cancelSubscription = useBillingStore((s) => s.cancelSubscription);
   const reactivateSubscription = useBillingStore((s) => s.reactivateSubscription);
@@ -54,6 +85,11 @@ export function BillingSection() {
   useEffect(() => {
     void fetchBillingData();
   }, [fetchBillingData]);
+
+  useEffect(() => {
+    if (!subscription?.planId) return;
+    void fetchBillingQuota();
+  }, [subscription?.planId, fetchBillingQuota]);
 
   const currentPlanId = subscription?.planId;
   const nextPlan = useMemo(
@@ -70,9 +106,12 @@ export function BillingSection() {
           <div className="space-y-4">
             <Skeleton className="h-6 w-32" />
             <Skeleton className="h-4 w-48" />
-            <div className="grid gap-4 md:grid-cols-2">
-              <Skeleton className="h-20 rounded-lg" />
-              <Skeleton className="h-20 rounded-lg" />
+            <div className="space-y-3 pt-2">
+              <Skeleton className="h-4 w-28" />
+              <div className="grid gap-4 md:grid-cols-2">
+                <Skeleton className="h-24 rounded-lg" />
+                <Skeleton className="h-24 rounded-lg" />
+              </div>
             </div>
           </div>
         ) : subscription ? (
@@ -116,16 +155,66 @@ export function BillingSection() {
                 ) : null}
               </div>
             </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {[
-                { label: "Leads per campaign", value: subscription.limits.maxLeadsPerCampaign },
-                { label: "Campaigns", value: subscription.limits.maxCampaigns }
-              ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-border p-4">
-                  <p className="text-xs text-muted-foreground">{item.label}</p>
-                  <p className="mt-1 font-display text-xl font-bold">{item.value.toLocaleString()}</p>
+            <div className="mt-6 space-y-4">
+              <div>
+                <h4 className="text-sm font-semibold">Usage & quota</h4>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Track how much of your plan limits you have used.
+                </p>
+              </div>
+              {isFetchingQuota && !quota ? (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Skeleton className="h-24 rounded-lg" />
+                  <Skeleton className="h-24 rounded-lg" />
                 </div>
-              ))}
+              ) : quota ? (
+                <div className={cn("space-y-4", isFetchingQuota && "opacity-60")}>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <QuotaUsageBar
+                      label="Campaigns"
+                      used={quota.campaigns.used}
+                      limit={quota.campaigns.limit}
+                      available={quota.campaigns.available}
+                    />
+                    <QuotaUsageBar
+                      label="Daily emails"
+                      used={quota.dailyEmails.used}
+                      limit={quota.dailyEmails.limit}
+                      available={quota.dailyEmails.available}
+                    />
+                  </div>
+                  {quota.leadsPerCampaign.campaigns.length > 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Leads per campaign ({quota.leadsPerCampaign.limit.toLocaleString()} max each)
+                      </p>
+                      <div className="grid gap-4 md:grid-cols-2">
+                        {quota.leadsPerCampaign.campaigns.map((campaign) => (
+                          <QuotaUsageBar
+                            key={campaign.campaignId}
+                            label={campaign.campaignName}
+                            used={campaign.used}
+                            limit={campaign.limit}
+                            available={campaign.available}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {[
+                    { label: "Leads per campaign", value: subscription.limits.maxLeadsPerCampaign },
+                    { label: "Campaigns", value: subscription.limits.maxCampaigns }
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-lg border border-border p-4">
+                      <p className="text-xs text-muted-foreground">{item.label}</p>
+                      <p className="mt-1 font-display text-xl font-bold">{item.value.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         ) : (

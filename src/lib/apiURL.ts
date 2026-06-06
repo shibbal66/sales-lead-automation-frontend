@@ -70,6 +70,7 @@ export const END_POINT = {
     portal: "/billing/portal",
     paymentMethods: "/billing/payment-methods",
     paymentMethodsDefault: "/billing/payment-methods/default",
-    paymentMethodById: (paymentMethodId: string) => `/billing/payment-methods/${paymentMethodId}`
+    paymentMethodById: (paymentMethodId: string) => `/billing/payment-methods/${paymentMethodId}`,
+    quota: "/billing/quota"
   } as const
 };

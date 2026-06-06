@@ -10,6 +10,7 @@ import type {
   BillingUpgradeResponse,
   GetBillingPaymentMethodsResponse,
   GetBillingPlansResponse,
+  GetBillingQuotaResponse,
   GetBillingSubscriptionResponse,
   DeletePaymentMethodResponse,
   SetDefaultPaymentMethodRequest,
@@ -22,6 +23,10 @@ export function getBillingPlans() {
 
 export function getBillingSubscription() {
   return apiInvoker<GetBillingSubscriptionResponse>(END_POINT.billing.subscription, "GET");
+}
+
+export function getBillingQuota() {
+  return apiInvoker<GetBillingQuotaResponse>(END_POINT.billing.quota, "GET");
 }
 
 export function getBillingPaymentMethods() {
