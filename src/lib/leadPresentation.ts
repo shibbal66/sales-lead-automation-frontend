@@ -28,6 +28,18 @@ export function mapApiStatusToPresentation(
   return "new";
 }
 
+/** e.g. `master_operations` → `Master Operations` */
+export function formatSnakeCaseLabel(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return trimmed;
+
+  return trimmed
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 export function mapLeadApiToListRow(lead: LeadApiModel): LeadListRowViewModel {
   return {
     id: String(lead.id),

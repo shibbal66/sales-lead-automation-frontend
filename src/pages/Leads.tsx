@@ -125,7 +125,7 @@ export default function Leads() {
               {/* <TableHead>Campaign</TableHead> */}
               <TableHead>Fit Score</TableHead>
               <TableHead>Contacted</TableHead>
-              {/* <TableHead className="text-right">Actions</TableHead> */}
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -160,7 +160,7 @@ export default function Leads() {
                       <StatusPill status={l.fitScore} />
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">{l.lastContacted}</TableCell>
-                    {/* <TableCell className="text-right">
+                    <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="default"
@@ -175,7 +175,7 @@ export default function Leads() {
                           )}
                           {openingLeadId === l.id ? "Loading…" : "View"}
                         </Button>
-                        <DropdownMenu>
+                        {/* <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
                           </DropdownMenuTrigger>
@@ -185,9 +185,9 @@ export default function Leads() {
                             <DropdownMenuItem><X className="h-3.5 w-3.5 mr-2" />Mark as Unsubscribed</DropdownMenuItem>
                             <DropdownMenuItem className="text-destructive"><Trash2 className="h-3.5 w-3.5 mr-2" />Delete</DropdownMenuItem>
                           </DropdownMenuContent>
-                        </DropdownMenu>
+                        </DropdownMenu> */}
                       </div>
-                    </TableCell> */}
+                    </TableCell>
                   </TableRow>
                 ))
               : null}

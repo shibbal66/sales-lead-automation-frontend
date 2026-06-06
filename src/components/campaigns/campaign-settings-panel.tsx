@@ -13,6 +13,7 @@ import {
   type CampaignTone,
 } from "@/lib/campaignPresentation";
 import type { CampaignLeadSource } from "@/types";
+import { sanitizeCampaignCallToActionInput, sanitizeCampaignTargetZoneInput, CALL_TO_ACTION_MAX_LENGTH, CAMPAIGN_GOAL_MAX_LENGTH, TARGET_ZONE_MAX_LENGTH } from "@/validators";
 
 type CampaignSettingsPanelProps = {
   campaign: CampaignDetailViewModel;
@@ -162,6 +163,8 @@ export function CampaignSettingsPanel({
             id="goal"
             rows={3}
             value={goal}
+            maxLength={CAMPAIGN_GOAL_MAX_LENGTH}
+            aria-invalid={!!errors.goal}
             onChange={(event) => onGoalChange(event.target.value)}
           />
           <FieldError message={errors.goal} />
@@ -194,7 +197,9 @@ export function CampaignSettingsPanel({
           <Input
             id="cta"
             value={callToAction}
-            onChange={(event) => onCallToActionChange(event.target.value)}
+            maxLength={CALL_TO_ACTION_MAX_LENGTH}
+            aria-invalid={!!errors.callToAction}
+            onChange={(event) => onCallToActionChange(sanitizeCampaignCallToActionInput(event.target.value))}
           />
           <FieldError message={errors.callToAction} />
         </div>
@@ -204,7 +209,9 @@ export function CampaignSettingsPanel({
           <Input
             id="target-zone"
             value={targetZone}
-            onChange={(event) => onTargetZoneChange(event.target.value)}
+            maxLength={TARGET_ZONE_MAX_LENGTH}
+            aria-invalid={!!errors.targetZone}
+            onChange={(event) => onTargetZoneChange(sanitizeCampaignTargetZoneInput(event.target.value))}
           />
           <FieldError message={errors.targetZone} />
         </div>

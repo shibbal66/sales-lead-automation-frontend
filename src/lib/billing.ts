@@ -141,3 +141,8 @@ export function getSubscriptionPendingChangeMessage(subscription: BillingSubscri
   }
   return "Your plan will change at the end of the current billing period.";
 }
+
+export function getBillingQuotaUsagePercent(used: number, limit: number): number {
+  if (!Number.isFinite(limit) || limit <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((used / limit) * 100)));
+}

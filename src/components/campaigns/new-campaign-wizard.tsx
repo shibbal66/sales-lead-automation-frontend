@@ -9,7 +9,19 @@ import { cn } from "@/lib/utils";
 import { Bot, Hand, Check, ArrowLeft, ArrowRight, Plus, Trash2, Users } from "lucide-react";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { PhoneNumberField } from "@/components/shared/phone-number-field";
-import { createCampaignSchema, mailTemplateSampleSchema } from "@/validators";
+import {
+  createCampaignSchema,
+  mailTemplateSampleSchema,
+  sanitizeCampaignNameInput,
+  sanitizeCampaignTargetZoneInput,
+  sanitizeCampaignCallToActionInput,
+  CAMPAIGN_NAME_MAX_LENGTH,
+  TARGET_ZONE_MAX_LENGTH,
+  CALL_TO_ACTION_MAX_LENGTH,
+  MAIL_TRAINING_INSTRUCTION_MAX_LENGTH,
+  CAMPAIGN_GOAL_MAX_LENGTH,
+  MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH
+} from "@/validators";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import { CAMPAIGN_LEAD_SOURCES, CAMPAIGN_TONES } from "@/lib/campaignPresentation";
 import type { CreateCampaignRequest, MailTemplateSample } from "@/types";
@@ -144,6 +156,43 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     validateFields([field], { [field]: value });
   };
 
+  const buildSampleDraftPayload = () => ({
+    subject: sampleSubject,
+    body: sampleContentFormat === "body" ? sampleBody : "",
+    html: sampleContentFormat === "html" ? sampleHtml : "",
+    text: sampleContentFormat === "text" ? sampleText : ""
+  });
+
+  const hasSampleDraftContent = (
+    draft: ReturnType<typeof buildSampleDraftPayload> = buildSampleDraftPayload()
+  ) => [draft.subject, draft.body, draft.html, draft.text].some((part) => part.trim().length > 0);
+
+  const clearSampleDraft = () => {
+    setSampleSubject("");
+    setSampleContentFormat("body");
+    setSampleBody("");
+    setSampleHtml("");
+    setSampleText("");
+  };
+
+  const resolveTemplateSamplesWithDraft = ():
+    | { ok: true; samples: MailTemplateSample[] }
+    | { ok: false; error: string } => {
+    if (!hasSampleDraftContent()) {
+      return { ok: true, samples: templateSamples };
+    }
+
+    const parsed = mailTemplateSampleSchema.safeParse(buildSampleDraftPayload());
+    if (!parsed.success) {
+      return {
+        ok: false,
+        error: parsed.error.errors[0]?.message ?? "Please complete subject and email content."
+      };
+    }
+
+    return { ok: true, samples: [...templateSamples, parsed.data] };
+  };
+
   const validateSampleDraft = (draft?: {
     subject?: string;
     body?: string;
@@ -201,12 +250,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
   };
 
   const handleAddTemplateSample = () => {
-    const parsed = mailTemplateSampleSchema.safeParse({
-      subject: sampleSubject,
-      body: sampleContentFormat === "body" ? sampleBody : "",
-      html: sampleContentFormat === "html" ? sampleHtml : "",
-      text: sampleContentFormat === "text" ? sampleText : ""
-    });
+    const parsed = mailTemplateSampleSchema.safeParse(buildSampleDraftPayload());
     if (!parsed.success) {
       const first = parsed.error.errors[0]?.message ?? "Please complete subject and email content.";
       setErrors((prev) => ({ ...prev, sampleDraft: first }));
@@ -214,16 +258,35 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     }
     const nextSamples = [...templateSamples, parsed.data];
     setTemplateSamples(nextSamples);
-    setSampleSubject("");
-    setSampleContentFormat("body");
-    setSampleBody("");
-    setSampleHtml("");
-    setSampleText("");
+    clearSampleDraft();
     setErrors((prev) => ({ ...prev, sampleDraft: undefined }));
     validateFields(["mail_template_samples"], { mail_template_samples: nextSamples });
   };
 
   const handleNext = () => {
+    if (step === 5) {
+      const resolved = resolveTemplateSamplesWithDraft();
+      if (resolved.ok === false) {
+        setErrors((prev) => ({ ...prev, sampleDraft: resolved.error }));
+        return;
+      }
+
+      const { samples } = resolved;
+      const addedDraft = samples.length > templateSamples.length;
+      if (addedDraft) {
+        setTemplateSamples(samples);
+        clearSampleDraft();
+      }
+
+      setErrors((prev) => ({ ...prev, sampleDraft: undefined }));
+      if (!validateFields(["mail_template_samples"], { mail_template_samples: samples })) {
+        return;
+      }
+
+      setStep((s) => s + 1);
+      return;
+    }
+
     if (!validateCurrentStep(step)) return;
     setStep((s) => s + 1);
   };
@@ -242,11 +305,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     setSenderPhone("");
     setMailTrainingInstruction("");
     setTemplateSamples([]);
-    setSampleSubject("");
-    setSampleContentFormat("body");
-    setSampleBody("");
-    setSampleHtml("");
-    setSampleText("");
+    clearSampleDraft();
     setLeadCount(100);
     setErrors({});
   };
@@ -262,7 +321,23 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
 
   const create = async () => {
     const allFields = Object.keys(createCampaignSchema.shape) as Array<keyof CreateCampaignFormValues>;
-    const parsed = createCampaignSchema.safeParse(buildDraftPayload());
+    const resolved = resolveTemplateSamplesWithDraft();
+    if (resolved.ok === false) {
+      setStep(5);
+      setErrors((prev) => ({ ...prev, sampleDraft: resolved.error }));
+      showApiErrorToast(new Error("Please fix mail template sample errors."));
+      return;
+    }
+
+    const { samples } = resolved;
+    if (samples.length > templateSamples.length) {
+      setTemplateSamples(samples);
+      clearSampleDraft();
+    }
+
+    const parsed = createCampaignSchema.safeParse(
+      buildDraftPayload({ mail_template_samples: samples })
+    );
 
     if (!parsed.success) {
       validateFields(allFields);
@@ -271,9 +346,13 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     }
 
     const payload = parsed.data as CreateCampaignRequest;
-    const { campaign, message } = await createCampaign(payload);
-    showApiSuccessToast(message || `Campaign "${campaign.name}" created successfully.`);
-    closeAndReset();
+    try {
+      const { campaign, message } = await createCampaign(payload);
+      showApiSuccessToast(message || `Campaign "${campaign.name}" created successfully.`);
+      closeAndReset();
+    } catch {
+      // Plan limit dialog or error toast is handled in the campaign store.
+    }
   };
 
   const presets = [50, 100, 250, 500];
@@ -329,8 +408,13 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="name"
                   value={name}
-                  onChange={(e) => patchField("name", e.target.value, () => setName(e.target.value))}
-                  placeholder="e.g. Q2 Outbound — SaaS"
+                  maxLength={CAMPAIGN_NAME_MAX_LENGTH}
+                  aria-invalid={!!errors.name}
+                  onChange={(e) => {
+                    const next = sanitizeCampaignNameInput(e.target.value);
+                    patchField("name", next, () => setName(next));
+                  }}
+                  placeholder="e.g. Q2 Outbound SaaS"
                 />
                 {errors.name ? <p className="text-xs text-destructive">{errors.name}</p> : null}
               </div>
@@ -340,6 +424,8 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   id="goal"
                   rows={3}
                   value={goal}
+                  maxLength={CAMPAIGN_GOAL_MAX_LENGTH}
+                  aria-invalid={!!errors.goal}
                   onChange={(e) => patchField("goal", e.target.value, () => setGoal(e.target.value))}
                   placeholder="What is the objective of this campaign?"
                 />
@@ -350,10 +436,13 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="targetZone"
                   value={targetZone}
-                  onChange={(e) =>
-                    patchField("target_zone", e.target.value, () => setTargetZone(e.target.value))
-                  }
-                  placeholder="e.g. North America - SaaS Companies"
+                  maxLength={TARGET_ZONE_MAX_LENGTH}
+                  aria-invalid={!!errors.target_zone}
+                  onChange={(e) => {
+                    const next = sanitizeCampaignTargetZoneInput(e.target.value);
+                    patchField("target_zone", next, () => setTargetZone(next));
+                  }}
+                  placeholder="e.g. North America SaaS Companies"
                 />
                 {errors.target_zone ? <p className="text-xs text-destructive">{errors.target_zone}</p> : null}
               </div>
@@ -383,9 +472,12 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                 <Input
                   id="cta"
                   value={cta}
-                  onChange={(e) =>
-                    patchField("call_to_action", e.target.value, () => setCta(e.target.value))
-                  }
+                  maxLength={CALL_TO_ACTION_MAX_LENGTH}
+                  aria-invalid={!!errors.call_to_action}
+                  onChange={(e) => {
+                    const next = sanitizeCampaignCallToActionInput(e.target.value);
+                    patchField("call_to_action", next, () => setCta(next));
+                  }}
                   placeholder="What action do you want leads to take?"
                 />
                 {errors.call_to_action ? (
@@ -539,6 +631,8 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   id="mailTraining"
                   rows={10}
                   value={mailTrainingInstruction}
+                  maxLength={MAIL_TRAINING_INSTRUCTION_MAX_LENGTH}
+                  aria-invalid={!!errors.mail_training_instruction}
                   onChange={(e) =>
                     patchField("mail_training_instruction", e.target.value, () =>
                       setMailTrainingInstruction(e.target.value)
@@ -547,7 +641,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   placeholder="Tell the AI how to write emails: tone, length, personalization rules, CTA style..."
                 />
                 <p className="text-right text-[11px] text-muted-foreground">
-                  {mailTrainingInstruction.length} / 2000
+                  {mailTrainingInstruction.length} / {MAIL_TRAINING_INSTRUCTION_MAX_LENGTH}
                 </p>
                 {errors.mail_training_instruction ? (
                   <p className="text-xs text-destructive">{errors.mail_training_instruction}</p>
@@ -572,6 +666,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                   <Input
                     id="sampleSubject"
                     value={sampleSubject}
+                    maxLength={MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH}
                     onChange={(e) => {
                       const value = e.target.value;
                       setSampleSubject(value);

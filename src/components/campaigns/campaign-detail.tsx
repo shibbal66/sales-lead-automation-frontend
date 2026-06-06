@@ -20,7 +20,7 @@ import { getGoogleLinkStatus } from "@/services/auth/authServices";
 import { parseGoogleLinkStatus } from "@/lib/googleLinkStatus";
 import { GoogleLinkDialog } from "@/components/auth/google-link-dialog";
 import { setPendingGoogleLinkReturn } from "@/utils/googleLinkReturn";
-import { createCampaignFollowUpSchema, mailTemplateSampleSchema, parseCreateCampaignFollowUpPayload } from "@/validators";
+import { createCampaignFollowUpSchema, mailTemplateSampleSchema, MAIL_TRAINING_INSTRUCTION_MAX_LENGTH, MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH, parseCreateCampaignFollowUpPayload } from "@/validators";
 import type { CreateCampaignFollowUpFormValues } from "@/validators";
 import type { CampaignDetailViewModel } from "@/lib/campaignPresentation";
 import type { CreateCampaignFollowUpRequest } from "@/types";
@@ -367,11 +367,13 @@ export function CampaignDetail({
               rows={6}
               className="mt-3 font-mono text-sm"
               value={form.mailTemplate}
+              maxLength={MAIL_TRAINING_INSTRUCTION_MAX_LENGTH}
+              aria-invalid={!!errors.mailTemplate}
               onChange={(event) => patchField("mailTemplate", event.target.value)}
               placeholder="Example: Write in a warm, conversational tone..."
             />
             <p className="mt-1 text-right text-[11px] text-muted-foreground">
-              {form.mailTemplate.length} / 2000
+              {form.mailTemplate.length} / {MAIL_TRAINING_INSTRUCTION_MAX_LENGTH}
             </p>
             {errors.mailTemplate ? (
               <p className="text-xs text-destructive">{errors.mailTemplate}</p>
@@ -526,6 +528,7 @@ export function CampaignDetail({
               <Input
                 id="exSubject"
                 value={exSubject}
+                maxLength={MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH}
                 onChange={(event) => {
                   setExSubject(event.target.value);
                   setAddExampleError("");

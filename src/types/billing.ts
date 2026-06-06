@@ -117,3 +117,38 @@ export interface SetDefaultPaymentMethodRequest {
 export type SetDefaultPaymentMethodResponse = GetBillingPaymentMethodsResponse;
 
 export type DeletePaymentMethodResponse = GetBillingPaymentMethodsResponse;
+
+export interface BillingQuotaUsage {
+  limit: number;
+  used: number;
+  available: number;
+}
+
+export interface BillingQuotaCampaignLeads {
+  campaignId: string;
+  campaignName: string;
+  limit: number;
+  used: number;
+  available: number;
+}
+
+export interface BillingQuota {
+  plan: {
+    id: string;
+    name: string;
+  };
+  campaigns: BillingQuotaUsage;
+  leadsPerCampaign: {
+    limit: number;
+    campaigns: BillingQuotaCampaignLeads[];
+  };
+  dailyEmails: BillingQuotaUsage;
+}
+
+export interface GetBillingQuotaResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    quota: BillingQuota;
+  };
+}

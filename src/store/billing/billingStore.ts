@@ -10,6 +10,7 @@ import {
   deleteBillingPaymentMethod,
   getBillingPaymentMethods,
   getBillingPlans,
+  getBillingQuota,
   getBillingSubscription,
   postBillingCancel,
   postBillingCheckout,
@@ -19,17 +20,20 @@ import {
   postBillingSetDefaultPaymentMethod,
   postBillingUpgrade
 } from "@/services/billing/billingServices";
-import type { BillingPaymentMethod, BillingPlan, BillingSubscription } from "@/types/billing";
+import type { BillingPaymentMethod, BillingPlan, BillingQuota, BillingSubscription } from "@/types/billing";
 
 let subscriptionInflight: Promise<void> | null = null;
 let billingDataInflight: Promise<void> | null = null;
+let quotaInflight: Promise<void> | null = null;
 
 interface BillingStoreState {
   subscription: BillingSubscription | null;
   plans: BillingPlan[];
   paymentMethods: BillingPaymentMethod[];
+  quota: BillingQuota | null;
   isFetchingSubscription: boolean;
   isFetchingBillingData: boolean;
+  isFetchingQuota: boolean;
   subscriptionHydrated: boolean;
   billingDataHydrated: boolean;
   actionPlanId: string | null;
@@ -40,6 +44,7 @@ interface BillingStoreState {
   deletingPaymentMethodId: string | null;
   fetchSubscription: (options?: { force?: boolean; treatAsCancel?: boolean }) => Promise<void>;
   fetchBillingData: (options?: { force?: boolean }) => Promise<void>;
+  fetchBillingQuota: () => Promise<void>;
   setSubscription: (subscription: BillingSubscription | null) => void;
   invalidateSubscription: () => void;
   invalidateBillingData: () => void;
@@ -55,8 +60,10 @@ export const useBillingStore = create<BillingStoreState>((set, get) => ({
   subscription: null,
   plans: [],
   paymentMethods: [],
+  quota: null,
   isFetchingSubscription: false,
   isFetchingBillingData: false,
+  isFetchingQuota: false,
   subscriptionHydrated: false,
   billingDataHydrated: false,
   actionPlanId: null,
@@ -75,7 +82,32 @@ export const useBillingStore = create<BillingStoreState>((set, get) => ({
   },
 
   invalidateBillingData: () => {
-    set({ billingDataHydrated: false });
+    set({ billingDataHydrated: false, quota: null });
+  },
+
+  fetchBillingQuota: async () => {
+    if (quotaInflight) return quotaInflight;
+
+    quotaInflight = (async () => {
+      set({ isFetchingQuota: true });
+      try {
+        const response = await getBillingQuota();
+        if (response.success && response.data?.quota) {
+          set({ quota: response.data.quota });
+          return;
+        }
+        if (!response.success) {
+          showApiErrorToast(response);
+        }
+      } catch (error) {
+        showApiErrorToast(error);
+      } finally {
+        set({ isFetchingQuota: false });
+        quotaInflight = null;
+      }
+    })();
+
+    return quotaInflight;
   },
 
   fetchSubscription: async (options = {}) => {
@@ -171,6 +203,7 @@ export const useBillingStore = create<BillingStoreState>((set, get) => ({
         if (response.success) {
           if (response.message) showApiSuccessToast(response.message);
           await get().fetchSubscription({ force: true });
+          await get().fetchBillingQuota();
           return;
         }
         showApiErrorToast(response);
@@ -192,6 +225,7 @@ export const useBillingStore = create<BillingStoreState>((set, get) => ({
       if (response.success) {
         if (response.message) showApiSuccessToast(response.message);
         await get().fetchSubscription({ force: true });
+        await get().fetchBillingQuota();
         if (response.data?.checkoutUrl) {
           window.location.assign(response.data.checkoutUrl);
         }

@@ -7,7 +7,7 @@ import { StatusPill } from "@/components/status-pill";
 import { UserProfileAvatar } from "@/components/user-profile-avatar";
 import { LeadDetailSheetSkeleton } from "@/components/skeletons/leads/lead-detail-sheet-skeleton";
 import type { LeadApiModel } from "@/types";
-import type { LeadListRowViewModel } from "@/lib/leadPresentation";
+import { formatSnakeCaseLabel, type LeadListRowViewModel } from "@/lib/leadPresentation";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { formatDateTime, formatRelativeDate, hasPresentableDate } from "@/lib/dateFormatting";
 import { cn } from "@/lib/utils";
@@ -243,7 +243,10 @@ export function LeadDetailSheet({
                         <DetailRow label="Email status" value={selectedLead.emailStatus} className="capitalize" />
                         <DetailRow label="Title" value={selectedLead.title} />
                         <DetailRow label="Seniority" value={selectedLead.seniority} className="capitalize" />
-                        <DetailRow label="Department" value={selectedLead.department} />
+                        <DetailRow
+                          label="Department"
+                          value={formatSnakeCaseLabel(selectedLead.department)}
+                        />
                       </div>
                     </Card>
                   ) : null}
