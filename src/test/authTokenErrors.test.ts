@@ -53,4 +53,11 @@ describe("authTokenErrors", () => {
     const error = createAxiosError(500, "/leads", TOKEN_EXPIRED_CODE);
     expect(shouldRefreshAccessToken(error, error.config)).toBe(false);
   });
+
+  it("does not refresh when skipAuthRefresh is set", () => {
+    const error = createAxiosError(401, "/notifications/push/register", TOKEN_EXPIRED_CODE);
+    expect(
+      shouldRefreshAccessToken(error, { url: "/notifications/push/register", _skipAuthRefresh: true })
+    ).toBe(false);
+  });
 });

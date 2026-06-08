@@ -48,12 +48,18 @@ export function isTokenExpiredError(error: unknown): boolean {
   return status === 401 || status === 200 || status === 403;
 }
 
+export type AuthAwareAxiosRequestConfig = InternalAxiosRequestConfig & {
+  /** When true, TOKEN_EXPIRED responses are not retried via refresh (e.g. logout cleanup). */
+  _skipAuthRefresh?: boolean;
+};
+
 /** True when the interceptor should refresh the access token and retry. */
 export function shouldRefreshAccessToken(
   error: unknown,
-  config?: InternalAxiosRequestConfig
+  config?: AuthAwareAxiosRequestConfig
 ): boolean {
   if (isAuthEndpoint(config?.url)) return false;
+  if (config?._skipAuthRefresh) return false;
   return isTokenExpiredError(error);
 }
 
