@@ -1,4 +1,10 @@
-import { createCampaignSchema, type CreateCampaignFormValues } from "@/validators/campaign";
+import {
+  createCampaignSchema,
+  sanitizeCampaignCallToActionInput,
+  sanitizeCampaignNameInput,
+  sanitizeCampaignTargetZoneInput,
+  type CreateCampaignFormValues
+} from "@/validators/campaign";
 import type {
   CampaignApiModel,
   CampaignLeadSource,
@@ -142,15 +148,22 @@ export function mapCampaignApiToDuplicateRequest(
   options?: { name?: string }
 ): CreateCampaignFormValues {
   const detail = mapCampaignApiToDetail(campaign);
+  const duplicatedName = options?.name ?? `${detail.name} Copy`;
+  const name = sanitizeCampaignNameInput(duplicatedName) || "Campaign Copy";
+
+  const mailTemplate =
+    typeof detail.mailTrainingInstruction === "string" && detail.mailTrainingInstruction.trim()
+      ? detail.mailTrainingInstruction.trim()
+      : DEFAULT_MAIL_TRAINING_INSTRUCTION;
+
   const form: CampaignDetailFormState = {
-    name: options?.name ?? `${detail.name} (Copy)`,
+    name,
     goal: detail.goal,
-    targetZone: detail.targetZone,
-    callToAction: detail.callToAction,
+    targetZone: sanitizeCampaignTargetZoneInput(detail.targetZone),
+    callToAction: sanitizeCampaignCallToActionInput(detail.callToAction),
     leadSource: detail.leadSource,
     runMode: detail.runMode,
-    mailTemplate:
-      detail.mailTrainingInstruction.trim() || DEFAULT_MAIL_TRAINING_INSTRUCTION,
+    mailTemplate,
     exampleTraining: "",
     mailTemplateSamples: detail.mailTemplateSamples.map((sample) => ({ ...sample })),
     tone: resolveCampaignTone(detail.targetTone),
