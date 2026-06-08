@@ -16,11 +16,16 @@ export function registerPushToken(payload: RegisterPushTokenRequest) {
   );
 }
 
-export function unregisterPushToken(payload: UnregisterPushTokenRequest) {
+export function unregisterPushToken(
+  payload: UnregisterPushTokenRequest,
+  options?: { skipAuthRefresh?: boolean }
+) {
   return apiInvoker<UnregisterPushTokenResponse>(
     END_POINT.notifications.pushRegister,
     "DELETE",
-    payload
+    payload,
+    undefined,
+    { skipAuthRefresh: options?.skipAuthRefresh }
   );
 }
 

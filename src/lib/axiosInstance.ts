@@ -1,17 +1,18 @@
-import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from "axios";
-import { clearAuthStorage, getAuthToken, setPendingAuthError } from "@/utils/authStorage";
+import axios, { type AxiosInstance, type AxiosError } from "axios";
+import { clearAuthStorage, getAuthToken, getRefreshToken, setPendingAuthError } from "@/utils/authStorage";
 import { refreshSession } from "@/lib/refreshSession";
 import { getApiErrorMessage, setSuppressApiErrorToasts } from "@/lib/apiToast";
 import {
   isAuthEndpoint,
   isTokenExpiredPayload,
   shouldRefreshAccessToken,
-  tokenExpiredResponseToAxiosError
+  tokenExpiredResponseToAxiosError,
+  type AuthAwareAxiosRequestConfig
 } from "@/lib/authTokenErrors";
 
 const LOGIN_PATH = "/login";
 
-type RetryableAxiosRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean };
+type RetryableAxiosRequestConfig = AuthAwareAxiosRequestConfig & { _retry?: boolean };
 
 type QueueItem = {
   resolve: (value?: unknown) => void;
@@ -19,6 +20,7 @@ type QueueItem = {
 };
 
 let isRefreshing = false;
+let isHandlingAuthFailure = false;
 let failedQueue: QueueItem[] = [];
 
 const processQueue = (error: unknown = null, token: string | null = null) => {
@@ -32,18 +34,26 @@ const processQueue = (error: unknown = null, token: string | null = null) => {
   failedQueue = [];
 };
 
-const setAuthorizationHeader = (request: InternalAxiosRequestConfig, token: string) => {
+const setAuthorizationHeader = (request: AuthAwareAxiosRequestConfig, token: string) => {
   request.headers.Authorization = `Bearer ${token}`;
 };
 
 const handleRefreshFailure = async (refreshError: unknown) => {
+  if (isHandlingAuthFailure) return;
+
+  isHandlingAuthFailure = true;
   setSuppressApiErrorToasts(true);
   processQueue(refreshError, null);
-  const { unregisterFcmPushToken } = await import("@/services/fcm/fcmPush");
-  await unregisterFcmPushToken();
-  clearAuthStorage();
-  setPendingAuthError(getApiErrorMessage(refreshError));
-  window.location.href = LOGIN_PATH;
+
+  try {
+    const { unregisterFcmPushToken } = await import("@/services/fcm/fcmPush");
+    await unregisterFcmPushToken({ skipAuthRefresh: true });
+    clearAuthStorage();
+    setPendingAuthError(getApiErrorMessage(refreshError));
+    window.location.href = LOGIN_PATH;
+  } finally {
+    isHandlingAuthFailure = false;
+  }
 };
 
 const axiosInstance: AxiosInstance = axios.create({
@@ -71,9 +81,20 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   async (error: AxiosError) => {
-    const originalRequest = error.config as RetryableAxiosRequestConfig;
+    const originalRequest = error.config as RetryableAxiosRequestConfig | undefined;
 
-    if (originalRequest && !originalRequest._retry && shouldRefreshAccessToken(error, originalRequest)) {
+    if (originalRequest && shouldRefreshAccessToken(error, originalRequest)) {
+      if (originalRequest._retry) {
+        isRefreshing = false;
+        await handleRefreshFailure(error);
+        return Promise.reject(error);
+      }
+
+      if (!getRefreshToken()) {
+        await handleRefreshFailure(new Error("No refresh token available"));
+        return Promise.reject(error);
+      }
+
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -94,6 +115,7 @@ axiosInstance.interceptors.response.use(
         processQueue(null, newAccessToken);
         return axiosInstance(originalRequest);
       } catch (refreshError) {
+        isRefreshing = false;
         await handleRefreshFailure(refreshError);
         return Promise.reject(refreshError);
       } finally {

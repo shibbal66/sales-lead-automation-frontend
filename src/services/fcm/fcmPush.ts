@@ -31,13 +31,15 @@ export async function syncFcmPushRegistration(): Promise<void> {
   }
 }
 
-export async function unregisterFcmPushToken(): Promise<void> {
+export async function unregisterFcmPushToken(options?: {
+  skipAuthRefresh?: boolean;
+}): Promise<void> {
   const fcmToken = getStoredFcmToken();
   if (!fcmToken) return;
 
   try {
     if (getAuthToken()) {
-      await unregisterPushToken({ fcmToken });
+      await unregisterPushToken({ fcmToken }, { skipAuthRefresh: options?.skipAuthRefresh });
     }
   } catch (error) {
     console.warn("Failed to unregister FCM token:", error);
