@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Moon, Sun } from "lucide-react";
 import { Logo } from "@/components/logo";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/theme-provider";
 import type { ReactNode } from "react";
@@ -68,13 +69,16 @@ export function MarketingLayout({ children, isAuthenticated }: MarketingLayoutPr
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} RapidShips LLC · Sales outreach automation for modern revenue teams
           </p>
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            <Link to="/login" className="font-medium text-brand-text hover:underline">
-              Sign in
-            </Link>
-            <Link to="/signup" className="font-medium text-brand-text hover:underline">
-              Create account
-            </Link>
+          <div className="flex flex-col gap-3 sm:items-end">
+            <LegalLinks className="text-sm" />
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+              <Link to="/login" className="font-medium text-brand-text hover:underline">
+                Sign in
+              </Link>
+              <Link to="/signup" className="font-medium text-brand-text hover:underline">
+                Create account
+              </Link>
+            </div>
           </div>
         </div>
       </footer>

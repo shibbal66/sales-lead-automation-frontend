@@ -196,7 +196,7 @@ export default function Meetings() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-          </div>add
+          </div>
         </div>
 
         {view === "list" ? (

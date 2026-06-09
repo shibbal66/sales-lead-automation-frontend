@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AuthLayout } from "@/components/auth/auth-layout";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
@@ -187,6 +188,10 @@ export default function Login() {
         Don't have an account?{" "}
         <Link to="/signup" className="font-semibold text-brand-text hover:underline">Sign up</Link>
       </p>
+
+      <div className="mt-6 flex justify-center">
+        <LegalLinks />
+      </div>
     </AuthLayout>
   );
 }

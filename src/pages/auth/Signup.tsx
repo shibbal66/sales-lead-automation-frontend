@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AuthLayout } from "@/components/auth/auth-layout";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
@@ -242,13 +243,13 @@ export default function Signup() {
           <Checkbox checked={accept} onCheckedChange={(v) => setAccept(!!v)} className="mt-0.5" />
           <span>
             I agree to the{" "}
-            <a className="text-brand-text hover:underline" href="#">
-              Terms of Service
-            </a>{" "}
+            <Link to="/terms" className="text-brand-text hover:underline" target="_blank" rel="noopener noreferrer">
+              Terms and Conditions
+            </Link>{" "}
             and{" "}
-            <a className="text-brand-text hover:underline" href="#">
+            <Link to="/privacy" className="text-brand-text hover:underline" target="_blank" rel="noopener noreferrer">
               Privacy Policy
-            </a>
+            </Link>
             .
           </span>
         </label>
@@ -266,6 +267,10 @@ export default function Signup() {
           Sign in
         </Link>
       </p>
+
+      <div className="mt-6 flex justify-center">
+        <LegalLinks />
+      </div>
     </AuthLayout>
   );
 }

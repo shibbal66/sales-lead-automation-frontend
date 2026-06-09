@@ -1,4 +1,6 @@
+import { Link } from "react-router-dom";
 import { Logo } from "@/components/logo";
+import { LegalLinks } from "@/components/legal/legal-links";
 import type { ReactNode } from "react";
 
 export function AuthLayout({
@@ -18,7 +20,13 @@ export function AuthLayout({
         <div className="absolute inset-0 bg-gradient-mesh" />
         <div className="absolute inset-0 bg-dot-pattern opacity-20" />
         <div className="relative z-10 p-10">
-          <Logo size="lg" />
+          <Link
+            to="/"
+            className="inline-flex rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label="Rapid AI home"
+          >
+            <Logo size="lg" />
+          </Link>
         </div>
         <div className="relative z-10 max-w-lg p-10">
           <p className="font-display text-4xl font-bold leading-tight text-foreground">
@@ -38,15 +46,24 @@ export function AuthLayout({
             ))}
           </div>
         </div>
-        <div className="relative z-10 p-10 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} RapidShips LLC · New Jersey
+        <div className="relative z-10 space-y-3 p-10 text-xs text-muted-foreground">
+          <LegalLinks />
+          <p>© {new Date().getFullYear()} RapidShips LLC · New Jersey</p>
         </div>
       </div>
 
       {/* Form panel */}
       <div className="flex min-h-screen items-center justify-center bg-background p-6 lg:p-10">
         <div className="w-full max-w-md">
-          <div className="lg:hidden mb-8 flex justify-center"><Logo size="md" /></div>
+          <div className="mb-8 flex justify-center lg:hidden">
+            <Link
+              to="/"
+              className="inline-flex rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Rapid AI home"
+            >
+              <Logo size="md" />
+            </Link>
+          </div>
           {children}
         </div>
       </div>
