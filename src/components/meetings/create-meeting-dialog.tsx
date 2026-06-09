@@ -35,6 +35,7 @@ import {
   buildCreateMeetingPayload,
   buildUpdateMeetingPayload,
   createMeetingSchema,
+  sanitizeMeetingTitleInput,
   updateMeetingSchema,
   type CreateMeetingFormValues,
   type UpdateMeetingFormValues
@@ -106,7 +107,7 @@ function defaultFormState(initialDay?: Date): FormState {
 
 function formStateFromMeeting(meeting: Meeting): FormState {
   return {
-    title: meeting.leadName,
+    title: sanitizeMeetingTitleInput(meeting.leadName),
     description: meeting.description ?? "",
     startLocal: isoToDatetimeLocalValue(meeting.meetingAt),
     endLocal: isoToDatetimeLocalValue(meeting.endAt),
@@ -284,7 +285,11 @@ export function CreateMeetingDialog({
               <Input
                 id="meeting-title"
                 value={form.title}
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                onChange={(e) => {
+                  const title = sanitizeMeetingTitleInput(e.target.value);
+                  setForm((f) => ({ ...f, title }));
+                  if (errors.title) setErrors((prev) => ({ ...prev, title: undefined }));
+                }}
                 placeholder="Intro call with Acme"
               />
               {errors.title ? <p className="text-xs text-destructive">{errors.title}</p> : null}

@@ -20,6 +20,8 @@ import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import BillingSuccess from "./pages/billing/BillingSuccess";
 import BillingCancel from "./pages/billing/BillingCancel";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsOfService from "./pages/legal/TermsOfService";
 import NotFound from "./pages/NotFound.tsx";
 import { useAuthStore } from "@/store/auth/authStore";
 
@@ -45,6 +47,8 @@ function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/google/callback" element={<GoogleCallback />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
       <Route element={isAuthenticated ? <AppShell /> : <Navigate to="/login" replace />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/leads" element={<Leads />} />

@@ -1,0 +1,205 @@
+Privacy Policy
+
+Last Updated: June 9, 2026
+
+RapidAI2X (“RapidAI2X,” “we,” “our,” or “us”) respects your privacy and is committed to protecting your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website, software platform, applications, and related services.
+
+Information We Collect
+
+We may collect the following information:
+
+Personal Information
+
+* Name
+* Email address
+* Phone number
+* Company name
+* Job title
+* Billing information
+* Account credentials
+
+Business Data
+
+* Company information
+* Contact information
+* Lead generation data
+* CRM data
+* Email campaign data
+* User-generated content
+
+Automatically Collected Information
+
+* IP address
+* Browser type
+* Device information
+* Usage statistics
+* Cookies and similar technologies
+
+How We Use Information
+
+We use collected information to:
+
+* Provide and maintain our services
+* Process transactions
+* Authenticate users
+* Improve platform performance
+* Deliver customer support
+* Send service-related communications
+* Prevent fraud and abuse
+* Comply with legal obligations
+
+Third-Party Services
+
+RapidAI2X may integrate with third-party providers including:
+
+* Google APIs
+* CRM platforms
+* Email service providers
+* Payment processors
+* Analytics providers
+* Cloud hosting providers
+
+These third parties may collect and process information according to their own privacy policies.
+
+Data Sharing
+
+We do not sell personal information.
+
+We may share information with:
+
+* Service providers assisting in platform operations
+* Business partners necessary to provide services
+* Legal authorities when required by law
+* Successors in the event of a merger, acquisition, or asset sale
+
+Data Security
+
+We implement commercially reasonable security measures designed to protect information from unauthorized access, disclosure, alteration, or destruction. No method of transmission or storage is 100% secure.
+
+Data Retention
+
+We retain information for as long as necessary to provide services, comply with legal obligations, resolve disputes, and enforce agreements.
+
+Your Rights
+
+Depending on your jurisdiction, you may have rights to:
+
+* Access your information
+* Correct inaccurate information
+* Request deletion of your information
+* Restrict processing
+* Object to certain processing activities
+
+To exercise these rights, contact us using the information below.
+
+Google API Services
+
+RapidAI2X’s use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including Limited Use requirements.
+
+Children’s Privacy
+
+RapidAI2X is not intended for individuals under the age of 18. We do not knowingly collect information from children.
+
+Changes to This Policy
+
+We may update this Privacy Policy periodically. Continued use of the service after updates constitutes acceptance of the revised policy.
+
+Contact Us
+
+RapidAI2X
+
+Email: support@rapidai2x.com
+
+Website: https://rapidai2x.com
+
+Terms and Conditions
+
+Last Updated: June 9, 2026
+
+Welcome to RapidAI2X. By accessing or using RapidAI2X’s website, software, platform, or services, you agree to be bound by these Terms and Conditions.
+
+Acceptance of Terms
+
+By creating an account or using our services, you agree to these Terms and Conditions and all applicable laws and regulations.
+
+Services
+
+RapidAI2X provides business intelligence, lead generation, contact enrichment, sales engagement, AI-powered outreach, and related software services.
+
+We reserve the right to modify, suspend, or discontinue any aspect of the services at any time.
+
+User Accounts
+
+You are responsible for:
+
+* Maintaining account security
+* Protecting login credentials
+* All activity occurring under your account
+* Providing accurate information
+
+Acceptable Use
+
+Users agree not to:
+
+* Violate any applicable law
+* Send unlawful spam
+* Use the platform for fraudulent activities
+* Interfere with platform operations
+* Reverse engineer or copy the platform
+* Access data without authorization
+
+Data and Compliance
+
+Users are responsible for ensuring their use of RapidAI2X complies with applicable privacy, marketing, and anti-spam laws, including CAN-SPAM, GDPR, and other applicable regulations.
+
+Subscription and Billing
+
+Certain services require payment.
+
+Subscriptions may automatically renew unless canceled before the renewal date.
+
+Fees are non-refundable except where required by law or expressly stated otherwise.
+
+Intellectual Property
+
+All software, content, branding, trademarks, and technology associated with RapidAI2X remain the exclusive property of RapidAI2X.
+
+No ownership rights are transferred to users.
+
+Disclaimer
+
+RapidAI2X provides information and tools on an “as-is” and “as-available” basis.
+
+We do not guarantee:
+
+* Accuracy of third-party data
+* Lead conversion results
+* Email deliverability
+* Revenue outcomes
+* Continuous service availability
+
+Limitation of Liability
+
+To the maximum extent permitted by law, RapidAI2X shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from use of the services.
+
+Our total liability shall not exceed the amount paid by the user during the twelve months preceding the claim.
+
+Termination
+
+We may suspend or terminate accounts at our discretion for violations of these Terms or applicable laws.
+
+Governing Law
+
+These Terms shall be governed by the laws of the State of New Jersey, United States, without regard to conflict of law principles.
+
+Changes to Terms
+
+We may update these Terms periodically. Continued use of the services constitutes acceptance of any revised Terms.
+
+Contact Information
+
+RapidAI2X
+
+Email: support@rapidai2x.com
+
+Website: https://rapidai2x.com

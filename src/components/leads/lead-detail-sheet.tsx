@@ -227,7 +227,7 @@ export function LeadDetailSheet({
                   <Card className="space-y-3 border-border bg-card p-4 shadow-card">
                     <SectionTitle>Record</SectionTitle>
                     <div className="grid gap-2 sm:grid-cols-2">
-                      <DetailRow label="ID" value={String(selectedLead.id)} alwaysShow />
+                      {/* <DetailRow label="ID" value={String(selectedLead.id)} alwaysShow /> */}
                       <DetailRow label="Date added" value={formatLeadDateValue(selectedLead.dateAdded)} />
                     </div>
                   </Card>
@@ -237,8 +237,8 @@ export function LeadDetailSheet({
                       <SectionTitle>Person</SectionTitle>
                       <div className="grid gap-2 sm:grid-cols-2">
                         <DetailRow label="Full name" value={selectedLead.fullName} />
-                        <DetailRow label="First name" value={selectedLead.firstName} />
-                        <DetailRow label="Last name" value={selectedLead.lastName} />
+                        {/* <DetailRow label="First name" value={selectedLead.firstName} /> */}
+                        {/* <DetailRow label="Last name" value={selectedLead.lastName} /> */}
                         <DetailRow label="Email" value={selectedLead.email} />
                         <DetailRow label="Email status" value={selectedLead.emailStatus} className="capitalize" />
                         <DetailRow label="Title" value={selectedLead.title} />

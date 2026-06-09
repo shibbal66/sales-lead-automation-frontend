@@ -1,9 +1,33 @@
 import { z } from "zod";
 import { datetimeLocalValueToIsoUtc } from "@/lib/dateFormatting";
+import { emailSchema } from "@/validators/auth";
 import {
   isAllowedMeetingStartLocal,
   MEETING_PAST_DATE_MESSAGE
 } from "@/lib/meetings/meetingDates";
+
+const letterNumberSpacePattern = /^[\p{L}\p{N}\s]+$/u;
+
+function includesLetter(value: string): boolean {
+  return /\p{L}/u.test(value);
+}
+
+export const MEETING_TITLE_MAX_LENGTH = 200;
+
+export const meetingTitleSchema = z
+  .string()
+  .trim()
+  .min(1, "Title is required")
+  .max(MEETING_TITLE_MAX_LENGTH, `Title must be ${MEETING_TITLE_MAX_LENGTH} characters or less`)
+  .regex(letterNumberSpacePattern, "Title must contain only letters, numbers, and spaces")
+  .refine(includesLetter, {
+    message: "Title must include at least one letter"
+  });
+
+/** Strips invalid characters and enforces max length while typing. */
+export function sanitizeMeetingTitleInput(value: string): string {
+  return value.replace(/[^\p{L}\p{N}\s]/gu, "").slice(0, MEETING_TITLE_MAX_LENGTH);
+}
 
 const optionalUuidSchema = z
   .string()
@@ -18,15 +42,11 @@ const datetimeLocalField = z
 
 export const createMeetingSchema = z
   .object({
-    title: z.string().trim().min(1, "Title is required").max(200, "Title is too long"),
+    title: meetingTitleSchema,
     description: z.string().trim().max(2000, "Description is too long").optional(),
     startLocal: datetimeLocalField,
     endLocal: datetimeLocalField,
-    attendee_email: z
-      .string()
-      .trim()
-      .min(1, "Attendee email is required")
-      .email("Please provide a valid email address"),
+    attendee_email: emailSchema,
     campaign_id: optionalUuidSchema,
     campaign_lead_id: optionalUuidSchema,
     sync_google: z.boolean().default(true),
@@ -73,15 +93,11 @@ const meetingDatetimeRefine = (
 
 export const updateMeetingSchema = z
   .object({
-    title: z.string().trim().min(1, "Title is required").max(200, "Title is too long"),
+    title: meetingTitleSchema,
     description: z.string().trim().max(2000, "Description is too long").optional(),
     startLocal: datetimeLocalField,
     endLocal: datetimeLocalField,
-    attendee_email: z
-      .string()
-      .trim()
-      .min(1, "Attendee email is required")
-      .email("Please provide a valid email address"),
+    attendee_email: emailSchema,
     status: z.enum(["scheduled", "completed", "cancelled"])
   })
   .superRefine(meetingDatetimeRefine);
