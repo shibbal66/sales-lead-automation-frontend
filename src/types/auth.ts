@@ -101,6 +101,22 @@ export interface GoogleLinkStatusResponse {
 
 
 
+export type OtpPurpose = "email_verification" | "password_reset";
+
+export interface ValidateOtpRequest {
+  email: string;
+  otp: string;
+  purpose: OtpPurpose;
+}
+
+export interface ValidateOtpResponse {
+  success: boolean;
+  message: string;
+  data?: {
+    valid: boolean;
+  };
+}
+
 export interface VerifyOtpRequest {
   email: string;
   otp: string;

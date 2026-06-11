@@ -211,6 +211,14 @@ export const requestOtpSchema = z.object({
 
 export type RequestOtpFormValues = z.infer<typeof requestOtpSchema>;
 
+// --- Validate OTP (check code without consuming it) ---
+export const validateOtpSchema = z.object({
+  email: emailSchema,
+  otp: otpSchema
+});
+
+export type ValidateOtpFormValues = z.infer<typeof validateOtpSchema>;
+
 // --- Verify OTP ---
 export const verifyOtpSchema = z.object({
   email: emailSchema,
@@ -239,11 +247,18 @@ export const addPasswordSchema = z
 
 export type AddPasswordFormValues = z.infer<typeof addPasswordSchema>;
 
-// --- Reset password (email + OTP + new password) ---
+// --- Reset password OTP step (email + OTP only) ---
+export const resetPasswordOtpSchema = z.object({
+  email: emailSchema,
+  otp: otpSchema
+});
+
+export type ResetPasswordOtpFormValues = z.infer<typeof resetPasswordOtpSchema>;
+
+// --- Reset password (new password only; OTP passed from prior step) ---
 export const resetPasswordSchema = z
   .object({
     email: emailSchema,
-    otp: otpSchema,
     password: strongPasswordSchema,
     confirmPassword: z.string().min(1, "Please confirm your password")
   })

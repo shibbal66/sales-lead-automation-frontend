@@ -24,7 +24,9 @@ import type {
   UpdateCampaignLeadResponse,
   UpdateCampaignRequest,
   UpdateCampaignResponse,
-  RunCampaignLeadsResponse
+  RunCampaignLeadsResponse,
+  SendCampaignLeadEmailsRequest,
+  SendCampaignLeadEmailsResponse
 } from "@/types";
 
 export function createCampaign(payload: CreateCampaignRequest) {
@@ -140,5 +142,16 @@ export function runCampaignLeads(campaignId: string) {
   return apiInvoker<RunCampaignLeadsResponse>(
     `${END_POINT.campaign.create}/${campaignId}/leads/run`,
     "POST"
+  );
+}
+
+export function sendCampaignLeadEmails(
+  campaignId: string,
+  payload: SendCampaignLeadEmailsRequest
+) {
+  return apiInvoker<SendCampaignLeadEmailsResponse>(
+    `${END_POINT.campaign.create}/${campaignId}/leads/send-emails`,
+    "POST",
+    payload
   );
 }

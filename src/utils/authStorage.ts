@@ -84,18 +84,18 @@ export function clearPendingVerification(): void {
   sessionStorage.removeItem(PENDING_VERIFY_KEY);
 }
 
-export function setPendingPasswordReset(data: { email: string }): void {
+export function setPendingPasswordReset(data: { email: string; otp?: string }): void {
   if (!isBrowser()) return;
   sessionStorage.setItem(PENDING_PASSWORD_RESET_KEY, JSON.stringify(data));
 }
 
-export function getPendingPasswordReset(): { email: string } | null {
+export function getPendingPasswordReset(): { email: string; otp?: string } | null {
   if (!isBrowser()) return null;
   const raw = sessionStorage.getItem(PENDING_PASSWORD_RESET_KEY);
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as { email?: string };
-    if (parsed.email) return { email: parsed.email };
+    const parsed = JSON.parse(raw) as { email?: string; otp?: string };
+    if (parsed.email) return { email: parsed.email, otp: parsed.otp };
     return null;
   } catch {
     return null;

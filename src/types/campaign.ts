@@ -285,3 +285,36 @@ export interface RunCampaignLeadsResponse {
   data?: unknown;
 }
 
+export interface SendCampaignLeadEmailsRequest {
+  campaign_lead_id: string;
+}
+
+export interface SendCampaignLeadEmailResult {
+  campaignLeadId: string;
+  status: string;
+  to: string;
+  subject: string;
+  messageId?: string;
+}
+
+export interface SendCampaignLeadEmailsData {
+  sent: number;
+  failed: number;
+  skipped: number;
+  tokensRefreshed?: number;
+  total: number;
+  dailyLimitReached: boolean;
+  alreadySentToday: number;
+  totalSentToday: number;
+  dailyLimit: number;
+  results: SendCampaignLeadEmailResult[];
+}
+
+/** POST `/campaigns/:id/leads/send-emails` — send email for one campaign lead. */
+export interface SendCampaignLeadEmailsResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+  data?: SendCampaignLeadEmailsData;
+}
+

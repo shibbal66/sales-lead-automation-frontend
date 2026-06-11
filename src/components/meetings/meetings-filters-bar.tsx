@@ -17,7 +17,7 @@ import {
   type MeetingsFilterDraft
 } from "@/lib/meetings/filters";
 import type { MeetingsViewMode } from "@/lib/meetings";
-import type { MeetingApiStatus } from "@/types/meeting";
+import type { MeetingReadStatus } from "@/types/meeting";
 import type { CampaignApiModel } from "@/types/campaign";
 
 export type { MeetingsFilterDraft };
@@ -32,7 +32,7 @@ type MeetingsFiltersBarProps = {
 };
 
 export function meetingsFiltersFromStore(filters: {
-  status?: MeetingApiStatus;
+  status?: MeetingReadStatus;
   campaign_id?: string;
   from?: string;
   to?: string;

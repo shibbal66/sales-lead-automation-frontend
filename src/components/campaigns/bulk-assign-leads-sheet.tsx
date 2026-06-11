@@ -4,13 +4,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle
-} from "@/components/ui/sheet";
+  Collapsible,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -28,13 +32,14 @@ import { parseLeadsListResponse } from "@/lib/parseLeadsListResponse";
 import { mapLeadApiToListRow } from "@/lib/leadPresentation";
 import { showApiErrorToast } from "@/lib/apiToast";
 import { clampPage, getTotalPages } from "@/lib/listPagination";
+import { cn } from "@/lib/utils";
 import type { LeadApiModel } from "@/types";
 import {
   EMPTY_LEADS_BROWSE_FILTERS,
   leadsBrowseFiltersToQuery,
   type LeadsBrowseFilters,
 } from "@/lib/leads/query";
-import { Plus, RotateCcw, Search } from "lucide-react";
+import { ChevronDown, Plus, RotateCcw, Search } from "lucide-react";
 
 const PAGE_LIMIT = 20;
 
@@ -60,6 +65,7 @@ export function BulkAssignLeadsSheet({
   const [total, setTotal] = useState(0);
   const [isFetching, setIsFetching] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   const totalPages = getTotalPages(total, PAGE_LIMIT);
 
@@ -101,6 +107,7 @@ export function BulkAssignLeadsSheet({
     setAppliedFilters(EMPTY_LEADS_BROWSE_FILTERS);
     setSelected(new Set());
     setPage(1);
+    setFiltersOpen(true);
   }, []);
 
   useEffect(() => {
@@ -172,89 +179,108 @@ export function BulkAssignLeadsSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="flex h-full w-full min-h-0 flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <SheetHeader className="border-b border-border px-6 py-5 text-left">
-          <SheetTitle>Add leads to campaign</SheetTitle>
-          <SheetDescription>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:w-full">
+        <DialogHeader className="border-b border-border px-6 py-5 text-left">
+          <DialogTitle>Add leads to campaign</DialogTitle>
+          <DialogDescription>
             Filter leads, select rows, then add them to this campaign.
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
-          <div className="space-y-4 rounded-xl border border-border bg-muted/20 p-4">
-            <p className="text-sm font-semibold">Filters</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="lead-filter-search">Search</Label>
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="lead-filter-search"
-                    value={draftFilters.search}
-                    onChange={(event) => updateDraftFilter("search", event.target.value)}
-                    placeholder="Name, company, email..."
-                    className="pl-9"
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") handleApplyFilters();
-                    }}
-                  />
+          <div className="rounded-xl border border-border bg-muted/20 p-4">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((open) => !open)}
+              className="flex w-full items-center justify-between gap-2 text-left"
+              aria-expanded={filtersOpen}
+              aria-controls="bulk-assign-leads-filters"
+            >
+              <span className="text-sm font-semibold">Filters</span>
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200",
+                  filtersOpen && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </button>
+            <Collapsible open={filtersOpen}>
+              <CollapsibleContent id="bulk-assign-leads-filters" className="space-y-4 pt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="lead-filter-search">Search</Label>
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="lead-filter-search"
+                        value={draftFilters.search}
+                        onChange={(event) => updateDraftFilter("search", event.target.value)}
+                        placeholder="Name, company, email..."
+                        className="pl-9"
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") handleApplyFilters();
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="lead-filter-email-status">Email status</Label>
+                    <Input
+                      id="lead-filter-email-status"
+                      value={draftFilters.emailStatus}
+                      onChange={(event) => updateDraftFilter("emailStatus", event.target.value)}
+                      placeholder="e.g. sent"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="lead-filter-country">Country</Label>
+                    <Input
+                      id="lead-filter-country"
+                      value={draftFilters.country}
+                      onChange={(event) => updateDraftFilter("country", event.target.value)}
+                      placeholder="Country"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="lead-filter-state">State</Label>
+                    <Input
+                      id="lead-filter-state"
+                      value={draftFilters.state}
+                      onChange={(event) => updateDraftFilter("state", event.target.value)}
+                      placeholder="State"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="lead-filter-city">City</Label>
+                    <Input
+                      id="lead-filter-city"
+                      value={draftFilters.city}
+                      onChange={(event) => updateDraftFilter("city", event.target.value)}
+                      placeholder="City"
+                    />
+                  </div>
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="lead-filter-industry">Industry</Label>
+                    <Input
+                      id="lead-filter-industry"
+                      value={draftFilters.industry}
+                      onChange={(event) => updateDraftFilter("industry", event.target.value)}
+                      placeholder="Industry"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="lead-filter-email-status">Email status</Label>
-                <Input
-                  id="lead-filter-email-status"
-                  value={draftFilters.emailStatus}
-                  onChange={(event) => updateDraftFilter("emailStatus", event.target.value)}
-                  placeholder="e.g. sent"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="lead-filter-country">Country</Label>
-                <Input
-                  id="lead-filter-country"
-                  value={draftFilters.country}
-                  onChange={(event) => updateDraftFilter("country", event.target.value)}
-                  placeholder="Country"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="lead-filter-state">State</Label>
-                <Input
-                  id="lead-filter-state"
-                  value={draftFilters.state}
-                  onChange={(event) => updateDraftFilter("state", event.target.value)}
-                  placeholder="State"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="lead-filter-city">City</Label>
-                <Input
-                  id="lead-filter-city"
-                  value={draftFilters.city}
-                  onChange={(event) => updateDraftFilter("city", event.target.value)}
-                  placeholder="City"
-                />
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label htmlFor="lead-filter-industry">Industry</Label>
-                <Input
-                  id="lead-filter-industry"
-                  value={draftFilters.industry}
-                  onChange={(event) => updateDraftFilter("industry", event.target.value)}
-                  placeholder="Industry"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={handleResetFilters}>
-                <RotateCcw className="h-4 w-4" /> Reset
-              </Button>
-              <Button type="button" size="sm" onClick={handleApplyFilters} disabled={isFetching}>
-                Apply filters
-              </Button>
-            </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={handleResetFilters}>
+                    <RotateCcw className="h-4 w-4" /> Reset
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleApplyFilters} disabled={isFetching}>
+                    Apply filters
+                  </Button>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
 
           <div className="mt-4 flex items-center justify-between gap-2">
@@ -347,7 +373,7 @@ export function BulkAssignLeadsSheet({
           </div>
         </div>
 
-        <SheetFooter className="border-t border-border px-6 py-4 sm:justify-between">
+        <DialogFooter className="flex-row justify-between gap-2 border-t border-border px-6 py-4 sm:space-x-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>
             Cancel
           </Button>
@@ -363,8 +389,8 @@ export function BulkAssignLeadsSheet({
                 ? `Add ${selected.size} lead${selected.size === 1 ? "" : "s"}`
                 : "Add to campaign"}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

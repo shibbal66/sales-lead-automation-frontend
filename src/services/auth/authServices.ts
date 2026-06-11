@@ -9,6 +9,8 @@ import type {
   GoogleLinkStatusResponse,
   GoogleTokenExchangeRequest,
   GoogleTokenExchangeResponse,
+  ValidateOtpRequest,
+  ValidateOtpResponse,
   VerifyOtpRequest,
   VerifyOtpResponse,
   ForgotPasswordRequest,
@@ -51,6 +53,10 @@ export function getGoogleLinkStatus() {
 
 export function signup(payload: SignupRequest) {
   return apiInvoker<SignupResponse>(END_POINT.auth.signup, "POST", payload);
+}
+
+export function validateOtp(payload: ValidateOtpRequest) {
+  return apiInvoker<ValidateOtpResponse>(END_POINT.auth.validateOtp, "POST", payload);
 }
 
 export function verifyOtp(payload: VerifyOtpRequest) {

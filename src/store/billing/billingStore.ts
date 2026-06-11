@@ -295,9 +295,10 @@ export const useBillingStore = create<BillingStoreState>((set, get) => ({
     set({ isOpeningPortal: true });
     try {
       const response = await postBillingPortal();
-      if (response.success && response.data?.portalUrl) {
+      const portalUrl = response.data?.url ?? response.data?.portalUrl;
+      if (response.success && portalUrl) {
         if (response.message) showApiSuccessToast(response.message);
-        window.location.assign(response.data.portalUrl);
+        window.location.assign(portalUrl);
         return;
       }
       showApiErrorToast(response);

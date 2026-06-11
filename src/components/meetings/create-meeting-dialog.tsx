@@ -106,13 +106,16 @@ function defaultFormState(initialDay?: Date): FormState {
 }
 
 function formStateFromMeeting(meeting: Meeting): FormState {
+  const status: MeetingApiStatus =
+    meeting.apiStatus === "completed" ? "completed" : "scheduled";
+
   return {
     title: sanitizeMeetingTitleInput(meeting.leadName),
     description: meeting.description ?? "",
     startLocal: isoToDatetimeLocalValue(meeting.meetingAt),
     endLocal: isoToDatetimeLocalValue(meeting.endAt),
     attendee_email: meeting.company,
-    status: meeting.apiStatus,
+    status,
     campaign_id: EMPTY_CAMPAIGN,
     campaign_lead_id: EMPTY_LEAD,
     sync_google: false,
@@ -385,7 +388,13 @@ export function CreateMeetingDialog({
               ) : null}
             </div>
 
-            {isEditMode ? (
+            {isEditMode && isAlreadyCancelled ? (
+              <div className="space-y-1.5">
+                <Label>Status</Label>
+                <Input value="Cancelled" disabled readOnly />
+              </div>
+            ) : null}
+            {isEditMode && !isAlreadyCancelled ? (
               <div className="space-y-1.5">
                 <Label>Status</Label>
                 <Select
@@ -407,7 +416,8 @@ export function CreateMeetingDialog({
                 </Select>
                 {errors.status ? <p className="text-xs text-destructive">{errors.status}</p> : null}
               </div>
-            ) : (
+            ) : null}
+            {!isEditMode ? (
               <>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
@@ -522,7 +532,7 @@ export function CreateMeetingDialog({
                   </div>
                 </div>
               </>
-            )}
+            ) : null}
 
             {errors.form ? <p className="text-sm text-destructive">{errors.form}</p> : null}
 

@@ -15,7 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { EllipsisVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { EllipsisVertical, Mail, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   CAMPAIGN_LEAD_STATUS_OPTIONS,
@@ -39,6 +39,8 @@ type CampaignLeadsTableProps = {
   onAssignClick: () => void;
   onEditLead: (lead: CampaignLeadApiModel) => void;
   onDeleteLead: (lead: CampaignLeadApiModel) => void;
+  onSendEmail: (lead: CampaignLeadApiModel) => void;
+  sendingEmailLeadId: string | null;
 };
 
 export function CampaignLeadsTable({
@@ -53,6 +55,8 @@ export function CampaignLeadsTable({
   onAssignClick,
   onEditLead,
   onDeleteLead,
+  onSendEmail,
+  sendingEmailLeadId,
 }: CampaignLeadsTableProps) {
   const skeletonRows = leads.length > 0 ? leads.length : 6;
 
@@ -110,7 +114,7 @@ export function CampaignLeadsTable({
             <TableHead>Mail Template</TableHead>
             <TableHead>Sent At</TableHead>
             <TableHead>Error</TableHead>
-            <TableHead>Created</TableHead>
+            {/* <TableHead>Created</TableHead> */}
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -155,35 +159,49 @@ export function CampaignLeadsTable({
               <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
                 {lead.error_message || "—"}
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">
+              {/* <TableCell className="text-sm text-muted-foreground">
                 {formatDateTime(lead.created_at)}
-              </TableCell>
+              </TableCell> */}
               <TableCell className="text-right">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                <div className="flex items-center justify-end gap-2">
+                  {lead.status === "failed" ? (
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Open row actions"
+                      variant="outline"
+                      size="sm"
+                      disabled={sendingEmailLeadId === lead.id}
+                      onClick={() => onSendEmail(lead)}
                     >
-                      <EllipsisVertical className="h-4 w-4" />
+                      <Mail className="h-4 w-4" />
+                      {sendingEmailLeadId === lead.id ? "Sending..." : "Send email"}
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onEditLead(lead)}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Update
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => onDeleteLead(lead)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  ) : null}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Open row actions"
+                      >
+                        <EllipsisVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onEditLead(lead)}>
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Update
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => onDeleteLead(lead)}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </TableCell>
             </TableRow>
               ))

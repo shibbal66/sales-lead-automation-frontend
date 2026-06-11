@@ -1,8 +1,8 @@
 import { format, parseISO } from "date-fns";
 import { formatRelativeDate } from "@/lib/dateFormatting";
-import type { Meeting, MeetingApiModel, MeetingApiStatus } from "@/types/meeting";
+import type { Meeting, MeetingApiModel, MeetingReadStatus } from "@/types/meeting";
 
-export function normalizeMeetingApiStatus(status: string): MeetingApiStatus {
+export function normalizeMeetingApiStatus(status: string): MeetingReadStatus {
   const normalized = status.trim().toLowerCase();
   if (normalized === "completed") return "completed";
   if (normalized === "cancelled" || normalized === "canceled") return "cancelled";

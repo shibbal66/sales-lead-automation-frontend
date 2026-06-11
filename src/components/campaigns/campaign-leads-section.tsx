@@ -36,7 +36,9 @@ export function CampaignLeadsSection({ campaignId }: CampaignLeadsSectionProps) 
     handleStatusFilterChange,
     bulkAssignLeads,
     saveCampaignLead,
-    removeCampaignLead
+    removeCampaignLead,
+    sendCampaignLeadEmail,
+    sendingEmailLeadId
   } = useCampaignLeads(campaignId);
   const [assignLeadsOpen, setAssignLeadsOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<CampaignLeadApiModel | null>(null);
@@ -78,6 +80,8 @@ export function CampaignLeadsSection({ campaignId }: CampaignLeadsSectionProps) 
           onAssignClick={() => setAssignLeadsOpen(true)}
           onEditLead={setEditingLead}
           onDeleteLead={setDeletingLead}
+          onSendEmail={(lead) => void sendCampaignLeadEmail(lead.id)}
+          sendingEmailLeadId={sendingEmailLeadId}
         />
       </Card>
       <BulkAssignLeadsSheet

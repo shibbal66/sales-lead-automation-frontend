@@ -39,7 +39,7 @@ export default function ForgotPassword() {
           "If an account with this email exists and has a password, a reset code has been sent."
       );
       setPendingPasswordReset({ email: data.email });
-      navigate("/reset-password", {
+      navigate("/reset-password-otp", {
         replace: true,
         state: { email: data.email }
       });
