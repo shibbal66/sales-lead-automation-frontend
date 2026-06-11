@@ -41,8 +41,14 @@ export {
   ANALYTICS_CAMPAIGN_COMPARISON_EMPTY_MESSAGE,
   DEFAULT_CAMPAIGN_COMPARISON_LIMIT,
   formatAnalyticsRatePercent,
+  buildReplySparklineGeometry,
+  findNearestReplySparklinePointIndex,
+  formatReplySparklineTooltip,
+  getReplySparklinePeriodLabel,
   replySparklineToChartData,
-  type ReplySparklineChartPoint
+  type ReplySparklineChartPoint,
+  type ReplySparklineGeometry,
+  type ReplySparklinePoint
 } from "./campaignComparison";
 
 export {

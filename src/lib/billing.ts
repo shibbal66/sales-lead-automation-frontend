@@ -146,3 +146,47 @@ export function getBillingQuotaUsagePercent(used: number, limit: number): number
   if (!Number.isFinite(limit) || limit <= 0) return 0;
   return Math.min(100, Math.max(0, Math.round((used / limit) * 100)));
 }
+
+export const DEFAULT_PLAN_MAX_LEADS_PER_CAMPAIGN = 100;
+
+export const LEAD_COUNT_PRESETS = [50, 100, 250, 500, 1000] as const;
+
+export function getMaxLeadsPerCampaign(subscription: BillingSubscription | null | undefined): number {
+  const fromLimits = subscription?.limits?.maxLeadsPerCampaign;
+  if (typeof fromLimits === "number" && fromLimits > 0) return fromLimits;
+
+  const fromPlan = subscription?.plan?.maxLeadsPerCampaign;
+  if (typeof fromPlan === "number" && fromPlan > 0) return fromPlan;
+
+  return DEFAULT_PLAN_MAX_LEADS_PER_CAMPAIGN;
+}
+
+export function getCurrentPlanName(subscription: BillingSubscription | null | undefined): string {
+  return subscription?.plan?.name?.trim() || "Free";
+}
+
+export function getLeadCountPresets(maxLeadsPerCampaign: number): number[] {
+  const presets: number[] = LEAD_COUNT_PRESETS.filter((value) => value <= maxLeadsPerCampaign);
+  if (maxLeadsPerCampaign >= 1 && !presets.includes(maxLeadsPerCampaign)) {
+    presets.push(maxLeadsPerCampaign);
+  }
+  return presets.sort((a, b) => a - b);
+}
+
+export function getCampaignLeadCapacity(options: {
+  maxLeadsPerCampaign: number;
+  currentLeadCount: number;
+  campaignTargetLeads?: number;
+}): { maxAllowed: number; remainingSlots: number } {
+  const targetCap =
+    typeof options.campaignTargetLeads === "number" && options.campaignTargetLeads > 0
+      ? options.campaignTargetLeads
+      : options.maxLeadsPerCampaign;
+  const maxAllowed = Math.max(0, Math.min(options.maxLeadsPerCampaign, targetCap));
+  const currentLeadCount = Math.max(0, options.currentLeadCount);
+
+  return {
+    maxAllowed,
+    remainingSlots: Math.max(0, maxAllowed - currentLeadCount)
+  };
+}

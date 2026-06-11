@@ -33,7 +33,7 @@ describe("mapCampaignApiToDuplicateRequest", () => {
     if (parsed.success) {
       expect(parsed.data.name).toBe("Q2 Launch Copy");
       expect(parsed.data.target_zone).toBe("North America");
-      expect(parsed.data.call_to_action).toBe("Lets talk now");
+      expect(parsed.data.call_to_action).toBe("Let's talk now!");
       expect(parsed.data.status).toBe("draft");
     }
   });

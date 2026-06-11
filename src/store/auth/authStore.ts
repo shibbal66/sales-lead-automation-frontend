@@ -30,7 +30,6 @@ import {
   setRefreshToken,
   setStoredUser
 } from "@/utils/authStorage";
-import { refreshSession } from "@/lib/refreshSession";
 import { syncFcmPushRegistration, unregisterFcmPushToken } from "@/services/fcm/fcmPush";
 
 function getHydratedAuth(): { user: AuthUser | null; token: string | null; isAuthenticated: boolean } {
@@ -372,32 +371,13 @@ export const useAuthStore = create<AuthState>((set, get) => {
     initializeAuth: async () => {
       const token = getAuthToken();
       const storedUser = getStoredUser();
-      const refreshToken = getRefreshToken();
 
       if (!token || !storedUser) {
         set({ isLoading: false });
         return;
       }
 
-      set({ user: storedUser, token, isAuthenticated: true });
-
-      if (refreshToken) {
-        try {
-          const newAccessToken = await refreshSession();
-          set({ token: newAccessToken });
-        } catch {
-          clearAuthStorage();
-          set({
-            user: null,
-            token: null,
-            isAuthenticated: false,
-            isLoading: false
-          });
-          return;
-        }
-      }
-
-      set({ isLoading: false });
+      set({ user: storedUser, token, isAuthenticated: true, isLoading: false });
       void get().fetchCurrentUser();
     }
   };

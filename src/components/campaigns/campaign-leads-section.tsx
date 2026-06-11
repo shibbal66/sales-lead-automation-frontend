@@ -19,9 +19,10 @@ import type { CampaignLeadApiModel, UpdateCampaignLeadRequest } from "@/types";
 type CampaignLeadsSectionProps = {
   campaignId: string;
   mailTemplate: string;
+  campaignTargetLeads: number;
 };
 
-export function CampaignLeadsSection({ campaignId }: CampaignLeadsSectionProps) {
+export function CampaignLeadsSection({ campaignId, campaignTargetLeads }: CampaignLeadsSectionProps) {
   const {
     campaignLeads,
     campaignLeadsTotal,
@@ -87,6 +88,8 @@ export function CampaignLeadsSection({ campaignId }: CampaignLeadsSectionProps) 
       <BulkAssignLeadsSheet
         open={assignLeadsOpen}
         assignedLeadDataIds={assignedLeadDataIds}
+        campaignLeadCount={campaignLeadsTotal}
+        campaignTargetLeads={campaignTargetLeads}
         isSubmitting={isBulkAddingCampaignLeads}
         onOpenChange={setAssignLeadsOpen}
         onAssign={bulkAssignLeads}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import { Bot, Hand, Check, ArrowLeft, ArrowRight, Plus, Trash2, Users } from "lu
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { PhoneNumberField } from "@/components/shared/phone-number-field";
 import {
-  createCampaignSchema,
+  createCampaignSchemaForPlan,
   mailTemplateSampleSchema,
   sanitizeCampaignNameInput,
   sanitizeCampaignTargetZoneInput,
@@ -23,6 +23,12 @@ import {
   MAIL_TEMPLATE_SAMPLE_SUBJECT_MAX_LENGTH
 } from "@/validators";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
+import { useBillingStore } from "@/store/billing/billingStore";
+import {
+  getCurrentPlanName,
+  getLeadCountPresets,
+  getMaxLeadsPerCampaign
+} from "@/lib/billing";
 import { CAMPAIGN_LEAD_SOURCES, CAMPAIGN_TONES } from "@/lib/campaignPresentation";
 import type { CreateCampaignRequest, MailTemplateSample } from "@/types";
 import type { CreateCampaignFormValues } from "@/validators";
@@ -49,6 +55,21 @@ type SampleContentFormat = (typeof sampleContentFormats)[number]["id"];
 export function NewCampaignWizard({ open, onOpenChange }: Props) {
   const createCampaign = useCampaignStore((state) => state.createCampaign);
   const isCreating = useCampaignStore((state) => state.isCreating);
+  const subscription = useBillingStore((state) => state.subscription);
+  const fetchSubscription = useBillingStore((state) => state.fetchSubscription);
+  const maxLeadsPerCampaign = getMaxLeadsPerCampaign(subscription);
+  const planName = getCurrentPlanName(subscription);
+  const campaignSchema = useMemo(
+    () => createCampaignSchemaForPlan(maxLeadsPerCampaign),
+    [maxLeadsPerCampaign]
+  );
+  const presets = useMemo(() => getLeadCountPresets(maxLeadsPerCampaign), [maxLeadsPerCampaign]);
+
+  useEffect(() => {
+    if (open) {
+      void fetchSubscription();
+    }
+  }, [open, fetchSubscription]);
 
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
@@ -126,7 +147,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     fields: Array<keyof CreateCampaignFormValues>,
     overrides: Partial<CreateCampaignFormValues> = {}
   ) => {
-    const parsed = createCampaignSchema.safeParse(buildDraftPayload(overrides));
+    const parsed = campaignSchema.safeParse(buildDraftPayload(overrides));
     const allErrors = !parsed.success ? mapZodErrors(parsed.error) : {};
     const nextErrors: Partial<CampaignFormErrors> = {};
 
@@ -155,6 +176,14 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
     apply();
     validateFields([field], { [field]: value });
   };
+
+  useEffect(() => {
+    if (typeof leadCount === "number" && leadCount > maxLeadsPerCampaign) {
+      setLeadCount(maxLeadsPerCampaign);
+      validateFields(["target_leads"], { target_leads: maxLeadsPerCampaign });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clamp when plan limit changes
+  }, [maxLeadsPerCampaign]);
 
   const buildSampleDraftPayload = () => ({
     subject: sampleSubject,
@@ -320,7 +349,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
   };
 
   const create = async () => {
-    const allFields = Object.keys(createCampaignSchema.shape) as Array<keyof CreateCampaignFormValues>;
+    const allFields = Object.keys(campaignSchema.shape) as Array<keyof CreateCampaignFormValues>;
     const resolved = resolveTemplateSamplesWithDraft();
     if (resolved.ok === false) {
       setStep(5);
@@ -335,7 +364,7 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
       clearSampleDraft();
     }
 
-    const parsed = createCampaignSchema.safeParse(
+    const parsed = campaignSchema.safeParse(
       buildDraftPayload({ mail_template_samples: samples })
     );
 
@@ -354,8 +383,6 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
       // Plan limit dialog or error toast is handled in the campaign store.
     }
   };
-
-  const presets = [50, 100, 250, 500];
 
   return (
     <Dialog open={open} onOpenChange={(o) => (o ? onOpenChange(true) : dismiss())}>
@@ -778,9 +805,16 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
               </div>
 
               <div className="rounded-xl border border-border bg-surface p-5">
-                <Label htmlFor="leadCount" className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Number of leads
-                </Label>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label htmlFor="leadCount" className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Number of leads
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{planName}</span>· up to{" "}
+                    <span className="font-medium text-foreground">{maxLeadsPerCampaign.toLocaleString()}</span>{" "}
+                    leads per campaign
+                  </p>
+                </div>
                 <div className="mt-2 flex items-center gap-3">
                   <div className="relative flex-1">
                     <Users className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -788,11 +822,15 @@ export function NewCampaignWizard({ open, onOpenChange }: Props) {
                       id="leadCount"
                       type="number"
                       min={1}
-                      max={100000}
+                      max={maxLeadsPerCampaign}
                       value={leadCount}
                       onChange={(e) => {
                         const v = e.target.value;
-                        const next = v === "" ? "" : Math.max(0, parseInt(v, 10) || 0);
+                        const parsed = v === "" ? "" : Math.max(0, parseInt(v, 10) || 0);
+                        const next =
+                          typeof parsed === "number"
+                            ? Math.min(parsed, maxLeadsPerCampaign)
+                            : parsed;
                         const targetLeads = typeof next === "number" ? next : 0;
                         patchField("target_leads", targetLeads, () => setLeadCount(next));
                       }}

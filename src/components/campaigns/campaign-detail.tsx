@@ -517,7 +517,11 @@ export function CampaignDetail({
         </div>
       </div>
 
-      <CampaignLeadsSection campaignId={campaign.id} mailTemplate={form.mailTemplate} />
+      <CampaignLeadsSection
+        campaignId={campaign.id}
+        mailTemplate={form.mailTemplate}
+        campaignTargetLeads={form.targetLeads}
+      />
 
       <Dialog open={addingExample} onOpenChange={handleAddExampleOpenChange}>
         <DialogContent>
