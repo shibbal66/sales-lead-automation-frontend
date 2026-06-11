@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { getCampaignLeadCapacity } from "@/lib/billing";
 import { addressSchema, nameSchema, phoneSchema } from "@/validators/auth";
 import {
   CAMPAIGN_LEAD_SOURCE_VALUES,
@@ -74,6 +75,7 @@ export const mailTemplateSampleSchema = mailTemplateSampleBaseSchema.superRefine
 export const CAMPAIGN_NAME_MAX_LENGTH = 120;
 
 const letterNumberSpacePattern = /^[\p{L}\p{N}\s]+$/u;
+const letterNumberSpacePunctuationPattern = /^[\p{L}\p{N}\s\p{P}]+$/u;
 
 export const campaignNameSchema = z
   .string()
@@ -114,14 +116,17 @@ export const callToActionSchema = z
   .trim()
   .min(1, "Call to action is required")
   .max(CALL_TO_ACTION_MAX_LENGTH, `Call to action must be ${CALL_TO_ACTION_MAX_LENGTH} characters or less`)
-  .regex(letterNumberSpacePattern, "Call to action must contain only letters, numbers, and spaces")
+  .regex(
+    letterNumberSpacePunctuationPattern,
+    "Call to action must contain only letters, numbers, spaces, and punctuation"
+  )
   .refine(includesLetter, {
     message: "Call to action must include at least one letter"
   });
 
 /** Strips invalid characters and enforces max length while typing. */
 export function sanitizeCampaignCallToActionInput(value: string): string {
-  return value.replace(/[^\p{L}\p{N}\s]/gu, "").slice(0, CALL_TO_ACTION_MAX_LENGTH);
+  return value.replace(/[^\p{L}\p{N}\s\p{P}]/gu, "").slice(0, CALL_TO_ACTION_MAX_LENGTH);
 }
 
 export const MAIL_TRAINING_INSTRUCTION_MAX_LENGTH = 2000;
@@ -149,32 +154,65 @@ export const campaignGoalSchema = z
     message: "Campaign goal must include at least one letter"
   });
 
-export const createCampaignSchema = z.object({
-  name: campaignNameSchema,
-  goal: campaignGoalSchema,
-  target_zone: targetZoneSchema,
-  call_to_action: callToActionSchema,
-  run_mode: z.enum(["auto", "manual"], {
-    errorMap: () => ({ message: "Run mode must be auto or manual" })
-  }),
-  target_tone: z.string().trim().min(1, "Target tone is required").max(80, "Target tone is too long"),
-  mail_training_instruction: mailTrainingInstructionSchema,
-  mail_template_samples: z.array(mailTemplateSampleSchema),
-  lead_source: z.enum(CAMPAIGN_LEAD_SOURCE_VALUES, {
-    errorMap: () => ({ message: "Lead source must be new, old, or both" })
-  }),
-  sender_display_name: nameSchema,
-  sender_address: addressSchema,
-  sender_phone: phoneSchema,
-  target_leads: z
+export const TARGET_LEADS_ABSOLUTE_MAX = 1_000_000;
+
+export function buildTargetLeadsSchema(maxLeadsPerCampaign: number) {
+  const limit = Math.max(1, Math.min(maxLeadsPerCampaign, TARGET_LEADS_ABSOLUTE_MAX));
+  return z
     .number({ invalid_type_error: "Target leads must be a number" })
     .int("Target leads must be a whole number")
     .min(1, "Target leads must be at least 1")
-    .max(1000000, "Target leads is too high"),
-  status: z.enum(["draft", "running", "paused", "completed"], {
-    errorMap: () => ({ message: "Invalid campaign status" })
-  })
-});
+    .max(
+      limit,
+      `Target leads cannot exceed your plan limit of ${limit.toLocaleString()}`
+    );
+}
+
+export function buildBulkLeadAddCountSchema(options: {
+  maxLeadsPerCampaign: number;
+  currentLeadCount: number;
+  campaignTargetLeads?: number;
+}) {
+  const { maxAllowed, remainingSlots } = getCampaignLeadCapacity(options);
+
+  return z
+    .number({ invalid_type_error: "Selection count must be a number" })
+    .int()
+    .min(1, "Select at least one lead.")
+    .max(
+      remainingSlots,
+      remainingSlots === 0
+        ? `This campaign already has the maximum of ${maxAllowed.toLocaleString()} leads allowed on your plan.`
+        : `You can only add ${remainingSlots.toLocaleString()} more lead${remainingSlots === 1 ? "" : "s"} (${maxAllowed.toLocaleString()} max per campaign).`
+    );
+}
+
+export function createCampaignSchemaForPlan(maxLeadsPerCampaign: number) {
+  return z.object({
+    name: campaignNameSchema,
+    goal: campaignGoalSchema,
+    target_zone: targetZoneSchema,
+    call_to_action: callToActionSchema,
+    run_mode: z.enum(["auto", "manual"], {
+      errorMap: () => ({ message: "Run mode must be auto or manual" })
+    }),
+    target_tone: z.string().trim().min(1, "Target tone is required").max(80, "Target tone is too long"),
+    mail_training_instruction: mailTrainingInstructionSchema,
+    mail_template_samples: z.array(mailTemplateSampleSchema),
+    lead_source: z.enum(CAMPAIGN_LEAD_SOURCE_VALUES, {
+      errorMap: () => ({ message: "Lead source must be new, old, or both" })
+    }),
+    sender_display_name: nameSchema,
+    sender_address: addressSchema,
+    sender_phone: phoneSchema,
+    target_leads: buildTargetLeadsSchema(maxLeadsPerCampaign),
+    status: z.enum(["draft", "running", "paused", "completed"], {
+      errorMap: () => ({ message: "Invalid campaign status" })
+    })
+  });
+}
+
+export const createCampaignSchema = createCampaignSchemaForPlan(TARGET_LEADS_ABSOLUTE_MAX);
 
 export type CreateCampaignFormValues = z.infer<typeof createCampaignSchema>;
 export type MailTemplateSampleFormValues = z.infer<typeof mailTemplateSampleSchema>;

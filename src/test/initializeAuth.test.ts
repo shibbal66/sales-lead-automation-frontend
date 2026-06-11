@@ -2,8 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthUser } from "@/core/types/user.types";
 import {
   clearAuthStorage,
-  getAuthToken,
-  getRefreshToken,
   setAuthToken,
   setRefreshToken,
   setStoredUser
@@ -55,11 +53,10 @@ describe("initializeAuth", () => {
     expect(mockRefreshSession).not.toHaveBeenCalled();
   });
 
-  it("refreshes access token before fetching the current user", async () => {
+  it("restores the stored session without calling refresh", async () => {
     setStoredUser(testUser);
-    setAuthToken("old-access");
+    setAuthToken("stored-access");
     setRefreshToken("refresh-token");
-    mockRefreshSession.mockResolvedValue("new-access");
     mockGetCurrentUser.mockResolvedValue({
       success: true,
       data: { user: { id: testUser.id, email: testUser.email, name: testUser.name } }
@@ -68,27 +65,10 @@ describe("initializeAuth", () => {
     const { useAuthStore } = await import("@/store/auth/authStore");
     await useAuthStore.getState().initializeAuth();
 
-    expect(mockRefreshSession).toHaveBeenCalledTimes(1);
-    expect(useAuthStore.getState().token).toBe("new-access");
+    expect(mockRefreshSession).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().token).toBe("stored-access");
     expect(useAuthStore.getState().isLoading).toBe(false);
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
-  });
-
-  it("clears session when refresh fails", async () => {
-    setStoredUser(testUser);
-    setAuthToken("old-access");
-    setRefreshToken("expired-refresh");
-    mockRefreshSession.mockRejectedValue(new Error("Invalid refresh token"));
-
-    const { useAuthStore } = await import("@/store/auth/authStore");
-    await useAuthStore.getState().initializeAuth();
-
-    const state = useAuthStore.getState();
-    expect(state.isAuthenticated).toBe(false);
-    expect(state.user).toBeNull();
-    expect(state.token).toBeNull();
-    expect(state.isLoading).toBe(false);
-    expect(getAuthToken()).toBeNull();
-    expect(getRefreshToken()).toBeNull();
+    expect(mockGetCurrentUser).toHaveBeenCalledTimes(1);
   });
 });

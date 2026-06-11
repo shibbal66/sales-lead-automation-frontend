@@ -31,6 +31,13 @@ import { getLeads } from "@/services/lead/leadServices";
 import { parseLeadsListResponse } from "@/lib/parseLeadsListResponse";
 import { mapLeadApiToListRow } from "@/lib/leadPresentation";
 import { showApiErrorToast } from "@/lib/apiToast";
+import {
+  getCampaignLeadCapacity,
+  getCurrentPlanName,
+  getMaxLeadsPerCampaign
+} from "@/lib/billing";
+import { useBillingStore } from "@/store/billing/billingStore";
+import { buildBulkLeadAddCountSchema } from "@/validators/campaign";
 import { clampPage, getTotalPages } from "@/lib/listPagination";
 import { cn } from "@/lib/utils";
 import type { LeadApiModel } from "@/types";
@@ -46,6 +53,8 @@ const PAGE_LIMIT = 20;
 type BulkAssignLeadsSheetProps = {
   open: boolean;
   assignedLeadDataIds: Set<string>;
+  campaignLeadCount: number;
+  campaignTargetLeads: number;
   isSubmitting: boolean;
   onOpenChange: (open: boolean) => void;
   onAssign: (leadDataIds: string[]) => Promise<boolean>;
@@ -54,10 +63,35 @@ type BulkAssignLeadsSheetProps = {
 export function BulkAssignLeadsSheet({
   open,
   assignedLeadDataIds,
+  campaignLeadCount,
+  campaignTargetLeads,
   isSubmitting,
   onOpenChange,
   onAssign
 }: BulkAssignLeadsSheetProps) {
+  const subscription = useBillingStore((state) => state.subscription);
+  const fetchSubscription = useBillingStore((state) => state.fetchSubscription);
+  const maxLeadsPerCampaign = getMaxLeadsPerCampaign(subscription);
+  const planName = getCurrentPlanName(subscription);
+  const { maxAllowed, remainingSlots } = useMemo(
+    () =>
+      getCampaignLeadCapacity({
+        maxLeadsPerCampaign,
+        currentLeadCount: campaignLeadCount,
+        campaignTargetLeads
+      }),
+    [campaignLeadCount, campaignTargetLeads, maxLeadsPerCampaign]
+  );
+  const bulkAddSchema = useMemo(
+    () =>
+      buildBulkLeadAddCountSchema({
+        maxLeadsPerCampaign,
+        currentLeadCount: campaignLeadCount,
+        campaignTargetLeads
+      }),
+    [campaignLeadCount, campaignTargetLeads, maxLeadsPerCampaign]
+  );
+
   const [draftFilters, setDraftFilters] = useState<LeadsBrowseFilters>(EMPTY_LEADS_BROWSE_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<LeadsBrowseFilters>(EMPTY_LEADS_BROWSE_FILTERS);
   const [leads, setLeads] = useState<LeadApiModel[]>([]);
@@ -66,6 +100,19 @@ export function BulkAssignLeadsSheet({
   const [isFetching, setIsFetching] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [assignmentError, setAssignmentError] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      void fetchSubscription();
+    }
+  }, [fetchSubscription, open]);
+
+  useEffect(() => {
+    if (selected.size <= remainingSlots) {
+      setAssignmentError("");
+    }
+  }, [remainingSlots, selected.size]);
 
   const totalPages = getTotalPages(total, PAGE_LIMIT);
 
@@ -108,6 +155,7 @@ export function BulkAssignLeadsSheet({
     setSelected(new Set());
     setPage(1);
     setFiltersOpen(true);
+    setAssignmentError("");
   }, []);
 
   useEffect(() => {
@@ -148,13 +196,25 @@ export function BulkAssignLeadsSheet({
   const allSelectableChecked =
     selectableRows.length > 0 && selectableRows.every((row) => selected.has(row.id));
 
+  const atSelectionLimit = selected.size >= remainingSlots;
+
   const toggleAll = () => {
     setSelected((previous) => {
       const next = new Set(previous);
       if (allSelectableChecked) {
         selectableRows.forEach((row) => next.delete(row.id));
+        setAssignmentError("");
       } else {
-        selectableRows.forEach((row) => next.add(row.id));
+        selectableRows.forEach((row) => {
+          if (next.size < remainingSlots) {
+            next.add(row.id);
+          }
+        });
+        if (selectableRows.length > remainingSlots - previous.size && remainingSlots > 0) {
+          setAssignmentError(
+            `Only ${remainingSlots.toLocaleString()} lead slot${remainingSlots === 1 ? "" : "s"} remaining on your plan.`
+          );
+        }
       }
       return next;
     });
@@ -164,13 +224,33 @@ export function BulkAssignLeadsSheet({
     if (assignedLeadDataIds.has(id)) return;
     setSelected((previous) => {
       const next = new Set(previous);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+        setAssignmentError("");
+      } else {
+        if (next.size >= remainingSlots) {
+          setAssignmentError(
+            remainingSlots === 0
+              ? `This campaign already has the maximum of ${maxAllowed.toLocaleString()} leads allowed on your plan.`
+              : `You can only add ${remainingSlots.toLocaleString()} more lead${remainingSlots === 1 ? "" : "s"}.`
+          );
+          return previous;
+        }
+        next.add(id);
+        setAssignmentError("");
+      }
       return next;
     });
   };
 
   const handleAssign = async () => {
+    const parsed = bulkAddSchema.safeParse(selected.size);
+    if (!parsed.success) {
+      setAssignmentError(parsed.error.errors[0]?.message ?? "Invalid selection.");
+      return;
+    }
+
+    setAssignmentError("");
     const ok = await onAssign([...selected]);
     if (ok) {
       setSelected(new Set());
@@ -186,6 +266,12 @@ export function BulkAssignLeadsSheet({
           <DialogDescription>
             Filter leads, select rows, then add them to this campaign.
           </DialogDescription>
+          <p className="pt-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">{planName}</span> ·{" "}
+            {campaignLeadCount.toLocaleString()} / {maxAllowed.toLocaleString()} leads in campaign ·{" "}
+            <span className="font-medium text-foreground">{remainingSlots.toLocaleString()}</span>{" "}
+            slot{remainingSlots === 1 ? "" : "s"} remaining
+          </p>
         </DialogHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4 scrollbar-thin">
@@ -292,9 +378,23 @@ export function BulkAssignLeadsSheet({
               )}
             </p>
             {selected.size > 0 ? (
-              <p className="text-sm font-medium">{selected.size} selected</p>
+              <p className="text-sm font-medium">
+                {selected.size} selected
+                {remainingSlots > 0 ? ` · ${remainingSlots - selected.size} slot${remainingSlots - selected.size === 1 ? "" : "s"} left` : null}
+              </p>
             ) : null}
           </div>
+
+          {assignmentError ? (
+            <p className="mt-2 text-xs text-destructive">{assignmentError}</p>
+          ) : null}
+
+          {remainingSlots === 0 ? (
+            <p className="mt-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              This campaign has reached the maximum of {maxAllowed.toLocaleString()} leads allowed on your{" "}
+              {planName} plan.
+            </p>
+          ) : null}
 
           <div className="mt-3 overflow-hidden rounded-xl border border-border">
             <div className="overflow-x-auto scrollbar-thin">
@@ -304,7 +404,7 @@ export function BulkAssignLeadsSheet({
                   <TableHead className="w-10">
                     <Checkbox
                       checked={allSelectableChecked}
-                      disabled={selectableRows.length === 0 || isFetching}
+                      disabled={selectableRows.length === 0 || isFetching || remainingSlots === 0}
                       onCheckedChange={toggleAll}
                       aria-label="Select all leads on this page"
                     />
@@ -335,7 +435,11 @@ export function BulkAssignLeadsSheet({
                       <TableCell>
                         <Checkbox
                           checked={selected.has(row.id)}
-                          disabled={isAssigned || isFetching}
+                          disabled={
+                            isAssigned ||
+                            isFetching ||
+                            (!selected.has(row.id) && (remainingSlots === 0 || atSelectionLimit))
+                          }
                           onCheckedChange={() => toggleOne(row.id)}
                           aria-label={`Select ${row.name}`}
                         />
@@ -380,7 +484,7 @@ export function BulkAssignLeadsSheet({
           <Button
             type="button"
             onClick={() => void handleAssign()}
-            disabled={isSubmitting || selected.size === 0}
+            disabled={isSubmitting || selected.size === 0 || remainingSlots === 0}
           >
             <Plus className="h-4 w-4" />
             {isSubmitting

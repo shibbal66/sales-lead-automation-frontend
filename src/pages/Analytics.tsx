@@ -442,8 +442,8 @@ export default function Analytics() {
                     <TableCell>{row.emails_sent.toLocaleString()}</TableCell>
                     <TableCell>{formatAnalyticsRatePercent(row.open_rate_percent)}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs">
+                      <div className="flex min-w-[8.5rem] items-center gap-2.5">
+                        <span className="font-mono text-xs tabular-nums">
                           {formatAnalyticsRatePercent(row.reply_rate_percent)}
                         </span>
                         <ReplySparkline values={row.reply_sparkline} />

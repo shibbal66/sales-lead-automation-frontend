@@ -1,5 +1,6 @@
 import {
   createCampaignSchema,
+  createCampaignSchemaForPlan,
   sanitizeCampaignCallToActionInput,
   sanitizeCampaignNameInput,
   sanitizeCampaignTargetZoneInput,
@@ -275,9 +276,14 @@ export function mapCreateCampaignZodErrors(
 
 export function validateCampaignDetailForm(
   form: CampaignDetailFormState,
-  fields: Array<keyof CampaignDetailFormState> = VALIDATED_CAMPAIGN_DETAIL_FIELDS
+  fields: Array<keyof CampaignDetailFormState> = VALIDATED_CAMPAIGN_DETAIL_FIELDS,
+  options?: { maxLeadsPerCampaign?: number }
 ): { ok: boolean; fieldErrors: CampaignDetailFormErrors } {
-  const parsed = createCampaignSchema.safeParse(campaignDetailFormToCreateValues(form));
+  const schema =
+    typeof options?.maxLeadsPerCampaign === "number"
+      ? createCampaignSchemaForPlan(options.maxLeadsPerCampaign)
+      : createCampaignSchema;
+  const parsed = schema.safeParse(campaignDetailFormToCreateValues(form));
   const mapped = parsed.success ? {} : mapCreateCampaignZodErrors(parsed.error);
   const fieldErrors: CampaignDetailFormErrors = {};
 

@@ -13,6 +13,8 @@ import {
   validateCampaignDetailForm,
   VALIDATED_CAMPAIGN_DETAIL_FIELDS
 } from "@/lib/campaignPresentation";
+import { getMaxLeadsPerCampaign } from "@/lib/billing";
+import { useBillingStore } from "@/store/billing/billingStore";
 import type { CampaignLeadSource, MailTemplateSample } from "@/types";
 import type { UpdateCampaignRequest } from "@/types";
 
@@ -44,6 +46,9 @@ function createFormState(campaign: CampaignDetailViewModel): CampaignDetailFormS
 }
 
 export function useCampaignDetailForm(campaign: CampaignDetailViewModel) {
+  const subscription = useBillingStore((state) => state.subscription);
+  const maxLeadsPerCampaign = getMaxLeadsPerCampaign(subscription);
+
   const [form, setForm] = useState<CampaignDetailFormState>(() => createFormState(campaign));
   const [errors, setErrors] = useState<CampaignDetailFormErrors>({});
   const initialState = useMemo(() => createFormState(campaign), [campaign]);
@@ -68,11 +73,11 @@ export function useCampaignDetailForm(campaign: CampaignDetailViewModel) {
 
   const validateFields = useCallback(
     (formState: CampaignDetailFormState, fields: Array<keyof CampaignDetailFormState>) => {
-      const result = validateCampaignDetailForm(formState, fields);
+      const result = validateCampaignDetailForm(formState, fields, { maxLeadsPerCampaign });
       applyFieldErrors(fields, result.fieldErrors);
       return result.ok;
     },
-    [applyFieldErrors]
+    [applyFieldErrors, maxLeadsPerCampaign]
   );
 
   const patchField = useCallback(
