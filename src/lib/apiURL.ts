@@ -8,6 +8,7 @@ export const END_POINT = {
     googleStatus: "/auth/google/status",
     refresh: "/auth/refresh",
     verifyOtp: "/auth/verify-otp",
+    validateOtp: "/auth/validate-otp",
     forgotPassword: "/auth/forgot-password",
     resetPassword: "/auth/reset-password",
     resendOtp: "/auth/resend-otp",

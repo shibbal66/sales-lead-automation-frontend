@@ -6,7 +6,7 @@ import { AuthLayout } from "@/components/auth/auth-layout";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { resendOtp, verifyOtp } from "@/services/auth/authServices";
+import { resendOtp, validateOtp, verifyOtp } from "@/services/auth/authServices";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { resendOtpSchema, verifyOtpSchema, type VerifyOtpFormValues } from "@/validators";
 import { useAuthStore } from "@/store/auth/authStore";
@@ -50,6 +50,17 @@ export default function VerifyOtp() {
   const onSubmit = async (data: VerifyOtpFormValues) => {
     setLoading(true);
     try {
+      const validateResponse = await validateOtp({
+        email: data.email,
+        otp: data.otp,
+        purpose: "email_verification"
+      });
+
+      if (!validateResponse.success || !validateResponse.data?.valid) {
+        showApiErrorToast(validateResponse);
+        return;
+      }
+
       const response = await verifyOtp({
         email: data.email,
         otp: data.otp

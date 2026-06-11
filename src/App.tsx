@@ -9,6 +9,7 @@ import Login from "./pages/auth/Login";
 import Signup from "./pages/auth/Signup";
 import VerifyOtp from "./pages/auth/VerifyOtp";
 import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPasswordOtp from "./pages/auth/ResetPasswordOtp";
 import ResetPassword from "./pages/auth/ResetPassword";
 import GoogleCallback from "./pages/auth/GoogleCallback";
 import Dashboard from "./pages/Dashboard";
@@ -45,6 +46,7 @@ function AppRoutes() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/verify-otp" element={<VerifyOtp />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password-otp" element={<ResetPasswordOtp />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/google/callback" element={<GoogleCallback />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />

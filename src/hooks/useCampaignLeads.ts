@@ -1,5 +1,6 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useCampaignStore } from "@/store/campaign/campaignStore";
+import { sendCampaignLeadEmails } from "@/services/campaign/campaignServices";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { clampPage, getTotalPages } from "@/lib/listPagination";
 import type {
@@ -9,6 +10,7 @@ import type {
 } from "@/types";
 
 export function useCampaignLeads(campaignId: string) {
+  const [sendingEmailLeadId, setSendingEmailLeadId] = useState<string | null>(null);
   const campaignLeads = useCampaignStore((state) => state.campaignLeads);
   const campaignLeadsTotal = useCampaignStore((state) => state.campaignLeadsTotal);
   const campaignLeadsPage = useCampaignStore((state) => state.campaignLeadsPage);
@@ -183,6 +185,44 @@ export function useCampaignLeads(campaignId: string) {
     [campaignId, deleteCampaignLead]
   );
 
+  const sendCampaignLeadEmail = useCallback(
+    async (campaignLeadId: string) => {
+      if (sendingEmailLeadId) return false;
+
+      setSendingEmailLeadId(campaignLeadId);
+      try {
+        const response = await sendCampaignLeadEmails(campaignId, {
+          campaign_lead_id: campaignLeadId
+        });
+        if (!response.success) {
+          showApiErrorToast(response);
+          return false;
+        }
+
+        showApiSuccessToast(response.message || "Email sent successfully.");
+        await fetchCampaignLeads(campaignId, {
+          page: campaignLeadsPage,
+          limit: campaignLeadsLimit,
+          status: campaignLeadsStatusFilter
+        });
+        return true;
+      } catch (error) {
+        showApiErrorToast(error);
+        return false;
+      } finally {
+        setSendingEmailLeadId(null);
+      }
+    },
+    [
+      campaignId,
+      campaignLeadsLimit,
+      campaignLeadsPage,
+      campaignLeadsStatusFilter,
+      fetchCampaignLeads,
+      sendingEmailLeadId
+    ]
+  );
+
   return {
     campaignLeads,
     campaignLeadsTotal,
@@ -199,6 +239,8 @@ export function useCampaignLeads(campaignId: string) {
     assignLead,
     bulkAssignLeads,
     saveCampaignLead,
-    removeCampaignLead
+    removeCampaignLead,
+    sendCampaignLeadEmail,
+    sendingEmailLeadId
   };
 }

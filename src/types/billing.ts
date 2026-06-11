@@ -89,7 +89,10 @@ export interface BillingPortalResponse {
   success: boolean;
   message?: string;
   data?: {
-    portalUrl: string;
+    /** Stripe customer portal URL (preferred API field). */
+    url?: string;
+    /** Legacy alias for `url`. */
+    portalUrl?: string;
   };
 }
 

@@ -1,6 +1,6 @@
 import { endOfDay, startOfDay } from "date-fns";
 import { parseDateInput } from "@/lib/dateFormatting";
-import type { MeetingApiStatus } from "@/types/meeting";
+import type { MeetingApiStatus, MeetingReadStatus } from "@/types/meeting";
 
 export const MEETINGS_FILTER_ALL = "__all__";
 
@@ -11,9 +11,10 @@ export const MEETING_STATUS_FILTER_OPTIONS: { value: string; label: string }[] =
   { value: "cancelled", label: "Cancelled" }
 ];
 
-export const MEETING_STATUS_FORM_OPTIONS = MEETING_STATUS_FILTER_OPTIONS.filter(
-  (opt) => opt.value !== MEETINGS_FILTER_ALL
-);
+export const MEETING_STATUS_FORM_OPTIONS: { value: MeetingApiStatus; label: string }[] = [
+  { value: "scheduled", label: "Scheduled" },
+  { value: "completed", label: "Completed" }
+];
 
 export type MeetingsFilterDraft = {
   status: string;
@@ -22,12 +23,12 @@ export type MeetingsFilterDraft = {
   toDate: string;
 };
 
-export function statusFilterToQuery(value: string): MeetingApiStatus | undefined {
+export function statusFilterToQuery(value: string): MeetingReadStatus | undefined {
   if (value === MEETINGS_FILTER_ALL) return undefined;
-  return value as MeetingApiStatus;
+  return value as MeetingReadStatus;
 }
 
-export function statusQueryToFilter(status?: MeetingApiStatus): string {
+export function statusQueryToFilter(status?: MeetingReadStatus): string {
   return status ?? MEETINGS_FILTER_ALL;
 }
 

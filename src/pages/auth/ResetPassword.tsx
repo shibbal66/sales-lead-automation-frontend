@@ -7,7 +7,6 @@ import { AuthLayout } from "@/components/auth/auth-layout";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { resetPassword } from "@/services/auth/authServices";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import { resetPasswordSchema, type ResetPasswordFormValues } from "@/validators";
@@ -15,14 +14,17 @@ import { clearPendingPasswordReset, getPendingPasswordReset } from "@/utils/auth
 
 type ResetPasswordLocationState = {
   email?: string;
+  otp?: string;
 };
 
 export default function ResetPassword() {
   const navigate = useNavigate();
   const { state } = useLocation();
   const pending = getPendingPasswordReset();
-  const { email: routeEmail } = ((state as ResetPasswordLocationState) || {}) as ResetPasswordLocationState;
+  const { email: routeEmail, otp: routeOtp } = ((state as ResetPasswordLocationState) ||
+    {}) as ResetPasswordLocationState;
   const resolvedEmail = routeEmail || pending?.email;
+  const resolvedOtp = routeOtp || pending?.otp;
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -32,7 +34,6 @@ export default function ResetPassword() {
     control,
     handleSubmit,
     setValue,
-    watch,
     trigger,
     formState: { errors }
   } = useForm<ResetPasswordFormValues>({
@@ -40,26 +41,37 @@ export default function ResetPassword() {
     mode: "onChange",
     defaultValues: {
       email: resolvedEmail || "",
-      otp: "",
       password: "",
       confirmPassword: ""
     }
   });
 
-  const otp = watch("otp");
-
   useEffect(() => {
-    if (resolvedEmail) {
-      setValue("email", resolvedEmail, { shouldValidate: true });
+    if (!resolvedEmail || !resolvedOtp) {
+      navigate("/reset-password-otp", {
+        replace: true,
+        state: resolvedEmail ? { email: resolvedEmail } : undefined
+      });
+      return;
     }
-  }, [resolvedEmail, setValue]);
+
+    setValue("email", resolvedEmail, { shouldValidate: true });
+  }, [resolvedEmail, resolvedOtp, navigate, setValue]);
 
   const onSubmit = async (data: ResetPasswordFormValues) => {
+    if (!resolvedOtp) {
+      navigate("/reset-password-otp", {
+        replace: true,
+        state: { email: data.email }
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await resetPassword({
         email: data.email,
-        otp: data.otp,
+        otp: resolvedOtp,
         password: data.password
       });
 
@@ -80,47 +92,21 @@ export default function ResetPassword() {
     }
   };
 
+  if (!resolvedEmail || !resolvedOtp) {
+    return null;
+  }
+
   return (
     <AuthLayout
       headline="Choose a new password."
-      subheadline="Enter the 6-digit code from your email and set a new password."
+      subheadline="Your reset code is verified. Set a strong password for your account."
     >
       <h2 className="font-display text-2xl font-bold">Reset password</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        {resolvedEmail
-          ? `Code sent to ${resolvedEmail}`
-          : "Enter the code from your email and your new password."}
+        Choose a new password for {resolvedEmail}
       </p>
 
       <form noValidate onSubmit={handleSubmit(onSubmit)} className="mt-8 space-y-5">
-        <Controller
-          name="otp"
-          control={control}
-          render={({ field }) => (
-            <div className="space-y-3">
-              <Label htmlFor="otp">Reset code</Label>
-              <InputOTP
-                id="otp"
-                maxLength={6}
-                value={field.value}
-                onChange={field.onChange}
-              >
-                <InputOTPGroup className="w-full justify-between">
-                  <InputOTPSlot index={0} className="h-12 w-11 text-lg" />
-                  <InputOTPSlot index={1} className="h-12 w-11 text-lg" />
-                  <InputOTPSlot index={2} className="h-12 w-11 text-lg" />
-                  <InputOTPSlot index={3} className="h-12 w-11 text-lg" />
-                  <InputOTPSlot index={4} className="h-12 w-11 text-lg" />
-                  <InputOTPSlot index={5} className="h-12 w-11 text-lg" />
-                </InputOTPGroup>
-              </InputOTP>
-              {errors.otp?.message ? (
-                <p className="text-xs text-destructive">{errors.otp.message}</p>
-              ) : null}
-            </div>
-          )}
-        />
-
         <Controller
           name="password"
           control={control}
@@ -187,23 +173,13 @@ export default function ResetPassword() {
           )}
         />
 
-        <Button
-          type="submit"
-          className="w-full"
-          disabled={loading || !resolvedEmail || otp.length !== 6}
-        >
+        <Button type="submit" className="w-full" disabled={loading}>
           {loading ? "Resetting..." : "Reset password"}
         </Button>
       </form>
 
-      {!resolvedEmail ? (
-        <p className="mt-6 text-sm text-destructive">
-          {errors.email?.message || "Missing reset context. Please request a new code."}
-        </p>
-      ) : null}
-
       <p className="mt-8 text-center text-sm text-muted-foreground">
-        Didn&apos;t get a code?{" "}
+        Need a new code?{" "}
         <Link to="/forgot-password" className="font-semibold text-brand-text hover:underline">
           Request a new code
         </Link>

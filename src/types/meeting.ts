@@ -1,9 +1,12 @@
 import type { ApiPagination } from "@/types/campaign";
 
-export type MeetingApiStatus = "scheduled" | "completed" | "cancelled";
+export type MeetingApiStatus = "scheduled" | "completed";
+
+/** Status values returned from the API (includes server-side cancelled). */
+export type MeetingReadStatus = MeetingApiStatus | "cancelled";
 
 export interface MeetingsListQuery {
-  status?: MeetingApiStatus;
+  status?: MeetingReadStatus;
   campaign_id?: string;
   from?: string;
   to?: string;
@@ -22,8 +25,8 @@ export interface Meeting {
   endAt: string;
   bookedAt: string;
   status: string;
-  /** Raw API status for edit payloads. */
-  apiStatus: MeetingApiStatus;
+  /** Raw API status (cancelled is read-only; use cancel meeting to cancel). */
+  apiStatus: MeetingReadStatus;
   description?: string | null;
   meetLink?: string | null;
 }

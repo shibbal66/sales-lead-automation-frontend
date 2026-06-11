@@ -98,7 +98,7 @@ export const updateMeetingSchema = z
     startLocal: datetimeLocalField,
     endLocal: datetimeLocalField,
     attendee_email: emailSchema,
-    status: z.enum(["scheduled", "completed", "cancelled"])
+    status: z.enum(["scheduled", "completed"])
   })
   .superRefine(meetingDatetimeRefine);
 
