@@ -19,6 +19,7 @@ export function useCampaignLeads(campaignId: string) {
   const isAddingCampaignLead = useCampaignStore((state) => state.isAddingCampaignLead);
   const isBulkAddingCampaignLeads = useCampaignStore((state) => state.isBulkAddingCampaignLeads);
   const bulkAddCampaignLeads = useCampaignStore((state) => state.bulkAddCampaignLeads);
+  const fetchCampaignById = useCampaignStore((state) => state.fetchCampaignById);
   const isUpdatingCampaignLead = useCampaignStore((state) => state.isUpdatingCampaignLead);
   const isDeletingCampaignLead = useCampaignStore((state) => state.isDeletingCampaignLead);
   const fetchCampaignLeads = useCampaignStore((state) => state.fetchCampaignLeads);
@@ -156,6 +157,7 @@ export function useCampaignLeads(campaignId: string) {
         showApiSuccessToast(message);
         setCampaignLeadsPage(1);
         await fetchCampaignLeads(campaignId, { page: 1, limit: campaignLeadsLimit });
+        void fetchCampaignById(campaignId);
         return true;
       } catch (error) {
         showApiErrorToast(error);
@@ -166,6 +168,7 @@ export function useCampaignLeads(campaignId: string) {
       bulkAddCampaignLeads,
       campaignId,
       campaignLeadsLimit,
+      fetchCampaignById,
       fetchCampaignLeads,
       setCampaignLeadsPage
     ]
@@ -205,6 +208,7 @@ export function useCampaignLeads(campaignId: string) {
           limit: campaignLeadsLimit,
           status: campaignLeadsStatusFilter
         });
+        void fetchCampaignById(campaignId);
         return true;
       } catch (error) {
         showApiErrorToast(error);
@@ -218,6 +222,7 @@ export function useCampaignLeads(campaignId: string) {
       campaignLeadsLimit,
       campaignLeadsPage,
       campaignLeadsStatusFilter,
+      fetchCampaignById,
       fetchCampaignLeads,
       sendingEmailLeadId
     ]

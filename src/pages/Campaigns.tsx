@@ -25,6 +25,8 @@ import { CampaignsGridSkeleton } from "@/components/skeletons/campaigns/campaign
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import {
   mapCampaignApiToDetail,
+  formatCampaignListLeadsValue,
+  getCampaignListProgressPercent,
   mapCampaignApiToDuplicateRequest,
   mapCampaignApiToListCard,
   mapCreateCampaignZodErrors
@@ -144,7 +146,7 @@ export default function CampaignsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {isFetching && allCampaigns.length === 0 ? <CampaignsGridSkeleton count={6} /> : null}
         {allCampaigns.map((c, idx) => {
-          const pct = Math.round((c.emailsSent / Math.max(c.targetLeads, 1)) * 100);
+          const pct = getCampaignListProgressPercent(c.totalLeads, c.targetLeads);
           return (
             <Card key={c.id} className="flex flex-col gap-3 p-5 shadow-card transition-shadow hover:shadow-elevated">
               <div className="flex items-start justify-between gap-2">
@@ -200,22 +202,37 @@ export default function CampaignsPage() {
 
               <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted/40 p-3 text-center">
                 <div>
-                  <p className="font-display text-lg font-bold">{c.targetLeads}</p>
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Leads</p>
+                  <p className="font-display text-lg font-bold">{c.totalLeads.toLocaleString()}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total leads</p>
                 </div>
                 <div>
-                  <p className="font-display text-lg font-bold">{c.emailsSent}</p>
+                  <p className="font-display text-lg font-bold">{c.pendingCount.toLocaleString()}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Pending</p>
+                </div>
+                <div>
+                  <p className="font-display text-lg font-bold">{c.failedCount.toLocaleString()}</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Failed</p>
+                </div>
+                <div>
+                  <p className="font-display text-lg font-bold">{c.sentCount.toLocaleString()}</p>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sent</p>
                 </div>
                 <div>
-                  <p className="font-display text-lg font-bold">{c.replyRate}%</p>
+                  <p className="font-display text-lg font-bold">{c.replyRatePercent}%</p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Reply %</p>
+                </div>
+                <div>
+                  <p className="font-display text-lg font-bold">{c.replyRate.toLocaleString()}</p>
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Reply rate</p>
                 </div>
               </div>
 
               <div>
                 <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
-                  <span>Progress</span><span>{pct}%</span>
+                  <span>
+                    Leads filled ({formatCampaignListLeadsValue(c.totalLeads, c.targetLeads)})
+                  </span>
+                  <span>{pct}%</span>
                 </div>
                 <Progress value={pct} className="h-1.5" />
               </div>

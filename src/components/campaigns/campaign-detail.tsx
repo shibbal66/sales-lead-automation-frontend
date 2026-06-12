@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CampaignLeadsSection } from "@/components/campaigns/campaign-leads-section";
+import { CampaignStatsSummary } from "@/components/campaigns/campaign-stats-summary";
 import { CampaignSettingsPanel } from "@/components/campaigns/campaign-settings-panel";
 import { CampaignSenderDetailsCard } from "@/components/campaigns/campaign-sender-details-card";
 import { FollowUpStepRow } from "@/components/campaigns/follow-up-step-row";
@@ -50,6 +51,7 @@ export function CampaignDetail({
   onBack: () => void;
 }) {
   const updateCampaign = useCampaignStore((state) => state.updateCampaign);
+  const fetchCampaignById = useCampaignStore((state) => state.fetchCampaignById);
   const deleteCampaign = useCampaignStore((state) => state.deleteCampaign);
   const isUpdating = useCampaignStore((state) => state.isUpdating);
   const isDeleting = useCampaignStore((state) => state.isDeleting);
@@ -261,6 +263,7 @@ export function CampaignDetail({
       const response = await runCampaignLeads(campaign.id);
       if (response.success) {
         showApiSuccessToast(response.message || "Emails processed successfully.");
+        void fetchCampaignById(campaign.id);
         return;
       }
       showApiErrorToast(response);
@@ -317,6 +320,8 @@ export function CampaignDetail({
           </Button>
         </div>
       </div>
+
+      <CampaignStatsSummary stats={campaign} targetLeads={campaign.targetLeads} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px,1fr]">
         <CampaignSettingsPanel

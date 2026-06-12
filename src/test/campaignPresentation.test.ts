@@ -1,7 +1,99 @@
 import { describe, expect, it } from "vitest";
-import { mapCampaignApiToDuplicateRequest } from "@/lib/campaignPresentation";
+import {
+  formatCampaignListLeadsValue,
+  getCampaignListProgressPercent,
+  mapCampaignApiToDetail,
+  mapCampaignApiToDuplicateRequest,
+  mapCampaignApiToListCard
+} from "@/lib/campaignPresentation";
 import { parseCreateCampaignPayload } from "@/validators/campaign";
 import type { CampaignApiModel } from "@/types";
+
+describe("mapCampaignApiToListCard", () => {
+  it("maps list stats from the campaigns API response", () => {
+    const card = mapCampaignApiToListCard({
+      id: "campaign-1",
+      user_id: "user-1",
+      name: "SaaS AI Workflow Acceleration",
+      goal: "Generate qualified leads",
+      target_zone: "US",
+      call_to_action: "Book a call",
+      run_mode: "auto",
+      lead_source: "both",
+      target_tone: "Professional",
+      mail_training_instruction: null,
+      mail_template_samples: [],
+      sender_display_name: null,
+      sender_address: null,
+      sender_phone: null,
+      target_leads: 10,
+      status: "active",
+      total_leads: 3,
+      pending_count: 2,
+      failed_count: 1,
+      sent_count: 0,
+      reply_rate: 0,
+      reply_rate_percent: 0,
+      created_at: "2026-01-01T00:00:00Z",
+      updated_at: "2026-01-02T00:00:00Z"
+    });
+
+    expect(card).toMatchObject({
+      targetLeads: 10,
+      totalLeads: 3,
+      sentCount: 0,
+      pendingCount: 2,
+      failedCount: 1,
+      replyRate: 0,
+      replyRatePercent: 0,
+      status: "running"
+    });
+    expect(formatCampaignListLeadsValue(card.totalLeads, card.targetLeads)).toBe("3/10");
+    expect(getCampaignListProgressPercent(card.totalLeads, card.targetLeads)).toBe(30);
+  });
+});
+
+describe("mapCampaignApiToDetail", () => {
+  it("maps read-only stats from the campaign detail API response", () => {
+    const detail = mapCampaignApiToDetail({
+      id: "campaign-detail-1",
+      user_id: "user-1",
+      name: "QA Testing",
+      goal: "Get Sales",
+      target_zone: "Asia",
+      call_to_action: "Book a call",
+      run_mode: "manual",
+      lead_source: "both",
+      target_tone: "Professional",
+      mail_training_instruction: "Professional",
+      mail_template_samples: [],
+      sender_display_name: "Hassan Ali",
+      sender_address: "Lahore",
+      sender_phone: "+15765576576",
+      target_leads: 100000,
+      status: "active",
+      total_leads: 20,
+      pending_count: 20,
+      failed_count: 0,
+      sent_count: 0,
+      reply_rate: 0,
+      reply_rate_percent: 0,
+      created_at: "2026-06-08T15:45:52.572379+00:00",
+      updated_at: "2026-06-08T15:57:58.073888+00:00"
+    });
+
+    expect(detail).toMatchObject({
+      totalLeads: 20,
+      pendingCount: 20,
+      failedCount: 0,
+      sentCount: 0,
+      replyRate: 0,
+      replyRatePercent: 0,
+      targetLeads: 100000,
+      status: "active"
+    });
+  });
+});
 
 describe("mapCampaignApiToDuplicateRequest", () => {
   it("sanitizes duplicate campaign payload fields so validation passes", () => {
