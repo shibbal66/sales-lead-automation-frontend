@@ -321,7 +321,7 @@ export function CampaignDetail({
         </div>
       </div>
 
-      <CampaignStatsSummary stats={campaign} targetLeads={campaign.targetLeads} />
+      <CampaignStatsSummary stats={campaign} />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px,1fr]">
         <CampaignSettingsPanel
