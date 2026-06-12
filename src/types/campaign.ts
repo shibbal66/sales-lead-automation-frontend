@@ -54,6 +54,9 @@ export interface CampaignApiModel {
   target_leads: number;
   status: CampaignStatus;
   /** Present on list responses (GET `/campaigns`). */
+  total_leads?: number;
+  pending_count?: number;
+  failed_count?: number;
   sent_count?: number;
   reply_rate?: number;
   reply_rate_percent?: number;

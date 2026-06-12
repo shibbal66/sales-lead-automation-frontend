@@ -69,6 +69,15 @@ export type CampaignDetailStatus = (typeof CAMPAIGN_DETAIL_STATUSES)[number];
 export type CampaignDetailRunMode = "automatic" | "manual";
 export type CampaignTone = (typeof CAMPAIGN_TONES)[number];
 
+export type CampaignStatsViewModel = {
+  totalLeads: number;
+  pendingCount: number;
+  failedCount: number;
+  sentCount: number;
+  replyRate: number;
+  replyRatePercent: number;
+};
+
 export type CampaignDetailViewModel = {
   id: string;
   name: string;
@@ -87,7 +96,7 @@ export type CampaignDetailViewModel = {
   targetLeads: number;
   createdAt: string;
   updatedAt: string;
-};
+} & CampaignStatsViewModel;
 
 export type CampaignListCardViewModel = {
   id: string;
@@ -96,9 +105,16 @@ export type CampaignListCardViewModel = {
   status: CampaignStatus;
   runMode: CampaignDetailRunMode;
   targetLeads: number;
-  emailsSent: number;
-  replyRate: number;
-};
+} & CampaignStatsViewModel;
+
+export function formatCampaignListLeadsValue(totalLeads: number, targetLeads: number): string {
+  return `${totalLeads.toLocaleString()}/${targetLeads.toLocaleString()}`;
+}
+
+export function getCampaignListProgressPercent(totalLeads: number, targetLeads: number): number {
+  if (!Number.isFinite(targetLeads) || targetLeads <= 0) return 0;
+  return Math.min(100, Math.max(0, Math.round((totalLeads / targetLeads) * 100)));
+}
 
 export function mapApiRunMode(runMode: CampaignApiModel["run_mode"]): CampaignDetailRunMode {
   return runMode === "auto" ? "automatic" : "manual";
@@ -112,6 +128,24 @@ export function mapApiStatusToDetailStatus(status: CampaignStatus): CampaignDeta
 
 export function mapApiStatusToListStatus(status: CampaignStatus): CampaignStatus {
   return status === "active" ? "running" : status;
+}
+
+export function mapCampaignApiToStats(campaign: CampaignApiModel): CampaignStatsViewModel {
+  const replyRate = campaign.reply_rate ?? 0;
+  const replyRatePercent =
+    campaign.reply_rate_percent ??
+    (campaign.reply_rate != null && campaign.reply_rate <= 1
+      ? Math.round(campaign.reply_rate * 100)
+      : campaign.reply_rate ?? 0);
+
+  return {
+    totalLeads: campaign.total_leads ?? 0,
+    pendingCount: campaign.pending_count ?? 0,
+    failedCount: campaign.failed_count ?? 0,
+    sentCount: campaign.sent_count ?? 0,
+    replyRate,
+    replyRatePercent
+  };
 }
 
 export function mapCampaignApiToDetail(campaign: CampaignApiModel): CampaignDetailViewModel {
@@ -135,7 +169,8 @@ export function mapCampaignApiToDetail(campaign: CampaignApiModel): CampaignDeta
     senderPhone: normalized.sender_phone ?? "",
     targetLeads: normalized.target_leads,
     createdAt: normalized.created_at,
-    updatedAt: normalized.updated_at
+    updatedAt: normalized.updated_at,
+    ...mapCampaignApiToStats(normalized)
   };
 }
 
@@ -178,10 +213,6 @@ export function mapCampaignApiToDuplicateRequest(
 }
 
 export function mapCampaignApiToListCard(campaign: CampaignApiModel): CampaignListCardViewModel {
-  const replyRate =
-    campaign.reply_rate_percent ??
-    (campaign.reply_rate != null ? Math.round(campaign.reply_rate * 100) : 0);
-
   return {
     id: campaign.id,
     name: campaign.name,
@@ -189,8 +220,7 @@ export function mapCampaignApiToListCard(campaign: CampaignApiModel): CampaignLi
     status: mapApiStatusToListStatus(campaign.status),
     runMode: mapApiRunMode(campaign.run_mode),
     targetLeads: campaign.target_leads,
-    emailsSent: campaign.sent_count ?? 0,
-    replyRate
+    ...mapCampaignApiToStats(campaign)
   };
 }
 
