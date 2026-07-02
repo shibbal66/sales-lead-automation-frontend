@@ -15,12 +15,18 @@ export type LeadListRowViewModel = {
   lastContacted: string;
 };
 
+/** Coerces API values (including null) to a trimmed string. */
+export function normalizeLeadText(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
 export function mapApiStatusToPresentation(
-  outreachStatus: string,
-  replyReceived: string
+  outreachStatus: string | null | undefined,
+  replyReceived: string | null | undefined
 ): LeadPresentationStatus {
-  const status = outreachStatus.toLowerCase();
-  const replied = replyReceived.toLowerCase() === "yes";
+  const status = normalizeLeadText(outreachStatus).toLowerCase();
+  const replied = normalizeLeadText(replyReceived).toLowerCase() === "yes";
   if (replied || status.includes("reply")) return "replied";
   if (status.includes("book")) return "booked";
   if (status.includes("unsub")) return "unsubscribed";
@@ -29,8 +35,8 @@ export function mapApiStatusToPresentation(
 }
 
 /** e.g. `master_operations` → `Master Operations` */
-export function formatSnakeCaseLabel(value: string): string {
-  const trimmed = value.trim();
+export function formatSnakeCaseLabel(value: string | null | undefined): string {
+  const trimmed = normalizeLeadText(value);
   if (!trimmed) return trimmed;
 
   return trimmed
@@ -41,16 +47,18 @@ export function formatSnakeCaseLabel(value: string): string {
 }
 
 export function mapLeadApiToListRow(lead: LeadApiModel): LeadListRowViewModel {
+  const nameFromParts = normalizeLeadText(`${lead.firstName ?? ""} ${lead.lastName ?? ""}`);
+
   return {
     id: String(lead.id),
-    name: lead.fullName || `${lead.firstName} ${lead.lastName}`.trim(),
-    company: lead.company,
-    email: lead.email,
-    title: lead.title || "—",
-    website: lead.domain || "—",
-    phone: lead.companyPhone || "—",
-    status: mapApiStatusToPresentation(lead.outreachStatus || "", lead.replyReceived || ""),
-    fitScore: lead.fitScore || "—",
+    name: normalizeLeadText(lead.fullName) || nameFromParts || "—",
+    company: normalizeLeadText(lead.company) || "—",
+    email: normalizeLeadText(lead.email),
+    title: normalizeLeadText(lead.title) || "—",
+    website: normalizeLeadText(lead.domain) || "—",
+    phone: normalizeLeadText(lead.companyPhone) || "—",
+    status: mapApiStatusToPresentation(lead.outreachStatus, lead.replyReceived),
+    fitScore: normalizeLeadText(lead.fitScore) || "—",
     lastContacted: formatRelativeDate(lead.emailSentDate || lead.created_at)
   };
 }

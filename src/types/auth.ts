@@ -96,12 +96,47 @@ export interface GoogleLinkStatusResponse {
   data?: GoogleLinkStatusData;
 }
 
+/** GET /auth/calendly/status — Calendly link state for the authenticated user. */
+export interface CalendlyLinkStatusData {
+  connected: boolean;
+  email: string | null;
+  schedulingUrl: string | null;
+  webhookActive: boolean;
+  connectedAt: string | null;
+}
+
+export interface CalendlyLinkStatusResponse {
+  success: boolean;
+  message?: string;
+  data?: CalendlyLinkStatusData;
+}
+
+export interface CalendlyConnectResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    authUrl: string;
+  };
+}
+
+export interface CalendlyDisconnectResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+}
+
+export interface CalendlyCallbackResponse {
+  success: boolean;
+  message?: string;
+  code?: string;
+}
 
 
 
 
 
-export type OtpPurpose = "email_verification" | "password_reset";
+
+export type OtpPurpose = "email_verify" | "password_reset";
 
 export interface ValidateOtpRequest {
   email: string;

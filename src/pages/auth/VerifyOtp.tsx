@@ -53,7 +53,7 @@ export default function VerifyOtp() {
       const validateResponse = await validateOtp({
         email: data.email,
         otp: data.otp,
-        purpose: "email_verification"
+        purpose: "email_verify"
       });
 
       if (!validateResponse.success || !validateResponse.data?.valid) {

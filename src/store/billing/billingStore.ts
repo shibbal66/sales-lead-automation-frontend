@@ -298,7 +298,10 @@ export const useBillingStore = create<BillingStoreState>((set, get) => ({
       const portalUrl = response.data?.url ?? response.data?.portalUrl;
       if (response.success && portalUrl) {
         if (response.message) showApiSuccessToast(response.message);
-        window.location.assign(portalUrl);
+        const portalTab = window.open(portalUrl, "_blank", "noopener,noreferrer");
+        if (!portalTab) {
+          showApiErrorToast("Could not open the billing portal. Allow pop-ups for this site and try again.");
+        }
         return;
       }
       showApiErrorToast(response);

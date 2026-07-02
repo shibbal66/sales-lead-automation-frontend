@@ -12,6 +12,7 @@ import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPasswordOtp from "./pages/auth/ResetPasswordOtp";
 import ResetPassword from "./pages/auth/ResetPassword";
 import GoogleCallback from "./pages/auth/GoogleCallback";
+import CalendlyCallback from "./pages/auth/CalendlyCallback";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
 import Campaigns from "./pages/Campaigns";
@@ -49,6 +50,7 @@ function AppRoutes() {
       <Route path="/reset-password-otp" element={<ResetPasswordOtp />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/google/callback" element={<GoogleCallback />} />
+      <Route path="/auth/calendly/callback" element={<CalendlyCallback />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
       <Route element={isAuthenticated ? <AppShell /> : <Navigate to="/login" replace />}>

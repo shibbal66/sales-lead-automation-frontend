@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "react-router-dom";
-import { GoogleLinkCard } from "@/components/auth/google-link-card";
+import { EmailAccountsSection } from "@/components/settings/email-accounts-section";
 import { BillingSection } from "@/components/settings/billing-section";
 import { DangerZoneSection } from "@/components/settings/danger-zone-section";
 import { NotificationsSection } from "@/components/settings/notifications-section";
@@ -163,8 +163,8 @@ export default function Settings() {
       );
     }
 
-    if (sectionId === "email") {
-      return <GoogleLinkCard linkStatus={googleLink} statusLoading={profileLoading} />;
+    if (sectionId === "social") {
+      return <EmailAccountsSection googleLink={googleLink} profileLoading={profileLoading} />;
     }
 
     if (sectionId === "billing") {
