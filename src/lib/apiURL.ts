@@ -7,7 +7,6 @@ export const END_POINT = {
     googleToken: "/auth/google/token",
     googleStatus: "/auth/google/status",
     calendlyConnect: "/auth/calendly/connect",
-    calendlyCallback: "/auth/calendly/callback",
     calendlyStatus: "/auth/calendly/status",
     calendlyDisconnect: "/auth/calendly/disconnect",
     refresh: "/auth/refresh",

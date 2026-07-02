@@ -29,7 +29,11 @@ const SETTINGS_SECTION_IDS = new Set<SettingsSectionId>(
   SETTINGS_SECTIONS.map((section) => section.id)
 );
 
-export function settingsSectionFromTab(tab: string | null): SettingsSectionId {
+export function settingsSectionFromTab(
+  tab: string | null,
+  calendlyResult: string | null = null
+): SettingsSectionId {
+  if (calendlyResult) return "social";
   if (tab === "email") return "social";
   if (tab && SETTINGS_SECTION_IDS.has(tab as SettingsSectionId)) {
     return tab as SettingsSectionId;
