@@ -6,28 +6,26 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCalendlyLinkStatus } from "@/services/auth/authServices";
 import {
+  applyCalendlyOAuthReturn,
+  clearCalendlyOAuthReturnParams,
   disconnectCalendlyAccount,
-  formatCalendlyCallbackError,
+  parseCalendlyOAuthReturn,
   startCalendlyOAuthRedirect
 } from "@/lib/calendlyAuth";
-import { formatCalendlyLinkDetail, parseCalendlyLinkStatus } from "@/lib/calendlyLinkStatus";
-import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
+import {
+  EMPTY_CALENDLY_LINK_STATUS,
+  formatCalendlyLinkDetail,
+  parseCalendlyLinkStatus
+} from "@/lib/calendlyLinkStatus";
+import { showApiErrorToast } from "@/lib/apiToast";
 import type { CalendlyLinkStatusData } from "@/types";
-
-const EMPTY_STATUS: CalendlyLinkStatusData = {
-  connected: false,
-  email: null,
-  schedulingUrl: null,
-  webhookActive: false,
-  connectedAt: null
-};
 
 export function CalendlyLinkCard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [status, setStatus] = useState<CalendlyLinkStatusData>(EMPTY_STATUS);
+  const [status, setStatus] = useState<CalendlyLinkStatusData>(EMPTY_CALENDLY_LINK_STATUS);
   const [detail, setDetail] = useState("");
   const oauthResultHandled = useRef(false);
 
@@ -39,7 +37,7 @@ export function CalendlyLinkCard() {
       setStatus(parsed);
       setDetail(formatCalendlyLinkDetail(parsed, response.message));
     } catch (error) {
-      setStatus(EMPTY_STATUS);
+      setStatus(EMPTY_CALENDLY_LINK_STATUS);
       setDetail("Could not load Calendly link status.");
       showApiErrorToast(error);
     } finally {
@@ -54,22 +52,16 @@ export function CalendlyLinkCard() {
   useEffect(() => {
     if (oauthResultHandled.current) return;
 
-    const calendly = searchParams.get("calendly");
-    if (!calendly) return;
+    const returnInfo = parseCalendlyOAuthReturn(searchParams);
+    if (!returnInfo) return;
 
     oauthResultHandled.current = true;
 
-    if (calendly === "connected") {
-      showApiSuccessToast("Calendly account connected.");
-      void loadStatus();
-    } else {
-      showApiErrorToast(formatCalendlyCallbackError(searchParams.get("message")));
-    }
+    applyCalendlyOAuthReturn(returnInfo, {
+      onConnected: () => void loadStatus()
+    });
 
-    const next = new URLSearchParams(searchParams);
-    next.delete("calendly");
-    next.delete("message");
-    setSearchParams(next, { replace: true });
+    setSearchParams(clearCalendlyOAuthReturnParams(searchParams), { replace: true });
   }, [loadStatus, searchParams, setSearchParams]);
 
   const handleConnect = () => {

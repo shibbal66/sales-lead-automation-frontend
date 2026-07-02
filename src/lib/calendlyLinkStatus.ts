@@ -4,6 +4,14 @@ import type {
   CalendlyLinkStatusResponse
 } from "@/types";
 
+export const EMPTY_CALENDLY_LINK_STATUS: CalendlyLinkStatusData = {
+  connected: false,
+  email: null,
+  schedulingUrl: null,
+  webhookActive: false,
+  connectedAt: null
+};
+
 export function parseCalendlyConnectAuthUrl(response: CalendlyConnectResponse): string | null {
   if (!response.success || !response.data) return null;
 
@@ -15,21 +23,21 @@ export function parseCalendlyConnectAuthUrl(response: CalendlyConnectResponse): 
 
 export function parseCalendlyLinkStatus(response: CalendlyLinkStatusResponse): CalendlyLinkStatusData {
   if (!response.success || !response.data) {
-    return {
-      connected: false,
-      email: null,
-      schedulingUrl: null,
-      webhookActive: false,
-      connectedAt: null
-    };
+    return EMPTY_CALENDLY_LINK_STATUS;
   }
 
+  const raw = response.data as CalendlyLinkStatusData & {
+    scheduling_url?: string | null;
+    webhook_active?: boolean;
+    connected_at?: string | null;
+  };
+
   return {
-    connected: Boolean(response.data.connected),
-    email: response.data.email ?? null,
-    schedulingUrl: response.data.schedulingUrl ?? null,
-    webhookActive: Boolean(response.data.webhookActive),
-    connectedAt: response.data.connectedAt ?? null
+    connected: Boolean(raw.connected),
+    email: raw.email ?? null,
+    schedulingUrl: raw.schedulingUrl ?? raw.scheduling_url ?? null,
+    webhookActive: Boolean(raw.webhookActive ?? raw.webhook_active),
+    connectedAt: raw.connectedAt ?? raw.connected_at ?? null
   };
 }
 
