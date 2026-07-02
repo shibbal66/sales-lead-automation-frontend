@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +12,7 @@ import ForgotPassword from "./pages/auth/ForgotPassword";
 import ResetPasswordOtp from "./pages/auth/ResetPasswordOtp";
 import ResetPassword from "./pages/auth/ResetPassword";
 import GoogleCallback from "./pages/auth/GoogleCallback";
+import CalendlyCallback from "./pages/auth/CalendlyCallback";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
 import Campaigns from "./pages/Campaigns";
@@ -25,6 +26,15 @@ import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import TermsOfService from "./pages/legal/TermsOfService";
 import NotFound from "./pages/NotFound.tsx";
 import { useAuthStore } from "@/store/auth/authStore";
+import { CALENDLY_SETTINGS_TAB } from "@/lib/calendlyAuth";
+
+/** API post-OAuth redirect lands here; forward to Settings → Social Accounts. */
+function SettingsIntegrationsRedirect() {
+  const { search } = useLocation();
+  const params = new URLSearchParams(search);
+  params.set("tab", CALENDLY_SETTINGS_TAB);
+  return <Navigate to={`/settings?${params.toString()}`} replace />;
+}
 
 function AppRoutes() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -49,6 +59,7 @@ function AppRoutes() {
       <Route path="/reset-password-otp" element={<ResetPasswordOtp />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/google/callback" element={<GoogleCallback />} />
+      <Route path="/auth/calendly/callback" element={<CalendlyCallback />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
       <Route element={isAuthenticated ? <AppShell /> : <Navigate to="/login" replace />}>
@@ -60,6 +71,7 @@ function AppRoutes() {
         <Route path="/meetings" element={<Meetings />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/integrations" element={<SettingsIntegrationsRedirect />} />
         <Route path="/billing/success" element={<BillingSuccess />} />
         <Route path="/billing/cancel" element={<BillingCancel />} />
       </Route>

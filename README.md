@@ -173,6 +173,7 @@ Server-only keys in `.env.example` (`FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_K
 | `/login`, `/signup` | Public | Authentication |
 | `/verify-otp`, `/forgot-password`, `/reset-password` | Public | Account verification and password flows |
 | `/auth/google/callback` | Public | Google OAuth callback |
+| `/auth/calendly/callback` | Public | Calendly OAuth passthrough → API callback |
 | `/dashboard`, `/leads`, `/campaigns`, … | Protected | App shell (requires auth) |
 | `/billing/success`, `/billing/cancel` | Protected | Stripe checkout return handlers |
 
