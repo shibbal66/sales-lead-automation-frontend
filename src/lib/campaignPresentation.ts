@@ -116,6 +116,20 @@ export function getCampaignListProgressPercent(totalLeads: number, targetLeads: 
   return Math.min(100, Math.max(0, Math.round((totalLeads / targetLeads) * 100)));
 }
 
+export function getCampaignCompletedLeadCount(stats: CampaignStatsViewModel): number {
+  return Math.max(0, stats.totalLeads - stats.pendingCount);
+}
+
+export function getCampaignLeadCompletionPercent(stats: CampaignStatsViewModel): number {
+  if (!Number.isFinite(stats.totalLeads) || stats.totalLeads <= 0) return 0;
+  const completed = getCampaignCompletedLeadCount(stats);
+  return Math.min(100, Math.max(0, Math.round((completed / stats.totalLeads) * 100)));
+}
+
+export function formatCampaignCompletedLeadsValue(completed: number, total: number): string {
+  return `${completed.toLocaleString()}/${total.toLocaleString()}`;
+}
+
 export function mapApiRunMode(runMode: CampaignApiModel["run_mode"]): CampaignDetailRunMode {
   return runMode === "auto" ? "automatic" : "manual";
 }

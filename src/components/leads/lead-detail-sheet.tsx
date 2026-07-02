@@ -7,7 +7,7 @@ import { StatusPill } from "@/components/status-pill";
 import { UserProfileAvatar } from "@/components/user-profile-avatar";
 import { LeadDetailSheetSkeleton } from "@/components/skeletons/leads/lead-detail-sheet-skeleton";
 import type { LeadApiModel } from "@/types";
-import { formatSnakeCaseLabel, type LeadListRowViewModel } from "@/lib/leadPresentation";
+import { formatSnakeCaseLabel, normalizeLeadText, type LeadListRowViewModel } from "@/lib/leadPresentation";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { formatDateTime, formatRelativeDate, hasPresentableDate } from "@/lib/dateFormatting";
 import { cn } from "@/lib/utils";
@@ -17,8 +17,8 @@ function isLeadValueEmpty(value: unknown): boolean {
   return String(value).trim() === "";
 }
 
-function formatLeadDateValue(value: string): string {
-  return hasPresentableDate(value) ? formatDateTime(value) : String(value).trim();
+function formatLeadDateValue(value: string | null | undefined): string {
+  return hasPresentableDate(value) ? formatDateTime(value) : normalizeLeadText(value);
 }
 
 function DetailRow({
@@ -30,7 +30,7 @@ function DetailRow({
   className
 }: {
   label: string;
-  value: string;
+  value: string | null | undefined;
   multiline?: boolean;
   href?: boolean;
   /** When true, row is shown even if value is empty (e.g. numeric id). */
@@ -38,7 +38,7 @@ function DetailRow({
   className?: string;
 }) {
   if (!alwaysShow && isLeadValueEmpty(value)) return null;
-  const display = alwaysShow && isLeadValueEmpty(value) ? "—" : String(value).trim();
+  const display = alwaysShow && isLeadValueEmpty(value) ? "—" : normalizeLeadText(value);
   const isLink = Boolean(href && display && display !== "—" && /^https?:\/\//i.test(display));
   const useCapitalize = Boolean(className?.includes("capitalize"));
   const displayText =
@@ -195,13 +195,15 @@ export function LeadDetailSheet({
                   </p>
                 ) : null}
                 {!isLeadValueEmpty(selectedLead.email) ? (
-                  <p className="mt-2 truncate text-sm font-medium text-brand-text">{selectedLead.email.trim()}</p>
+                  <p className="mt-2 truncate text-sm font-medium text-brand-text">
+                    {normalizeLeadText(selectedLead.email)}
+                  </p>
                 ) : null}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <StatusPill status={selectedLeadRow.status} />
                   {!isLeadValueEmpty(selectedLead.outreachStatus) ? (
                     <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-0.5 text-[10px] font-semibold text-brand-text">
-                      Outreach: {selectedLead.outreachStatus.trim()}
+                      Outreach: {normalizeLeadText(selectedLead.outreachStatus)}
                     </span>
                   ) : null}
                 </div>
@@ -312,7 +314,7 @@ export function LeadDetailSheet({
                             Email body
                           </p>
                           <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                            {String(selectedLead.emailBody ?? "").trim()}
+                            {normalizeLeadText(selectedLead.emailBody)}
                           </p>
                         </div>
                       ) : null}
@@ -346,7 +348,7 @@ export function LeadDetailSheet({
                             LinkedIn message
                           </p>
                           <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                            {String(selectedLead.linkedinMessage ?? "").trim()}
+                            {normalizeLeadText(selectedLead.linkedinMessage)}
                           </p>
                         </div>
                       ) : null}
@@ -371,7 +373,7 @@ export function LeadDetailSheet({
                             Fit reason
                           </p>
                           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                            {String(selectedLead.fitReason ?? "").trim()}
+                            {normalizeLeadText(selectedLead.fitReason)}
                           </p>
                         </div>
                       ) : null}
@@ -387,7 +389,7 @@ export function LeadDetailSheet({
                             <span className="absolute -left-[22px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
                             <p className="text-sm font-medium text-foreground">{item.label}</p>
                             <p className="text-xs text-muted-foreground">{formatLeadDateValue(String(item.value))}</p>
-                            {item.value?.trim() && hasPresentableDate(item.value) ? (
+                            {item.value && hasPresentableDate(item.value) ? (
                               <p className="mt-0.5 text-[10px] text-brand-text/80">
                                 {formatRelativeDate(item.value)}
                               </p>

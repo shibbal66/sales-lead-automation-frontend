@@ -1,14 +1,14 @@
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
-  formatCampaignListLeadsValue,
-  getCampaignListProgressPercent,
+  formatCampaignCompletedLeadsValue,
+  getCampaignCompletedLeadCount,
+  getCampaignLeadCompletionPercent,
   type CampaignStatsViewModel
 } from "@/lib/campaignPresentation";
 
 type CampaignStatsSummaryProps = {
   stats: CampaignStatsViewModel;
-  targetLeads?: number;
   className?: string;
 };
 
@@ -21,11 +21,10 @@ const STAT_ITEMS = [
   { key: "replyRate", label: "Reply rate" }
 ] as const;
 
-export function CampaignStatsSummary({ stats, targetLeads, className }: CampaignStatsSummaryProps) {
-  const progress =
-    typeof targetLeads === "number"
-      ? getCampaignListProgressPercent(stats.totalLeads, targetLeads)
-      : null;
+export function CampaignStatsSummary({ stats, className }: CampaignStatsSummaryProps) {
+  const completedLeads = getCampaignCompletedLeadCount(stats);
+  const progress = getCampaignLeadCompletionPercent(stats);
+  const showProgress = stats.totalLeads > 0;
 
   return (
     <Card className={className ?? "p-4 shadow-card"}>
@@ -47,10 +46,12 @@ export function CampaignStatsSummary({ stats, targetLeads, className }: Campaign
           );
         })}
       </div>
-      {progress != null ? (
+      {showProgress ? (
         <div className="mt-4">
           <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
-            <span>Leads filled ({formatCampaignListLeadsValue(stats.totalLeads, targetLeads)})</span>
+            <span>
+              Leads completed ({formatCampaignCompletedLeadsValue(completedLeads, stats.totalLeads)})
+            </span>
             <span>{progress}%</span>
           </div>
           <Progress value={progress} className="h-1.5" />

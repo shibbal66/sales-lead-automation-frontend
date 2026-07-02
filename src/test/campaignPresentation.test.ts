@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   formatCampaignListLeadsValue,
+  getCampaignCompletedLeadCount,
+  getCampaignLeadCompletionPercent,
   getCampaignListProgressPercent,
   mapCampaignApiToDetail,
   mapCampaignApiToDuplicateRequest,
@@ -50,6 +52,34 @@ describe("mapCampaignApiToListCard", () => {
     });
     expect(formatCampaignListLeadsValue(card.totalLeads, card.targetLeads)).toBe("3/10");
     expect(getCampaignListProgressPercent(card.totalLeads, card.targetLeads)).toBe(30);
+    expect(getCampaignCompletedLeadCount(card)).toBe(1);
+    expect(getCampaignLeadCompletionPercent(card)).toBe(33);
+  });
+});
+
+describe("getCampaignLeadCompletionPercent", () => {
+  it("measures completed leads against total assigned leads", () => {
+    expect(
+      getCampaignLeadCompletionPercent({
+        totalLeads: 20,
+        pendingCount: 20,
+        failedCount: 0,
+        sentCount: 0,
+        replyRate: 0,
+        replyRatePercent: 0
+      })
+    ).toBe(0);
+
+    expect(
+      getCampaignLeadCompletionPercent({
+        totalLeads: 20,
+        pendingCount: 5,
+        failedCount: 2,
+        sentCount: 13,
+        replyRate: 0,
+        replyRatePercent: 0
+      })
+    ).toBe(75);
   });
 });
 

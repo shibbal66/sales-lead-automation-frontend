@@ -25,8 +25,9 @@ import { CampaignsGridSkeleton } from "@/components/skeletons/campaigns/campaign
 import { useCampaignStore } from "@/store/campaign/campaignStore";
 import {
   mapCampaignApiToDetail,
-  formatCampaignListLeadsValue,
-  getCampaignListProgressPercent,
+  formatCampaignCompletedLeadsValue,
+  getCampaignCompletedLeadCount,
+  getCampaignLeadCompletionPercent,
   mapCampaignApiToDuplicateRequest,
   mapCampaignApiToListCard,
   mapCreateCampaignZodErrors
@@ -146,7 +147,8 @@ export default function CampaignsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {isFetching && allCampaigns.length === 0 ? <CampaignsGridSkeleton count={6} /> : null}
         {allCampaigns.map((c, idx) => {
-          const pct = getCampaignListProgressPercent(c.totalLeads, c.targetLeads);
+          const completedLeads = getCampaignCompletedLeadCount(c);
+          const pct = getCampaignLeadCompletionPercent(c);
           return (
             <Card key={c.id} className="flex flex-col gap-3 p-5 shadow-card transition-shadow hover:shadow-elevated">
               <div className="flex items-start justify-between gap-2">
@@ -227,15 +229,17 @@ export default function CampaignsPage() {
                 </div>
               </div>
 
-              <div>
-                <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
-                  <span>
-                    Leads filled ({formatCampaignListLeadsValue(c.totalLeads, c.targetLeads)})
-                  </span>
-                  <span>{pct}%</span>
+              {c.totalLeads > 0 ? (
+                <div>
+                  <div className="mb-1 flex justify-between text-[11px] text-muted-foreground">
+                    <span>
+                      Leads completed ({formatCampaignCompletedLeadsValue(completedLeads, c.totalLeads)})
+                    </span>
+                    <span>{pct}%</span>
+                  </div>
+                  <Progress value={pct} className="h-1.5" />
                 </div>
-                <Progress value={pct} className="h-1.5" />
-              </div>
+              ) : null}
 
               <Button variant="outline" className="mt-1" onClick={() => navigate(`/campaigns/${c.id}`)}>
                 View Campaign

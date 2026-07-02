@@ -3,7 +3,7 @@ import {
   Bell,
   CreditCard,
   KeyRound,
-  Mail,
+  Share2,
   User,
   type LucideIcon
 } from "lucide-react";
@@ -12,7 +12,7 @@ export const SETTINGS_SECTIONS = [
   { id: "profile", label: "Profile", icon: User },
   { id: "password", label: "Password", icon: KeyRound },
   { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "email", label: "Email Accounts", icon: Mail },
+  { id: "social", label: "Social Accounts", icon: Share2 },
   { id: "billing", label: "Subscription & Billing", icon: CreditCard },
   { id: "danger", label: "Danger Zone", icon: AlertTriangle }
 ] as const;
@@ -30,6 +30,7 @@ const SETTINGS_SECTION_IDS = new Set<SettingsSectionId>(
 );
 
 export function settingsSectionFromTab(tab: string | null): SettingsSectionId {
+  if (tab === "email") return "social";
   if (tab && SETTINGS_SECTION_IDS.has(tab as SettingsSectionId)) {
     return tab as SettingsSectionId;
   }

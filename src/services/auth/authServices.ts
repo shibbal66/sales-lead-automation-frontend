@@ -7,6 +7,10 @@ import type {
   LoginResponse,
   GoogleCallbackResponse,
   GoogleLinkStatusResponse,
+  CalendlyCallbackResponse,
+  CalendlyConnectResponse,
+  CalendlyDisconnectResponse,
+  CalendlyLinkStatusResponse,
   GoogleTokenExchangeRequest,
   GoogleTokenExchangeResponse,
   ValidateOtpRequest,
@@ -49,6 +53,28 @@ export function exchangeGoogleIdToken(body: GoogleTokenExchangeRequest) {
 /** Google link status for the current user (GET /auth/google/status, bearer required). */
 export function getGoogleLinkStatus() {
   return apiInvoker<GoogleLinkStatusResponse>(END_POINT.auth.googleStatus, "GET");
+}
+
+/** Calendly OAuth start URL (GET /auth/calendly/connect?format=json, bearer required). */
+export function getCalendlyConnectUrl() {
+  return apiInvoker<CalendlyConnectResponse>(END_POINT.auth.calendlyConnect, "GET", undefined, {
+    format: "json"
+  });
+}
+
+/** Complete Calendly OAuth after redirect (GET /auth/calendly/callback?code=&state=). */
+export function calendlyOAuthCallback(params: { code?: string; state?: string; error?: string }) {
+  return apiInvoker<CalendlyCallbackResponse>(END_POINT.auth.calendlyCallback, "GET", undefined, params);
+}
+
+/** Calendly link status for the current user (GET /auth/calendly/status, bearer required). */
+export function getCalendlyLinkStatus() {
+  return apiInvoker<CalendlyLinkStatusResponse>(END_POINT.auth.calendlyStatus, "GET");
+}
+
+/** Disconnect Calendly for the current user (DELETE /auth/calendly/disconnect, bearer required). */
+export function disconnectCalendly() {
+  return apiInvoker<CalendlyDisconnectResponse>(END_POINT.auth.calendlyDisconnect, "DELETE");
 }
 
 export function signup(payload: SignupRequest) {
