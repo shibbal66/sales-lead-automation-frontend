@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getCalendlyLinkStatus } from "@/services/auth/authServices";
-import { disconnectCalendlyAccount, startCalendlyOAuthRedirect } from "@/lib/calendlyAuth";
+import {
+  disconnectCalendlyAccount,
+  formatCalendlyCallbackError,
+  startCalendlyOAuthRedirect
+} from "@/lib/calendlyAuth";
 import { formatCalendlyLinkDetail, parseCalendlyLinkStatus } from "@/lib/calendlyLinkStatus";
 import { showApiErrorToast, showApiSuccessToast } from "@/lib/apiToast";
 import type { CalendlyLinkStatusData } from "@/types";
@@ -25,6 +29,7 @@ export function CalendlyLinkCard() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [status, setStatus] = useState<CalendlyLinkStatusData>(EMPTY_STATUS);
   const [detail, setDetail] = useState("");
+  const oauthResultHandled = useRef(false);
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -47,18 +52,23 @@ export function CalendlyLinkCard() {
   }, [loadStatus]);
 
   useEffect(() => {
+    if (oauthResultHandled.current) return;
+
     const calendly = searchParams.get("calendly");
     if (!calendly) return;
+
+    oauthResultHandled.current = true;
 
     if (calendly === "connected") {
       showApiSuccessToast("Calendly account connected.");
       void loadStatus();
-    } else if (calendly === "error") {
-      showApiErrorToast("Could not connect Calendly account.");
+    } else {
+      showApiErrorToast(formatCalendlyCallbackError(searchParams.get("message")));
     }
 
     const next = new URLSearchParams(searchParams);
     next.delete("calendly");
+    next.delete("message");
     setSearchParams(next, { replace: true });
   }, [loadStatus, searchParams, setSearchParams]);
 

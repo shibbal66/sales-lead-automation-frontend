@@ -57,7 +57,10 @@ export default function Settings() {
   const deleteAccount = useAuthStore((state) => state.deleteAccount);
   const accountDeleting = useAuthStore((state) => state.accountDeleting);
 
-  const section = settingsSectionFromTab(searchParams.get("tab"));
+  const section = settingsSectionFromTab(
+    searchParams.get("tab"),
+    searchParams.get("calendly")
+  );
   const [mobileOpenSection, setMobileOpenSection] = useState<SettingsSectionId | null>(section);
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferencesFormState>(() =>
     user ? notificationPreferencesFromAuthUser(user) : { notificationsEnabled: true }

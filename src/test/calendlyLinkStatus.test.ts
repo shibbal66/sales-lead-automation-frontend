@@ -1,9 +1,22 @@
 import { describe, expect, it } from "vitest";
+import { formatCalendlyCallbackError } from "@/lib/calendlyAuth";
 import {
   formatCalendlyLinkDetail,
   parseCalendlyConnectAuthUrl,
   parseCalendlyLinkStatus
 } from "@/lib/calendlyLinkStatus";
+
+describe("formatCalendlyCallbackError", () => {
+  it("maps known backend error codes", () => {
+    expect(formatCalendlyCallbackError("connect_failed")).toBe(
+      "Could not connect your Calendly account. Please try again."
+    );
+  });
+
+  it("falls back when message is missing", () => {
+    expect(formatCalendlyCallbackError(null)).toBe("Could not connect Calendly account.");
+  });
+});
 
 describe("parseCalendlyConnectAuthUrl", () => {
   it("reads authUrl from the connect API response", () => {

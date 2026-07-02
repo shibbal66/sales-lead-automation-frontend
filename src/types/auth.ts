@@ -125,12 +125,6 @@ export interface CalendlyDisconnectResponse {
   code?: string;
 }
 
-export interface CalendlyCallbackResponse {
-  success: boolean;
-  message?: string;
-  code?: string;
-}
-
 
 
 

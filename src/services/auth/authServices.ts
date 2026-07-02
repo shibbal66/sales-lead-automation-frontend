@@ -7,7 +7,6 @@ import type {
   LoginResponse,
   GoogleCallbackResponse,
   GoogleLinkStatusResponse,
-  CalendlyCallbackResponse,
   CalendlyConnectResponse,
   CalendlyDisconnectResponse,
   CalendlyLinkStatusResponse,
@@ -60,11 +59,6 @@ export function getCalendlyConnectUrl() {
   return apiInvoker<CalendlyConnectResponse>(END_POINT.auth.calendlyConnect, "GET", undefined, {
     format: "json"
   });
-}
-
-/** Complete Calendly OAuth after redirect (GET /auth/calendly/callback?code=&state=). */
-export function calendlyOAuthCallback(params: { code?: string; state?: string; error?: string }) {
-  return apiInvoker<CalendlyCallbackResponse>(END_POINT.auth.calendlyCallback, "GET", undefined, params);
 }
 
 /** Calendly link status for the current user (GET /auth/calendly/status, bearer required). */
